@@ -100,6 +100,20 @@ const COLS_PER_ROW = 12
 @onready var reset_layout_button = $UIPanel/UIArea/LayoutButtons/ResetLayoutButton
 @onready var pause_button = $UIPanel/UIArea/LayoutButtons/PauseButton
 
+# Result Popup References
+@onready var result_popup = $ResultPopup
+@onready var result_title = $ResultPopup/PopupContent/ResultTitle
+@onready var xp_label = $ResultPopup/PopupContent/XPLabel
+@onready var gold_label = $ResultPopup/PopupContent/GoldLabel
+@onready var continue_button = $ResultPopup/PopupContent/ContinueButton
+
+# UI Toggle Button
+@onready var hide_ui_button = $HideUIButton
+@onready var layout_buttons_container = $UIPanel/UIArea/LayoutButtons
+
+# Target Cursor
+@onready var target_cursor = $TargetCursor
+
 # UI References - Draggable Panels
 @onready var enemy_panel_1 = $BattleContainer/CombatArea/EnemyArea/EnemyPanel1
 @onready var enemy_panel_2 = $BattleContainer/CombatArea/EnemyArea/EnemyPanel2
@@ -117,26 +131,27 @@ const COLS_PER_ROW = 12
 
 # Default panel positions (for reset) - 2 rows of 3 mirrored formation (6v6)
 # NOTE: Positions are LOCAL to parent container (EnemyArea or PlayerArea), not global viewport
+# PERFECTLY CALCULATED for symmetry and proper spacing
 const DEFAULT_POSITIONS = {
 	# LEFT SIDE (EnemyArea) - Front row of 3, Back row of 3
 	# Enemies face RIGHT toward player/allies
-	# Local coords within 600px wide EnemyArea
-	"enemy_panel_1": {"position": Vector2(240, 60), "size": Vector2(170, 290)},    # Front top
-	"enemy_panel_2": {"position": Vector2(240, 220), "size": Vector2(170, 290)},   # Front middle
-	"enemy_panel_3": {"position": Vector2(240, 380), "size": Vector2(170, 290)},   # Front bottom
-	"enemy_panel_4": {"position": Vector2(60, 60), "size": Vector2(170, 290)},     # Back top
-	"enemy_panel_5": {"position": Vector2(60, 220), "size": Vector2(170, 290)},    # Back middle
-	"enemy_panel_6": {"position": Vector2(60, 380), "size": Vector2(170, 290)},    # Back bottom
+	# Local coords within 600px wide EnemyArea - SYMMETRIC layout
+	"enemy_panel_1": {"position": Vector2(365, 50), "size": Vector2(170, 290)},    # Front top
+	"enemy_panel_2": {"position": Vector2(365, 210), "size": Vector2(170, 290)},   # Front middle
+	"enemy_panel_3": {"position": Vector2(365, 370), "size": Vector2(170, 290)},   # Front bottom
+	"enemy_panel_4": {"position": Vector2(65, 50), "size": Vector2(170, 290)},     # Back top
+	"enemy_panel_5": {"position": Vector2(65, 210), "size": Vector2(170, 290)},    # Back middle
+	"enemy_panel_6": {"position": Vector2(65, 370), "size": Vector2(170, 290)},    # Back bottom
 
 	# RIGHT SIDE (PlayerArea/Allies) - Front row of 3, Back row of 3 (MIRRORED)
 	# Player/Allies face LEFT toward enemies
-	# Local coords within 300px wide PlayerArea (mirrored from enemy positions)
-	"ally_panel_1": {"position": Vector2(10, 60), "size": Vector2(170, 320)},      # Front top (closer to enemies)
-	"ally_panel_2": {"position": Vector2(10, 220), "size": Vector2(170, 320)},     # Front middle
-	"ally_panel_3": {"position": Vector2(10, 380), "size": Vector2(170, 320)},     # Front bottom
-	"ally_panel_4": {"position": Vector2(120, 60), "size": Vector2(170, 320)},     # Back top (further from enemies, x+170=290 fits in 300px)
-	"ally_panel_5": {"position": Vector2(120, 220), "size": Vector2(170, 320)},    # Back middle
-	"ally_panel_6": {"position": Vector2(120, 380), "size": Vector2(170, 320)},    # Back bottom
+	# Local coords within 300px wide PlayerArea - Properly spaced with margins
+	"ally_panel_1": {"position": Vector2(15, 50), "size": Vector2(170, 320)},      # Front top
+	"ally_panel_2": {"position": Vector2(15, 210), "size": Vector2(170, 320)},     # Front middle
+	"ally_panel_3": {"position": Vector2(15, 370), "size": Vector2(170, 320)},     # Front bottom
+	"ally_panel_4": {"position": Vector2(115, 50), "size": Vector2(170, 320)},     # Back top
+	"ally_panel_5": {"position": Vector2(115, 210), "size": Vector2(170, 320)},    # Back middle
+	"ally_panel_6": {"position": Vector2(115, 370), "size": Vector2(170, 320)},    # Back bottom
 
 	"ui_panel": {"position": Vector2(300, 500), "size": Vector2(680, 180)}
 }
@@ -149,6 +164,13 @@ var turn_order: Array = []
 var current_turn_index: int = 0
 var is_player_turn: bool = false
 var is_paused: bool = true  # Start paused for manual positioning
+var turn_timer: float = 0.0
+const TURN_TIME_LIMIT: float = 10.0  # 10 seconds per turn
+var is_player_defending: bool = false  # Player is in defensive stance (takes 50% damage)
+var is_animating_attack: bool = false  # Prevent position enforcement during attack animations
+
+# First strike system
+var player_initiated: bool = true  # Who started the battle? true = player attacked first, false = enemy ambushed
 
 # Manual positioning system
 var selected_panel: Panel = null
@@ -158,9 +180,14 @@ var all_battle_panels: Array = []
 var selected_button_index: int = 0
 var action_buttons: Array = []
 
-func _ready():
-	print("Battle window initialized")
+# UI visibility toggle
+var ui_elements_hidden: bool = true  # Start with UI hidden (clean battle view)
 
+# Floating HP/MP/Energy overlays for gameplay mode (combined bars)
+var enemy_stat_overlays: Array = []
+var ally_stat_overlays: Array = []
+
+func _ready():
 	# Load atlas textures
 	load_sprite_atlases()
 
@@ -190,6 +217,14 @@ func _ready():
 		pause_button.pressed.connect(_on_pause_pressed)
 		update_pause_button_text()
 
+	# Connect result popup button
+	if continue_button:
+		continue_button.pressed.connect(_on_continue_button_pressed)
+
+	# Connect hide UI button
+	if hide_ui_button:
+		hide_ui_button.pressed.connect(_on_hide_ui_pressed)
+
 	# Setup manual positioning system
 	setup_manual_positioning()
 
@@ -197,61 +232,171 @@ func _ready():
 	setup_battle()
 
 	# Link enemy panels to character data for animation cycling
-	# Enemies on LEFT side face RIGHT toward player/allies
+	# All characters face DOWN by default
 	enemy_panel_1.character_data = enemy_squad[0] if enemy_squad.size() > 0 else {}
 	enemy_panel_1.battle_window = self
-	enemy_panel_1.current_direction = "right"
-	enemy_panel_1.apply_character_animation("walk_right_1")
+	enemy_panel_1.current_direction = "down"
+	enemy_panel_1.apply_character_animation("walk_down_1")
+	enemy_panel_1.gui_input.connect(_on_enemy_panel_clicked.bind(0))
+
 	enemy_panel_2.character_data = enemy_squad[1] if enemy_squad.size() > 1 else {}
 	enemy_panel_2.battle_window = self
-	enemy_panel_2.current_direction = "right"
-	enemy_panel_2.apply_character_animation("walk_right_1")
+	enemy_panel_2.current_direction = "down"
+	enemy_panel_2.apply_character_animation("walk_down_1")
+	enemy_panel_2.gui_input.connect(_on_enemy_panel_clicked.bind(1))
+
 	enemy_panel_3.character_data = enemy_squad[2] if enemy_squad.size() > 2 else {}
 	enemy_panel_3.battle_window = self
-	enemy_panel_3.current_direction = "right"
-	enemy_panel_3.apply_character_animation("walk_right_1")
+	enemy_panel_3.current_direction = "down"
+	enemy_panel_3.apply_character_animation("walk_down_1")
+	enemy_panel_3.gui_input.connect(_on_enemy_panel_clicked.bind(2))
+
 	enemy_panel_4.character_data = enemy_squad[3] if enemy_squad.size() > 3 else {}
 	enemy_panel_4.battle_window = self
-	enemy_panel_4.current_direction = "right"
-	enemy_panel_4.apply_character_animation("walk_right_1")
+	enemy_panel_4.current_direction = "down"
+	enemy_panel_4.apply_character_animation("walk_down_1")
+	enemy_panel_4.gui_input.connect(_on_enemy_panel_clicked.bind(3))
+
 	enemy_panel_5.character_data = enemy_squad[4] if enemy_squad.size() > 4 else {}
 	enemy_panel_5.battle_window = self
-	enemy_panel_5.current_direction = "right"
-	enemy_panel_5.apply_character_animation("walk_right_1")
+	enemy_panel_5.current_direction = "down"
+	enemy_panel_5.apply_character_animation("walk_down_1")
+	enemy_panel_5.gui_input.connect(_on_enemy_panel_clicked.bind(4))
+
 	enemy_panel_6.character_data = enemy_squad[5] if enemy_squad.size() > 5 else {}
 	enemy_panel_6.battle_window = self
-	enemy_panel_6.current_direction = "right"
-	enemy_panel_6.apply_character_animation("walk_right_1")
+	enemy_panel_6.current_direction = "down"
+	enemy_panel_6.apply_character_animation("walk_down_1")
+	enemy_panel_6.gui_input.connect(_on_enemy_panel_clicked.bind(5))
 
-	# Link ally panels to ally squad data (includes player as ally[4])
-	# Player/Allies on RIGHT side face LEFT toward enemies
-	ally_panel_1.character_data = ally_squad[0] if ally_squad.size() > 0 else {}
+	# Link ally panels to ally squad data (player is ally[0] = Ally1Panel)
+	# All characters face DOWN by default
+	ally_panel_1.character_data = ally_squad[0] if ally_squad.size() > 0 else {}  # THIS IS THE PLAYER
 	ally_panel_1.battle_window = self
-	ally_panel_1.current_direction = "left"
-	ally_panel_1.apply_character_animation("walk_left_1")
+	ally_panel_1.current_direction = "down"
+	ally_panel_1.apply_character_animation("walk_down_1")
+	ally_panel_1.gui_input.connect(_on_ally_panel_clicked.bind(0))
+
 	ally_panel_2.character_data = ally_squad[1] if ally_squad.size() > 1 else {}
 	ally_panel_2.battle_window = self
-	ally_panel_2.current_direction = "left"
-	ally_panel_2.apply_character_animation("walk_left_1")
+	ally_panel_2.current_direction = "down"
+	ally_panel_2.apply_character_animation("walk_down_1")
+	ally_panel_2.gui_input.connect(_on_ally_panel_clicked.bind(1))
+
 	ally_panel_3.character_data = ally_squad[2] if ally_squad.size() > 2 else {}
 	ally_panel_3.battle_window = self
-	ally_panel_3.current_direction = "left"
-	ally_panel_3.apply_character_animation("walk_left_1")
+	ally_panel_3.current_direction = "down"
+	ally_panel_3.apply_character_animation("walk_down_1")
+	ally_panel_3.gui_input.connect(_on_ally_panel_clicked.bind(2))
+
 	ally_panel_4.character_data = ally_squad[3] if ally_squad.size() > 3 else {}
 	ally_panel_4.battle_window = self
-	ally_panel_4.current_direction = "left"
-	ally_panel_4.apply_character_animation("walk_left_1")
+	ally_panel_4.current_direction = "down"
+	ally_panel_4.apply_character_animation("walk_down_1")
+	ally_panel_4.gui_input.connect(_on_ally_panel_clicked.bind(3))
+
 	ally_panel_5.character_data = ally_squad[4] if ally_squad.size() > 4 else {}
 	ally_panel_5.battle_window = self
-	ally_panel_5.current_direction = "left"
-	ally_panel_5.apply_character_animation("walk_left_1")
+	ally_panel_5.current_direction = "down"
+	ally_panel_5.apply_character_animation("walk_down_1")
+	ally_panel_5.gui_input.connect(_on_ally_panel_clicked.bind(4))
+
 	ally_panel_6.character_data = ally_squad[5] if ally_squad.size() > 5 else {}
 	ally_panel_6.battle_window = self
-	ally_panel_6.current_direction = "left"
-	ally_panel_6.apply_character_animation("walk_left_1")
+	ally_panel_6.current_direction = "down"
+	ally_panel_6.apply_character_animation("walk_down_1")
+	ally_panel_6.gui_input.connect(_on_ally_panel_clicked.bind(5))
 
-	# Reset to default layout (ignore old saves with incorrect positions)
-	reset_battle_layout()
+	# Force perfect grid alignment on startup (ignore old saves with incorrect positions)
+	auto_align_all_panels()
+	# Don't lock panels - let enforce_panel_alignment() in _process() handle it every frame
+
+	# ALSO enforce alignment immediately in physics process to catch early frame issues
+	call_deferred("enforce_panel_alignment")
+
+	# Create floating HP/MP overlays for gameplay mode
+	create_floating_overlays()
+
+	# Apply default UI hidden state
+	call_deferred("apply_ui_visibility")
+
+func apply_ui_visibility():
+	"""Apply the current UI visibility state (called at startup)"""
+	# Call the toggle function which will apply the current ui_elements_hidden state
+	_on_hide_ui_pressed()
+
+func create_floating_overlays():
+	"""Create small combined HP/MP/Energy bars that float over character sprites"""
+	# Create enemy stat overlays (HP + MP + Energy - same as allies)
+	for i in range(6):
+		var overlay = create_combined_stat_overlay(false)  # enemies also get all bars
+		enemy_stat_overlays.append(overlay)
+		add_child(overlay)
+		overlay.visible = false
+
+	# Create ally stat overlays (HP + MP + Energy)
+	for i in range(6):
+		var overlay = create_combined_stat_overlay(false)  # allies = all bars
+		ally_stat_overlays.append(overlay)
+		add_child(overlay)
+		overlay.visible = false
+
+func create_combined_stat_overlay(is_enemy: bool) -> VBoxContainer:
+	"""Create a compact combined HP/MP/Energy bar overlay"""
+	var container = VBoxContainer.new()
+	container.z_index = 300
+	container.add_theme_constant_override("separation", 1)  # 1px spacing between bars
+
+	# HP Bar (always show)
+	var hp_bar = ProgressBar.new()
+	hp_bar.custom_minimum_size = Vector2(50, 6)  # Smaller: 50x6
+	hp_bar.size = Vector2(50, 6)
+	hp_bar.show_percentage = false
+	var hp_style = StyleBoxFlat.new()
+	hp_style.bg_color = Color(0, 0.8, 0, 1)  # Green
+	hp_bar.add_theme_stylebox_override("fill", hp_style)
+	container.add_child(hp_bar)
+
+	# MP Bar (only for allies)
+	if not is_enemy:
+		var mp_bar = ProgressBar.new()
+		mp_bar.custom_minimum_size = Vector2(50, 5)  # Smaller: 50x5
+		mp_bar.size = Vector2(50, 5)
+		mp_bar.show_percentage = false
+		var mp_style = StyleBoxFlat.new()
+		mp_style.bg_color = Color(0, 0.5, 1, 1)  # Blue
+		mp_bar.add_theme_stylebox_override("fill", mp_style)
+		container.add_child(mp_bar)
+
+		# Energy Bar (only for allies)
+		var energy_bar = ProgressBar.new()
+		energy_bar.custom_minimum_size = Vector2(50, 5)  # Smaller: 50x5
+		energy_bar.size = Vector2(50, 5)
+		energy_bar.show_percentage = false
+		var energy_style = StyleBoxFlat.new()
+		energy_style.bg_color = Color(1, 0.8, 0, 1)  # Yellow/Gold
+		energy_bar.add_theme_stylebox_override("fill", energy_style)
+		container.add_child(energy_bar)
+
+	return container
+
+func _process(delta):
+	"""Process turn timer countdown"""
+	if is_player_turn and not is_paused:
+		turn_timer -= delta
+		update_turn_timer_display()
+
+		# Auto-skip when timer runs out
+		if turn_timer <= 0:
+			auto_skip_turn()
+
+	# Update floating overlay positions if UI is hidden (in case sprites move)
+	if ui_elements_hidden:
+		update_floating_overlay_positions()
+
+	# Enforce alignment only when not animating attacks
+	if not is_animating_attack:
+		enforce_panel_alignment()
 
 func load_sprite_atlases():
 	"""Load sprite atlas textures for character rendering"""
@@ -267,6 +412,13 @@ func load_sprite_atlases():
 
 func _input(event: InputEvent):
 	"""Handle keyboard input for battle actions"""
+	# Allow G key for grid alignment even when not player turn
+	if event is InputEventKey and event.pressed and event.keycode == KEY_G:
+		auto_align_all_panels()
+		print("✓ Force aligned all panels to grid (pressed G)")
+		get_viewport().set_input_as_handled()
+		return
+
 	if not is_player_turn:
 		return
 
@@ -319,8 +471,19 @@ func setup_battle():
 	# Load 6 allies (player + 5 NPCs)
 	load_ally_squad()
 
-	# Calculate turn order based on DEX
+	# Calculate turn order based on DEX (with first strike)
 	calculate_turn_order()
+
+func set_battle_initiator(player_attacked_first: bool):
+	"""Called from world map to set who initiated combat"""
+	player_initiated = player_attacked_first
+	if player_attacked_first:
+		print("🗡️ Player initiated combat - your fastest ally gets first strike!")
+	else:
+		print("👹 Enemy ambush - their fastest unit gets first strike!")
+	# Recalculate turn order with new initiator
+	if turn_order.size() > 0:
+		calculate_turn_order()
 
 	# Update UI
 	update_all_enemies_ui()
@@ -505,28 +668,87 @@ func load_character_file(path: String) -> Dictionary:
 		return {}
 
 func calculate_turn_order():
-	"""Calculate turn order based on DEX stat (ATR system)"""
+	"""Calculate turn order based on DEX stat with first strike system"""
 	turn_order.clear()
+
+	# Build list of all combatants
+	var all_units: Array = []
 
 	# Add player
 	var player_dex = 10
 	if player_character.has("base_stats") and player_character.base_stats.has("dex"):
 		player_dex = player_character.base_stats.dex
-	turn_order.append({"type": "player", "data": player_character, "dex": player_dex})
+	all_units.append({"type": "player", "data": player_character, "dex": player_dex, "is_ally": true})
+
+	# Add allies
+	for ally in ally_squad:
+		if ally != player_character:  # Don't add player twice
+			var ally_dex = 10
+			if ally.has("base_stats") and ally.base_stats.has("dex"):
+				ally_dex = ally.base_stats.dex
+			all_units.append({"type": "ally", "data": ally, "dex": ally_dex, "is_ally": true})
 
 	# Add enemies
 	for enemy in enemy_squad:
 		var enemy_dex = 10
 		if enemy.has("base_stats") and enemy.base_stats.has("dex"):
 			enemy_dex = enemy.base_stats.dex
-		turn_order.append({"type": "enemy", "data": enemy, "dex": enemy_dex})
+		all_units.append({"type": "enemy", "data": enemy, "dex": enemy_dex, "is_ally": false})
 
-	# Sort by DEX (highest first)
-	turn_order.sort_custom(func(a, b): return a.dex > b.dex)
+	# FIRST STRIKE SYSTEM
+	var first_striker = null
+	var remaining_units: Array = []
+
+	if player_initiated:
+		# Player attacked first - fastest ALLY goes first
+		var fastest_ally = null
+		var fastest_dex = -1
+		for unit in all_units:
+			if unit.is_ally and unit.dex > fastest_dex:
+				fastest_ally = unit
+				fastest_dex = unit.dex
+
+		if fastest_ally:
+			first_striker = fastest_ally
+			print("⚔️ FIRST STRIKE: %s attacks first! (Player initiated)" % fastest_ally.data.get("character_name", "Ally"))
+
+		# Add remaining units
+		for unit in all_units:
+			if unit != first_striker:
+				remaining_units.append(unit)
+	else:
+		# Enemy ambushed - fastest ENEMY goes first
+		var fastest_enemy = null
+		var fastest_dex = -1
+		for unit in all_units:
+			if not unit.is_ally and unit.dex > fastest_dex:
+				fastest_enemy = unit
+				fastest_dex = unit.dex
+
+		if fastest_enemy:
+			first_striker = fastest_enemy
+			print("💀 AMBUSH: %s attacks first! (Enemy initiated)" % fastest_enemy.data.get("character_name", "Enemy"))
+
+		# Add remaining units
+		for unit in all_units:
+			if unit != first_striker:
+				remaining_units.append(unit)
+
+	# Sort remaining units by DEX
+	remaining_units.sort_custom(func(a, b): return a.dex > b.dex)
+
+	# Build final turn order: first striker + sorted remaining
+	if first_striker:
+		turn_order.append(first_striker)
+	turn_order.append_array(remaining_units)
 
 	print("Turn order calculated:")
-	for unit in turn_order:
-		print("  ", unit.data.get("character_name", "Unknown"), " (DEX: ", unit.dex, ")")
+	for i in range(turn_order.size()):
+		var unit = turn_order[i]
+		var prefix = "  "
+		if i == 0 and first_striker:
+			prefix = "⚡ "  # First strike marker
+		print(prefix, unit.data.get("character_name", "Unknown"), " (DEX: ", unit.dex, ")")
 
 func update_all_enemies_ui():
 	"""Update all enemy UI displays"""
@@ -554,6 +776,12 @@ func update_enemy_ui(index: int):
 		enemy_hp_bars[index].value = current_hp
 	if enemy_hp_labels[index]:
 		enemy_hp_labels[index].text = "HP: %d / %d" % [current_hp, max_hp]
+
+	# Update overlay if UI is hidden
+	if ui_elements_hidden and index < enemy_stat_overlays.size():
+		var hp_bar = enemy_stat_overlays[index].get_child(0)  # HP bar is first child
+		hp_bar.max_value = max_hp
+		hp_bar.value = current_hp
 
 	# Load sprite
 	load_character_sprite(enemy, enemy_sprites[index])
@@ -595,6 +823,21 @@ func update_ally_ui(index: int):
 		ally_mp_bars[index].value = current_mp
 	if ally_mp_labels[index]:
 		ally_mp_labels[index].text = "MP: %d / %d" % [current_mp, max_mp]
+
+	# Update combined overlay if UI is hidden
+	if ui_elements_hidden and index < ally_stat_overlays.size():
+		var hp_bar = ally_stat_overlays[index].get_child(0)  # HP bar
+		hp_bar.max_value = max_hp
+		hp_bar.value = current_hp
+
+		var mp_bar = ally_stat_overlays[index].get_child(1)  # MP bar
+		mp_bar.max_value = max_mp
+		mp_bar.value = current_mp
+
+		# Energy bar - placeholder for now (100/100)
+		var energy_bar = ally_stat_overlays[index].get_child(2)  # Energy bar
+		energy_bar.max_value = 100
+		energy_bar.value = 100
 
 	# Load sprite
 	load_character_sprite(ally, ally_sprites[index])
@@ -653,7 +896,7 @@ func start_next_turn():
 	# Don't start turns if paused
 	if is_paused:
 		return
-	
+
 	if current_turn_index >= turn_order.size():
 		# Round complete, restart
 		current_turn_index = 0
@@ -661,17 +904,34 @@ func start_next_turn():
 
 	var current_unit = turn_order[current_turn_index]
 
+	# Show first strike message on first turn only
+	if current_turn_index == 0:
+		var first_name = current_unit.data.get("character_name", "Unknown")
+		if current_unit.is_ally:
+			print("⚡ FIRST STRIKE: %s" % first_name)
+		else:
+			print("💀 AMBUSH: %s" % first_name)
+
+	# ONLY player character is controlled by player, NPCs auto-battle
 	if current_unit.type == "player":
 		start_player_turn()
+	elif current_unit.type == "ally":
+		start_ally_npc_turn(current_unit)
 	else:
 		start_enemy_turn(current_unit)
 
 func start_player_turn():
-	"""Start player's turn"""
+	"""Start PLAYER CHARACTER's turn (only one you control)"""
 	is_player_turn = true
-	turn_info.text = "Your Turn! Choose an action:"
+	turn_timer = TURN_TIME_LIMIT
+	update_turn_timer_display()
 
-	# Enable action buttons
+	# Clear defend state from previous turn (if player wasn't attacked)
+	if is_player_defending:
+		print("🛡️ Defense expired (new turn started)")
+		is_player_defending = false
+
+	# Enable action buttons (player only - NPCs auto-battle)
 	attack_button.disabled = false
 	defend_button.disabled = false
 	skills_button.disabled = false
@@ -681,7 +941,122 @@ func start_player_turn():
 	selected_button_index = 0
 	update_button_selection()
 
-	print("Player's turn")
+	print("🎮 YOUR TURN - 10 seconds to decide!")
+
+func update_turn_timer_display():
+	"""Update turn info with timer countdown"""
+	if is_player_turn:
+		turn_info.text = "Your Turn! Time: %.1f seconds" % turn_timer
+	else:
+		turn_info.text = "Enemy Turn..."
+
+func auto_skip_turn():
+	"""Auto-skip player turn when timer runs out"""
+	print("Turn timer expired - auto-skipping")
+	turn_info.text = "Time's up! Turn skipped."
+	is_player_turn = false
+	clear_enemy_highlights()
+	is_selecting_target = false
+
+	# Disable buttons
+	attack_button.disabled = true
+	defend_button.disabled = true
+	skills_button.disabled = true
+	items_button.disabled = true
+
+	# Advance to next turn after delay
+	await get_tree().create_timer(1.0).timeout
+	current_turn_index += 1
+	start_next_turn()
+
+func start_ally_npc_turn(ally_unit: Dictionary):
+	"""Start NPC ally's turn (auto-battle)"""
+	is_player_turn = false
+	var ally_name = ally_unit.data.get("character_name", "Ally")
+	turn_info.text = ally_name + " is acting..."
+
+	# Disable action buttons
+	attack_button.disabled = true
+	defend_button.disabled = true
+	skills_button.disabled = true
+	items_button.disabled = true
+
+	# Clear button focus
+	for button in action_buttons:
+		if button:
+			button.release_focus()
+
+	print(ally_name, "'s turn (NPC ally)")
+
+	# Execute ally AI after short delay
+	await get_tree().create_timer(0.8).timeout
+	execute_ally_npc_ai(ally_unit)
+
+func execute_ally_npc_ai(ally_unit: Dictionary):
+	"""NPC allies attack enemies (simple AI: attack weakest enemy)"""
+	# Find weakest alive enemy
+	var target_enemy_index = -1
+	var lowest_hp = 999999
+
+	for i in range(enemy_squad.size()):
+		if enemy_squad[i].hp > 0 and enemy_squad[i].hp < lowest_hp:
+			lowest_hp = enemy_squad[i].hp
+			target_enemy_index = i
+
+	if target_enemy_index == -1:
+		# No valid targets
+		print("  No enemies to attack!")
+		current_turn_index += 1
+		start_next_turn()
+		return
+
+	# Find which ally index this is
+	var ally_index = -1
+	for i in range(ally_squad.size()):
+		if ally_squad[i] == ally_unit.data:
+			ally_index = i
+			break
+
+	# Show ally attack animation (facing left toward enemies)
+	if ally_index >= 0:
+		await play_attack_animation(ally_sprites[ally_index], ally_unit.data, "attack_left", enemy_sprites[target_enemy_index])
+
+	# Calculate and apply damage
+	var damage = calculate_damage(ally_unit.data, enemy_squad[target_enemy_index], ally_index, target_enemy_index, false)
+	enemy_squad[target_enemy_index].hp -= damage
+	enemy_squad[target_enemy_index].hp = max(0, enemy_squad[target_enemy_index].hp)
+
+	# Update enemy UI
+	var max_hp = 100
+	if enemy_squad[target_enemy_index].has("derived_stats"):
+		max_hp = enemy_squad[target_enemy_index].derived_stats.get("max_hp", 100)
+
+	animate_hp_bar(enemy_hp_bars[target_enemy_index], enemy_squad[target_enemy_index].hp, max_hp)
+	update_hp_bar_color(enemy_hp_bars[target_enemy_index], enemy_squad[target_enemy_index].hp, max_hp)
+	update_enemy_ui(target_enemy_index)
+
+	print("Ally dealt ", damage, " damage to ", enemy_squad[target_enemy_index].get("character_name", "Enemy"))
+
+	# Check if enemy defeated
+	if enemy_squad[target_enemy_index].hp <= 0:
+		turn_info.text += " Enemy defeated!"
+
+		# Check if all enemies defeated
+		var all_dead = true
+		for e in enemy_squad:
+			if e.hp > 0:
+				all_dead = false
+				break
+
+		if all_dead:
+			await get_tree().create_timer(1.5).timeout
+			end_battle(true)
+			return
+
+	# Next turn after delay
+	await get_tree().create_timer(1.0).timeout
+	current_turn_index += 1
+	start_next_turn()
 
 func start_enemy_turn(enemy_unit: Dictionary):
 	"""Start enemy's turn"""
@@ -708,8 +1083,8 @@ func start_enemy_turn(enemy_unit: Dictionary):
 
 func execute_enemy_ai(enemy_unit: Dictionary):
 	"""Execute enemy AI (simple attack for now)"""
-	# Player is now ally index 4 (Ally5)
-	var player_ally_index = 4
+	# Player is ally index 0 (Ally1)
+	var player_ally_index = 0
 
 	# Find which enemy index this is
 	var enemy_index = -1
@@ -722,12 +1097,24 @@ func execute_enemy_ai(enemy_unit: Dictionary):
 	if enemy_index >= 0:
 		await play_attack_animation(enemy_sprites[enemy_index], enemy_unit.data, "attack_right", ally_sprites[player_ally_index])
 
-	# Enemy attacks player
-	var damage = calculate_damage(enemy_unit.data, player_character)
+	# Enemy attacks player with range system
+	var damage = calculate_damage(enemy_unit.data, player_character, enemy_index, player_ally_index, true)
+
+	# Apply defense reduction if player is defending
+	var original_damage = damage
+	if is_player_defending:
+		damage = int(damage * 0.5)  # Reduce damage by 50%
+		print("🛡️ Defense reduced damage from %d to %d" % [original_damage, damage])
+		is_player_defending = false  # Clear defend state after taking damage
+
 	player_character.hp -= damage
 	player_character.hp = max(0, player_character.hp)
 
-	turn_info.text = enemy_unit.data.get("character_name", "Enemy") + " attacks for " + str(damage) + " damage!"
+	# Show damage with defend indicator if applicable
+	if original_damage != damage:
+		turn_info.text = enemy_unit.data.get("character_name", "Enemy") + " attacks for " + str(damage) + " damage! (Defense reduced from " + str(original_damage) + ")"
+	else:
+		turn_info.text = enemy_unit.data.get("character_name", "Enemy") + " attacks for " + str(damage) + " damage!"
 
 	# Show damage number on player
 	show_damage_number(ally_sprites[player_ally_index].global_position, damage)
@@ -761,8 +1148,103 @@ func execute_enemy_ai(enemy_unit: Dictionary):
 	current_turn_index += 1
 	start_next_turn()
 
-func calculate_damage(attacker: Dictionary, defender: Dictionary) -> int:
-	"""Calculate damage using STAT_SYSTEM.md formulas"""
+func is_front_row(panel_index: int, is_enemy: bool) -> bool:
+	"""Determine if a panel is in the front row based on formation"""
+	# Front row = panels 1, 2, 3 (indices 0, 1, 2)
+	# Back row = panels 4, 5, 6 (indices 3, 4, 5)
+	return panel_index < 3
+
+func get_character_attack_type(character_data: Dictionary) -> String:
+	"""Determine combat role based on character's combat_role tag"""
+	# Use new combat_role field if available
+	if character_data.has("combat_role"):
+		var role = character_data.combat_role.to_lower()
+
+		if "melee" in role:
+			return "melee"
+		elif "ranged" in role:
+			return "ranged"
+		elif "caster" in role:
+			return "caster"
+		elif "hybrid" in role:
+			return "hybrid"
+
+	# Fallback to old class_template system for backward compatibility
+	if character_data.has("class_template"):
+		var char_class = character_data.class_template.to_lower()
+
+		# Pure melee classes
+		var melee_classes = ["warrior", "knight", "paladin", "berserker", "monk", "fighter"]
+		# Ranged classes
+		var ranged_classes = ["archer", "ranger", "gunner", "sniper", "hunter"]
+		# Magic classes
+		var magic_classes = ["mage", "wizard", "sorcerer", "cleric", "priest", "shaman", "warlock"]
+
+		for melee in melee_classes:
+			if melee in char_class:
+				return "melee"
+		for ranged in ranged_classes:
+			if ranged in char_class:
+				return "ranged"
+		for magic in magic_classes:
+			if magic in char_class:
+				return "caster"
+
+	# Default to melee if nothing specified
+	return "melee"
+
+func calculate_range_penalty(attacker_data: Dictionary, attacker_index: int, defender_index: int, is_attacker_enemy: bool, is_defender_enemy: bool) -> float:
+	"""Calculate damage multiplier based on combat role and position"""
+	var combat_role = get_character_attack_type(attacker_data)
+	var attacker_front = is_front_row(attacker_index, is_attacker_enemy)
+	var defender_front = is_front_row(defender_index, is_defender_enemy)
+
+	var penalty_multiplier = 1.0
+
+	match combat_role:
+		"caster":
+			# CASTER: Full damage from any position
+			# Front row = melee attacks, Back row = spell casting
+			# Both are 100% effective
+			return 1.0
+
+		"hybrid":
+			# HYBRID: 80% damage from any position (jack of all trades)
+			# Can melee OR range but neither is perfect
+			penalty_multiplier = 0.8
+			print("  ⚖️ Hybrid versatility penalty: 0.8x")
+			return penalty_multiplier
+
+		"ranged":
+			# RANGED: Full damage from back row, 50% if forced to melee in front
+			if attacker_front:
+				# Ranged fighter using melee in front row = 50% penalty
+				penalty_multiplier = 0.5
+				print("  🏹 Ranged using melee penalty: 0.5x")
+			# Attacking from back row = full damage regardless of target
+			return penalty_multiplier
+
+		"melee":
+			# MELEE: Full damage in front row, penalties for back row positioning
+			# Melee attacker in BACK ROW = 50% penalty
+			if not attacker_front:
+				penalty_multiplier *= 0.5
+				print("  📍 Back row melee penalty: 0.5x")
+
+			# Attacking BACK ROW defender = additional 50% penalty
+			if not defender_front:
+				penalty_multiplier *= 0.5
+				print("  🎯 Targeting back row penalty: 0.5x")
+
+			# Hard floor: minimum 25% damage (0.25x)
+			penalty_multiplier = max(0.25, penalty_multiplier)
+			return penalty_multiplier
+
+	# Default fallback
+	return 1.0
+
+func calculate_damage(attacker: Dictionary, defender: Dictionary, attacker_index: int = -1, defender_index: int = -1, is_attacker_enemy: bool = false) -> int:
+	"""Calculate damage using STAT_SYSTEM.md formulas with range penalties and defensive modifiers"""
 	var attacker_str = 10
 	var defender_vit = 10
 
@@ -774,30 +1256,139 @@ func calculate_damage(attacker: Dictionary, defender: Dictionary) -> int:
 	# Physical Damage = (STR * 2) - (VIT / 2)
 	var base_damage = (attacker_str * 2) - int(defender_vit / 2.0)
 
+	# Apply offensive range penalty (attacker's combat role)
+	if attacker_index >= 0 and defender_index >= 0:
+		var is_defender_enemy = !is_attacker_enemy  # Opposite teams
+		var range_multiplier = calculate_range_penalty(attacker, attacker_index, defender_index, is_attacker_enemy, is_defender_enemy)
+		base_damage = int(base_damage * range_multiplier)
+
+		# Log offensive penalty info
+		if range_multiplier < 1.0:
+			var attack_type = get_character_attack_type(attacker)
+			var attacker_name = attacker.get("character_name", "Unknown")
+			print("  ⚔️ ", attacker_name, " (", attack_type, ") offensive penalty: ", range_multiplier, "x")
+
+	# Apply defensive modifier (defender's combat role)
+	var defender_role = get_character_attack_type(defender)
+	var defensive_multiplier = get_defensive_modifier(defender_role)
+	if defensive_multiplier != 1.0:
+		base_damage = int(base_damage * defensive_multiplier)
+		var defender_name = defender.get("character_name", "Unknown")
+		print("  🛡️ ", defender_name, " (", defender_role, ") defensive modifier: ", defensive_multiplier, "x (takes ", int((defensive_multiplier - 1.0) * 100), "% extra damage)")
+
 	# Minimum 1 damage
 	return max(1, base_damage)
 
+func get_defensive_modifier(combat_role: String) -> float:
+	"""Get defensive damage multiplier based on combat role"""
+	match combat_role:
+		"caster":
+			# Casters are weak defensively - take 20% extra damage
+			return 1.2
+		"hybrid":
+			# Hybrids are weak defensively - take 20% extra damage
+			return 1.2
+		"melee":
+			# Melee fighters have normal defense
+			return 1.0
+		"ranged":
+			# Ranged fighters have normal defense
+			return 1.0
+	return 1.0
+
+var is_selecting_target: bool = false
+var selected_action: String = ""  # "attack", "heal", "buff", "debuff"
+var can_target_allies: bool = false  # True for heals/buffs, false for attacks
+var selected_target_index: int = -1  # Currently selected target (-1 = none)
+
 func _on_attack_pressed():
-	"""Player chooses to attack"""
+	"""Player confirms attack on selected target"""
 	if not is_player_turn:
 		return
 
-	# Attack first alive enemy
-	for i in range(enemy_squad.size()):
-		if enemy_squad[i].hp > 0:
-			execute_player_attack(i)
-			return
+	# If no target selected, show message
+	if selected_target_index < 0:
+		turn_info.text = "Click an enemy to select target first!"
+		return
+
+	# Store target index before clearing
+	var target = selected_target_index
+
+	# Clear selection
+	clear_enemy_highlights()
+	hide_target_cursor()
+	selected_target_index = -1
+
+	# Execute attack on stored target
+	execute_player_attack(target)
+
+func _on_enemy_panel_clicked(event: InputEvent, enemy_index: int):
+	"""Handle clicks on enemy panels - shows selection cursor"""
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		# Check if enemy is alive
+		if enemy_index < enemy_squad.size() and enemy_squad[enemy_index].hp > 0:
+			# Select this enemy (show cursor)
+			selected_target_index = enemy_index
+			show_target_cursor(enemy_panels_array()[enemy_index])
+			turn_info.text = "Target: %s - Choose action (Attack, Skills, Items)" % enemy_squad[enemy_index].get("character_name", "Enemy")
+
+func enemy_panels_array() -> Array:
+	"""Return array of enemy panels"""
+	return [enemy_panel_1, enemy_panel_2, enemy_panel_3, enemy_panel_4, enemy_panel_5, enemy_panel_6]
+
+func show_target_cursor(target_panel: Panel):
+	"""Show selection cursor over target panel"""
+	if not target_cursor or not target_panel:
+		return
+
+	# Position cursor at target's global position
+	target_cursor.global_position = target_panel.global_position
+	target_cursor.size = target_panel.size
+	target_cursor.visible = true
+
+	print("🎯 Target cursor shown over panel at: ", target_panel.global_position)
+
+func hide_target_cursor():
+	"""Hide selection cursor"""
+	if target_cursor:
+		target_cursor.visible = false
+
+func clear_enemy_highlights():
+	"""Remove yellow highlights from enemy HP bars"""
+	for hp_bar in enemy_hp_bars:
+		if hp_bar:
+			hp_bar.modulate = Color.WHITE
+
+func _on_ally_panel_clicked(event: InputEvent, ally_index: int):
+	"""Handle clicks on ally panels for heal/buff targeting (future feature)"""
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		if is_selecting_target and can_target_allies:
+			# Check if ally is alive
+			if ally_index < ally_squad.size() and ally_squad[ally_index].hp > 0:
+				clear_ally_highlights()
+				is_selecting_target = false
+				# Execute heal/buff (placeholder for when elemental trees are implemented)
+				var target_name = ally_squad[ally_index].get("character_name", "Ally")
+				turn_info.text = "Selected ally: " + target_name + " (Heal/Buff not yet implemented)"
+				print("🎯 Selected ally for healing/buffing: ", target_name)
+				# TODO: Implement heal/buff execution when elemental tree system is ready
+
+func clear_ally_highlights():
+	"""Remove green highlights from ally HP bars"""
+	for hp_bar in ally_hp_bars:
+		if hp_bar:
+			hp_bar.modulate = Color.WHITE
 
 func execute_player_attack(enemy_index: int):
 	"""Execute player attack on enemy"""
 	var enemy = enemy_squad[enemy_index]
-	var player_ally_index = 4  # Player is Ally5
+	var player_ally_index = 0  # Player is Ally1
 
 	# Show player attack animation (facing left toward enemies)
 	await play_attack_animation(ally_sprites[player_ally_index], player_character, "attack_left", enemy_sprites[enemy_index])
 
-	# Calculate and apply damage
-	var damage = calculate_damage(player_character, enemy)
+	# Calculate and apply damage with range system
+	var damage = calculate_damage(player_character, enemy, player_ally_index, enemy_index, false)
 	enemy.hp -= damage
 	enemy.hp = max(0, enemy.hp)
 
@@ -847,9 +1438,36 @@ func execute_player_attack(enemy_index: int):
 	start_next_turn()
 
 func _on_defend_pressed():
-	"""Player chooses to defend (placeholder)"""
-	turn_info.text = "You defend! (Not implemented yet)"
-	await get_tree().create_timer(1.0).timeout
+	"""Player chooses to defend - reduces damage taken by 50% until next turn"""
+	if not is_player_turn or is_selecting_target:
+		return
+
+	is_player_turn = false
+	is_player_defending = true
+
+	# Clear any target selection
+	clear_enemy_highlights()
+	is_selecting_target = false
+
+	# Show defend animation
+	var player_ally_index = 0  # Player is Ally1
+	turn_info.text = "You take a defensive stance! (Damage reduced by 50%)"
+	print("🛡️ Player is defending - damage reduced by 50%")
+
+	# Disable action buttons
+	attack_button.disabled = true
+	defend_button.disabled = true
+	skills_button.disabled = true
+	items_button.disabled = true
+
+	# Flash player sprite to indicate defending
+	if ally_sprites[player_ally_index]:
+		ally_sprites[player_ally_index].modulate = Color(0.5, 0.5, 1.0)  # Blue tint
+		await get_tree().create_timer(0.5).timeout
+		ally_sprites[player_ally_index].modulate = Color.WHITE
+
+	# Next turn after delay
+	await get_tree().create_timer(0.5).timeout
 	current_turn_index += 1
 	start_next_turn()
 
@@ -862,14 +1480,18 @@ func _on_items_pressed():
 	turn_info.text = "Items menu (Not implemented yet)"
 
 func play_attack_animation(sprite_node: TextureRect, character: Dictionary, attack_direction: String = "attack_right", target_sprite: TextureRect = null):
-	"""Play attack animation with both attacker and target sliding to center"""
+	"""Play attack animation - melee rushes to target, ranged/caster stays in position"""
+	is_animating_attack = true  # Disable position enforcement during animation
+
 	if not character.has("animations"):
+		is_animating_attack = false
 		return
 
 	# Get parent panels to move entire units
 	var attacker_panel = sprite_node.get_parent().get_parent()  # Sprite -> VBox -> Panel
 	var target_panel = target_sprite.get_parent().get_parent() if target_sprite else null
 	if not target_panel:
+		is_animating_attack = false
 		return
 
 	# Get target character data from panel
@@ -877,120 +1499,84 @@ func play_attack_animation(sprite_node: TextureRect, character: Dictionary, atta
 	if "character_data" in target_panel:
 		target_character_data = target_panel.character_data
 
+	# Determine combat role and if character should move
+	var attack_type = get_character_attack_type(character)
+
+	# Find which panel index this is to check front/back row
+	var attacker_index = -1
+	if attacker_panel.get_parent().name == "PlayerArea":
+		# Find in ally panels
+		var ally_panels = [ally_panel_1, ally_panel_2, ally_panel_3, ally_panel_4, ally_panel_5, ally_panel_6]
+		for i in range(ally_panels.size()):
+			if ally_panels[i] == attacker_panel:
+				attacker_index = i
+				break
+	else:
+		# Find in enemy panels
+		var enemy_panels = [enemy_panel_1, enemy_panel_2, enemy_panel_3, enemy_panel_4, enemy_panel_5, enemy_panel_6]
+		for i in range(enemy_panels.size()):
+			if enemy_panels[i] == attacker_panel:
+				attacker_index = i
+				break
+
+	var is_front_row_attacker = is_front_row(attacker_index, attacker_panel.get_parent().name == "EnemyArea")
+
+	# Melee always moves, Hybrid moves only if in front row
+	var should_move_to_target = (attack_type == "melee") or (attack_type == "hybrid" and is_front_row_attacker)
+
 	# Store original positions
 	var attacker_original_pos = attacker_panel.position
-	var target_original_pos = target_panel.position
 
-	# Calculate center point between attacker and target
-	var attacker_center = attacker_panel.global_position + (attacker_panel.size / 2.0)
-	var target_center = target_panel.global_position + (target_panel.size / 2.0)
-	var middle_point_global = (attacker_center + target_center) / 2.0
+	# Calculate attack position - small step forward from current position (not all the way to target)
+	var attacker_on_right = attacker_panel.get_parent().name == "PlayerArea"
+	var step_distance = 40.0  # Small step forward to show who's attacking
 
-	# Convert global middle point to local positions for each panel
-	var parent_global_pos = attacker_panel.get_parent().global_position if attacker_panel.get_parent() else Vector2.ZERO
-	var attacker_middle_pos = middle_point_global - parent_global_pos - (attacker_panel.size / 2.0)
+	# Start from current position and step forward
+	var attack_pos = attacker_original_pos
 
-	parent_global_pos = target_panel.get_parent().global_position if target_panel.get_parent() else Vector2.ZERO
-	var target_middle_pos = middle_point_global - parent_global_pos - (target_panel.size / 2.0)
-
-	# Space them 100px apart at center
-	var direction = "right" if attack_direction.contains("right") else "left"
-	var target_direction = "left" if direction == "right" else "right"  # Target faces opposite
-	var spacing = 100.0
-	if direction == "right":
-		attacker_middle_pos.x -= spacing / 2.0
-		target_middle_pos.x += spacing / 2.0
+	# Step toward opponent
+	if attacker_on_right:
+		attack_pos.x -= step_distance  # Step left toward enemies
 	else:
-		attacker_middle_pos.x += spacing / 2.0
-		target_middle_pos.x -= spacing / 2.0
+		attack_pos.x += step_distance  # Step right toward allies
 
-	# Determine walk directions based on which side they're on
-	# PlayerArea walks LEFT to approach, EnemyArea walks RIGHT to approach
-	var attacker_is_left_side = attacker_panel.get_parent().name == "PlayerArea"
-	var target_is_left_side = target_panel.get_parent().name == "PlayerArea"
-
-	var attacker_approach_dir = "left" if attacker_is_left_side else "right"
-	var target_approach_dir = "left" if target_is_left_side else "right"
-	var attacker_return_dir = "right" if attacker_is_left_side else "left"
-	var target_return_dir = "right" if target_is_left_side else "left"
+	# Determine walk directions
+	var attacker_approach_dir = "left" if attacker_on_right else "right"
+	var attacker_return_dir = "right" if attacker_on_right else "left"
 
 	# ========================================
-	# PHASE 1: WALK TO MIDDLE (ONLY WALK ANIMATIONS)
+	# PHASE 1: APPROACH (MELEE OR HYBRID IN FRONT ROW)
 	# ========================================
-	var tween_forward = create_tween()
-	tween_forward.set_parallel(true)
-	tween_forward.tween_property(attacker_panel, "position", attacker_middle_pos, 0.6).set_trans(Tween.TRANS_LINEAR)
-	tween_forward.tween_property(target_panel, "position", target_middle_pos, 0.6).set_trans(Tween.TRANS_LINEAR)
+	if should_move_to_target:
+		# Start movement tween - quick step forward
+		var tween_forward = create_tween()
+		tween_forward.set_parallel(false)
+		tween_forward.tween_property(attacker_panel, "position", attack_pos, 0.25).set_trans(Tween.TRANS_LINEAR)
 
-	# Animate ONLY walk cycles - 6 frames at 0.1s each = 0.6s (walk_1, walk_2, walk_1, walk_2, walk_1, walk_2)
-	for i in range(6):
-		var frame_suffix = "_1" if i % 2 == 0 else "_2"
+		# Animate walk cycle in parallel - 2 frames at 0.125s each = 0.25s
+		for i in range(2):
+			var frame_suffix = "_1" if i % 2 == 0 else "_2"
+			var attacker_walk_anim = "walk_" + attacker_approach_dir + frame_suffix
+			if character.animations.has(attacker_walk_anim):
+				var walk_frames = character.animations[attacker_walk_anim]
+				if walk_frames.size() > 0:
+					var frame_data = walk_frames[0]
+					var atlas_index = frame_data.get("atlas_index", 0)
+					var row = frame_data.get("row", 0)
+					var col = frame_data.get("col", 0)
+					var walk_texture = get_sprite_texture_from_coords(atlas_index, row, col)
+					if walk_texture:
+						sprite_node.texture = walk_texture
+			await get_tree().create_timer(0.125).timeout
 
-		# Attacker: PlayerArea walks LEFT, EnemyArea walks RIGHT
-		var attacker_walk_anim = "walk_" + attacker_approach_dir + frame_suffix
-		if character.animations.has(attacker_walk_anim):
-			var walk_frames = character.animations[attacker_walk_anim]
-			if walk_frames.size() > 0:
-				var frame_data = walk_frames[0]
-				var atlas_index = frame_data.get("atlas_index", 0)
-				var row = frame_data.get("row", 0)
-				var col = frame_data.get("col", 0)
-				var walk_texture = get_sprite_texture_from_coords(atlas_index, row, col)
-				if walk_texture:
-					sprite_node.texture = walk_texture
-
-		# Target: PlayerArea walks LEFT, EnemyArea walks RIGHT
-		var target_walk_anim = "walk_" + target_approach_dir + frame_suffix
-		if target_character_data.has("animations") and target_character_data.animations.has(target_walk_anim):
-			var target_walk_frames = target_character_data.animations[target_walk_anim]
-			if target_walk_frames.size() > 0:
-				var frame_data = target_walk_frames[0]
-				var atlas_index = frame_data.get("atlas_index", 0)
-				var row = frame_data.get("row", 0)
-				var col = frame_data.get("col", 0)
-				var target_walk_texture = get_sprite_texture_from_coords(atlas_index, row, col)
-				if target_walk_texture:
-					target_sprite.texture = target_walk_texture
-
-		await get_tree().create_timer(0.1).timeout
-
-	# PAUSE when they meet in the middle
-	await get_tree().create_timer(0.2).timeout
+		# Wait for tween to complete (in case of timing mismatch)
+		if tween_forward and tween_forward.is_running():
+			await tween_forward.finished
 
 	# ========================================
 	# PHASE 2: ATTACK SEQUENCE
 	# ========================================
-	# CHARGE-UP SEQUENCE: Spin animation (down -> left)
-	# Frame 1: Face down
-	if character.animations.has("walk_down_1"):
-		var down_frames = character.animations["walk_down_1"]
-		if down_frames.size() > 0:
-			var frame_data = down_frames[0]
-			var atlas_index = frame_data.get("atlas_index", 0)
-			var row = frame_data.get("row", 0)
-			var col = frame_data.get("col", 0)
-			var down_texture = get_sprite_texture_from_coords(atlas_index, row, col)
-			if down_texture:
-				sprite_node.texture = down_texture
-	await get_tree().create_timer(0.1).timeout
-
-	# Frame 2: Face left
-	if character.animations.has("walk_left_1"):
-		var left_frames = character.animations["walk_left_1"]
-		if left_frames.size() > 0:
-			var frame_data = left_frames[0]
-			var atlas_index = frame_data.get("atlas_index", 0)
-			var row = frame_data.get("row", 0)
-			var col = frame_data.get("col", 0)
-			var left_texture = get_sprite_texture_from_coords(atlas_index, row, col)
-			if left_texture:
-				sprite_node.texture = left_texture
-	await get_tree().create_timer(0.1).timeout
-
-	# Charge pause
-	await get_tree().create_timer(0.15).timeout
-
-	# PHASE 2: Attack animation at peak
+	# Show attack animation
 	if character.animations.has(attack_direction):
 		var attack_frames = character.animations[attack_direction]
 		if attack_frames.size() > 0:
@@ -1001,6 +1587,8 @@ func play_attack_animation(sprite_node: TextureRect, character: Dictionary, atta
 			var attack_texture = get_sprite_texture_from_coords(atlas_index, row, col)
 			if attack_texture:
 				sprite_node.texture = attack_texture
+
+	await get_tree().create_timer(0.15).timeout
 
 	# Show slash effect on target center
 	if target_sprite:
@@ -1063,49 +1651,40 @@ func play_attack_animation(sprite_node: TextureRect, character: Dictionary, atta
 		await get_tree().create_timer(0.08).timeout
 
 	# ========================================
-	# PHASE 3: WALK BACK TO ORIGINAL POSITIONS (ONLY WALK ANIMATIONS)
+	# PHASE 3: RETURN (MELEE OR HYBRID IN FRONT ROW)
 	# ========================================
-	var tween_back = create_tween()
-	tween_back.set_parallel(true)
-	tween_back.tween_property(attacker_panel, "position", attacker_original_pos, 0.6).set_trans(Tween.TRANS_LINEAR)
-	tween_back.tween_property(target_panel, "position", target_original_pos, 0.6).set_trans(Tween.TRANS_LINEAR)
+	if should_move_to_target:
+		# Start return tween - quick step back
+		var tween_back = create_tween()
+		tween_back.set_parallel(false)
+		tween_back.tween_property(attacker_panel, "position", attacker_original_pos, 0.25).set_trans(Tween.TRANS_LINEAR)
 
-	# Animate ONLY walk cycles - 6 frames at 0.1s each = 0.6s (walk_1, walk_2, walk_1, walk_2, walk_1, walk_2)
-	for i in range(6):
-		var frame_suffix = "_1" if i % 2 == 0 else "_2"
+		# Animate walk cycle in parallel - 2 frames at 0.125s each = 0.25s
+		for i in range(2):
+			var frame_suffix = "_1" if i % 2 == 0 else "_2"
+			var attacker_return_anim = "walk_" + attacker_return_dir + frame_suffix
+			if character.animations.has(attacker_return_anim):
+				var walk_frames = character.animations[attacker_return_anim]
+				if walk_frames.size() > 0:
+					var frame_data = walk_frames[0]
+					var atlas_index = frame_data.get("atlas_index", 0)
+					var row = frame_data.get("row", 0)
+					var col = frame_data.get("col", 0)
+					var walk_texture = get_sprite_texture_from_coords(atlas_index, row, col)
+					if walk_texture:
+						sprite_node.texture = walk_texture
+			await get_tree().create_timer(0.125).timeout
 
-		# Attacker: PlayerArea walks RIGHT to return, EnemyArea walks LEFT to return
-		var attacker_return_anim = "walk_" + attacker_return_dir + frame_suffix
-		if character.animations.has(attacker_return_anim):
-			var walk_frames = character.animations[attacker_return_anim]
-			if walk_frames.size() > 0:
-				var frame_data = walk_frames[0]
-				var atlas_index = frame_data.get("atlas_index", 0)
-				var row = frame_data.get("row", 0)
-				var col = frame_data.get("col", 0)
-				var walk_texture = get_sprite_texture_from_coords(atlas_index, row, col)
-				if walk_texture:
-					sprite_node.texture = walk_texture
+		# Wait for tween to complete (in case of timing mismatch)
+		if tween_back and tween_back.is_running():
+			await tween_back.finished
 
-		# Target: PlayerArea walks RIGHT to return, EnemyArea walks LEFT to return
-		var target_return_anim = "walk_" + target_return_dir + frame_suffix
-		if target_character_data.has("animations") and target_character_data.animations.has(target_return_anim):
-			var target_walk_frames = target_character_data.animations[target_return_anim]
-			if target_walk_frames.size() > 0:
-				var frame_data = target_walk_frames[0]
-				var atlas_index = frame_data.get("atlas_index", 0)
-				var row = frame_data.get("row", 0)
-				var col = frame_data.get("col", 0)
-				var target_walk_texture = get_sprite_texture_from_coords(atlas_index, row, col)
-				if target_walk_texture:
-					target_sprite.texture = target_walk_texture
-
-		await get_tree().create_timer(0.1).timeout
-
-	# Return both to idle sprites
+	# Return both to idle (facing down)
 	load_character_sprite(character, sprite_node)
 	if target_character_data.has("animations"):
 		load_character_sprite(target_character_data, target_sprite)
+
+	is_animating_attack = false  # Re-enable position enforcement
 
 func show_damage_number(position: Vector2, damage: int):
 	"""Show floating damage number that rises and fades"""
@@ -1142,22 +1721,179 @@ func animate_hp_bar(hp_bar: ProgressBar, new_hp: float, max_hp: float):
 
 func end_battle(victory: bool):
 	"""End battle with victory or defeat"""
-	if victory:
-		turn_info.text = "VICTORY! You defeated all enemies!"
-		print("=== VICTORY ===")
-	else:
-		turn_info.text = "DEFEAT! You were defeated..."
-		print("=== DEFEAT ===")
-
 	# Disable all buttons
 	attack_button.disabled = true
 	defend_button.disabled = true
 	skills_button.disabled = true
 	items_button.disabled = true
 
-	# Return to dev client after delay
-	await get_tree().create_timer(3.0).timeout
+	if victory:
+		turn_info.text = "VICTORY! You defeated all enemies!"
+		print("=== VICTORY ===")
+
+		# Calculate rewards
+		var rewards = calculate_rewards()
+
+		# Update popup text
+		result_title.text = "VICTORY!"
+		result_title.modulate = Color(0.2, 1.0, 0.2)  # Green
+		xp_label.text = "XP Gained: " + str(rewards.xp)
+		gold_label.text = "Gold Earned: " + str(rewards.gold)
+
+		# Show popup
+		result_popup.visible = true
+	else:
+		turn_info.text = "DEFEAT! You were defeated..."
+		print("=== DEFEAT ===")
+
+		# Update popup text
+		result_title.text = "DEFEAT!"
+		result_title.modulate = Color(1.0, 0.2, 0.2)  # Red
+		xp_label.text = "XP Gained: 0"
+		gold_label.text = "Gold Earned: 0"
+
+		# Show popup
+		result_popup.visible = true
+
+func calculate_rewards() -> Dictionary:
+	"""Calculate XP and gold rewards based on enemies defeated"""
+	var total_xp = 0
+	var total_gold = 0
+
+	# Base rewards per enemy (can be customized per enemy later)
+	for enemy in enemy_squad:
+		# Base XP: 10-50 depending on enemy level/stats
+		var enemy_level = 1
+		if enemy.has("level"):
+			enemy_level = enemy.level
+		var base_xp = 10 + (enemy_level * 5)
+		total_xp += base_xp
+
+		# Base gold: 5-25 depending on enemy level
+		var base_gold = 5 + (enemy_level * 2)
+		total_gold += base_gold
+
+	print("Rewards calculated: %d XP, %d Gold" % [total_xp, total_gold])
+	return {"xp": total_xp, "gold": total_gold}
+
+func _on_continue_button_pressed():
+	"""Return to dev client when continue button is pressed"""
+	result_popup.visible = false
 	get_tree().change_scene_to_file("res://dev_client.tscn")
+
+func _on_hide_ui_pressed():
+	"""Toggle visibility of developer UI elements"""
+	ui_elements_hidden = !ui_elements_hidden
+
+	# Hide/show layout buttons
+	if layout_buttons_container:
+		layout_buttons_container.visible = !ui_elements_hidden
+
+	# Hide/show title bars and lock buttons on all panels
+	var panels = [
+		enemy_panel_1, enemy_panel_2, enemy_panel_3,
+		enemy_panel_4, enemy_panel_5, enemy_panel_6,
+		ally_panel_1, ally_panel_2, ally_panel_3,
+		ally_panel_4, ally_panel_5, ally_panel_6
+	]
+
+	for panel in panels:
+		if panel and panel.has_node("TitleBar"):
+			panel.get_node("TitleBar").visible = !ui_elements_hidden
+
+		# When UI is hidden, panel background should be transparent
+		if ui_elements_hidden:
+			panel.self_modulate = Color(1, 1, 1, 0.0)
+		else:
+			panel.self_modulate = Color(1, 1, 1, 1.0)
+
+	# Hide/show UIPanel background (keep action buttons and turn info visible)
+	var ui_panel = get_node("UIPanel")
+	if ui_panel:
+		if ui_elements_hidden:
+			ui_panel.self_modulate = Color(1, 1, 1, 0.0)  # Transparent background
+		else:
+			ui_panel.self_modulate = Color(1, 1, 1, 1.0)  # Visible background
+
+	# Toggle between original bars and floating overlays
+	if ui_elements_hidden:
+		# Hide original HP/MP bars and labels
+		for i in range(6):
+			enemy_hp_bars[i].visible = false
+			enemy_hp_labels[i].visible = false
+			ally_hp_bars[i].visible = false
+			ally_hp_labels[i].visible = false
+			ally_mp_bars[i].visible = false
+			ally_mp_labels[i].visible = false
+			enemy_names[i].visible = false
+			ally_names[i].visible = false
+
+		# Show and position floating overlays
+		update_floating_overlays()
+		for i in range(6):
+			enemy_stat_overlays[i].visible = true
+			ally_stat_overlays[i].visible = true
+	else:
+		# Show original HP/MP bars and labels
+		for i in range(6):
+			enemy_hp_bars[i].visible = true
+			enemy_hp_labels[i].visible = true
+			ally_hp_bars[i].visible = true
+			ally_hp_labels[i].visible = true
+			ally_mp_bars[i].visible = true
+			ally_mp_labels[i].visible = true
+			enemy_names[i].visible = true
+			ally_names[i].visible = true
+
+		# Hide floating overlays
+		for i in range(6):
+			enemy_stat_overlays[i].visible = false
+			ally_stat_overlays[i].visible = false
+
+	print("UI elements %s" % ("hidden" if ui_elements_hidden else "shown"))
+
+func update_floating_overlays():
+	"""Update positions and values of floating HP/MP/Energy overlays to match sprites"""
+	# Update enemy stat overlays (HP only)
+	for i in range(6):
+		var hp_bar = enemy_stat_overlays[i].get_child(0)
+		hp_bar.max_value = enemy_hp_bars[i].max_value
+		hp_bar.value = enemy_hp_bars[i].value
+
+	# Update ally stat overlays (HP + MP + Energy)
+	for i in range(6):
+		var hp_bar = ally_stat_overlays[i].get_child(0)
+		hp_bar.max_value = ally_hp_bars[i].max_value
+		hp_bar.value = ally_hp_bars[i].value
+
+		var mp_bar = ally_stat_overlays[i].get_child(1)
+		mp_bar.max_value = ally_mp_bars[i].max_value
+		mp_bar.value = ally_mp_bars[i].value
+
+		var energy_bar = ally_stat_overlays[i].get_child(2)
+		energy_bar.max_value = 100
+		energy_bar.value = 100  # Placeholder
+
+	# Update positions
+	update_floating_overlay_positions()
+
+func update_floating_overlay_positions():
+	"""Update positions of floating overlays to follow sprites"""
+	# Center enemy stat overlays above sprites
+	for i in range(6):
+		var sprite_global_pos = enemy_sprites[i].global_position
+		var sprite_size = enemy_sprites[i].size
+		# Center horizontally: sprite center - half overlay width
+		var centered_x = sprite_global_pos.x + (sprite_size.x / 2) - 25  # 25 = half of 50px width
+		enemy_stat_overlays[i].position = Vector2(centered_x, sprite_global_pos.y - 10)
+
+	# Center ally stat overlays above sprites
+	for i in range(6):
+		var sprite_global_pos = ally_sprites[i].global_position
+		var sprite_size = ally_sprites[i].size
+		# Center horizontally: sprite center - half overlay width
+		var centered_x = sprite_global_pos.x + (sprite_size.x / 2) - 25  # 25 = half of 50px width
+		ally_stat_overlays[i].position = Vector2(centered_x, sprite_global_pos.y - 20)
 
 func _on_save_layout_pressed():
 	"""Save battle UI layout to file"""
@@ -1165,9 +1901,10 @@ func _on_save_layout_pressed():
 	print("Battle layout saved!")
 
 func _on_reset_layout_pressed():
-	"""Reset all panels to default positions"""
-	reset_battle_layout()
-	print("Battle layout reset to defaults!")
+	"""Reset all panels to default positions and force perfect alignment"""
+	auto_align_all_panels()  # Force perfect grid alignment
+	# Don't lock - enforce_panel_alignment() runs every frame to maintain positions
+	print("Battle layout reset to perfect grid alignment!")
 
 func save_battle_layout():
 	"""Save panel positions and states to JSON file"""
@@ -1255,53 +1992,231 @@ func load_battle_layout():
 
 func reset_battle_layout():
 	"""Reset all panels to their default positions and sizes"""
-	# Reset enemy panels
-	enemy_panel_1.position = DEFAULT_POSITIONS.enemy_panel_1.position
-	enemy_panel_1.size = DEFAULT_POSITIONS.enemy_panel_1.size
+	# MUST match auto_align_all_panels() and enforce_panel_alignment() EXACTLY
+	# Both EnemyArea and PlayerArea are 600px wide for perfect symmetry
+	const ENEMY_BACK_X = 65.0
+	const ENEMY_FRONT_X = 265.0    # Moved 100px left toward center
+	const ALLY_FRONT_X = 165.0     # Moved 100px right toward center
+	const ALLY_BACK_X = 365.0
+	const ROW_1_Y = 90.0
+	const ROW_2_Y = 250.0
+	const ROW_3_Y = 410.0
 
-	enemy_panel_2.position = DEFAULT_POSITIONS.enemy_panel_2.position
-	enemy_panel_2.size = DEFAULT_POSITIONS.enemy_panel_2.size
+	# Use POSITION property (layout_mode = 0 uses position for visual rendering, not offset!)
+	const PANEL_WIDTH = 170.0
+	const ENEMY_HEIGHT = 290.0
+	const ALLY_HEIGHT = 320.0
 
-	enemy_panel_3.position = DEFAULT_POSITIONS.enemy_panel_3.position
-	enemy_panel_3.size = DEFAULT_POSITIONS.enemy_panel_3.size
+	# Reset enemy panels with EXACT positions
+	enemy_panel_1.position = Vector2(ENEMY_FRONT_X, ROW_1_Y)
+	enemy_panel_1.size = Vector2(PANEL_WIDTH, ENEMY_HEIGHT)
 
-	enemy_panel_4.position = DEFAULT_POSITIONS.enemy_panel_4.position
-	enemy_panel_4.size = DEFAULT_POSITIONS.enemy_panel_4.size
+	enemy_panel_2.position = Vector2(ENEMY_FRONT_X, ROW_2_Y)
+	enemy_panel_2.size = Vector2(PANEL_WIDTH, ENEMY_HEIGHT)
 
-	enemy_panel_5.position = DEFAULT_POSITIONS.enemy_panel_5.position
-	enemy_panel_5.size = DEFAULT_POSITIONS.enemy_panel_5.size
+	enemy_panel_3.position = Vector2(ENEMY_FRONT_X, ROW_3_Y)
+	enemy_panel_3.size = Vector2(PANEL_WIDTH, ENEMY_HEIGHT)
 
-	enemy_panel_6.position = DEFAULT_POSITIONS.enemy_panel_6.position
-	enemy_panel_6.size = DEFAULT_POSITIONS.enemy_panel_6.size
+	enemy_panel_4.position = Vector2(ENEMY_BACK_X, ROW_1_Y)
+	enemy_panel_4.size = Vector2(PANEL_WIDTH, ENEMY_HEIGHT)
 
-	# Reset ally panels
-	ally_panel_1.position = DEFAULT_POSITIONS.ally_panel_1.position
-	ally_panel_1.size = DEFAULT_POSITIONS.ally_panel_1.size
+	enemy_panel_5.position = Vector2(ENEMY_BACK_X, ROW_2_Y)
+	enemy_panel_5.size = Vector2(PANEL_WIDTH, ENEMY_HEIGHT)
 
-	ally_panel_2.position = DEFAULT_POSITIONS.ally_panel_2.position
-	ally_panel_2.size = DEFAULT_POSITIONS.ally_panel_2.size
+	enemy_panel_6.position = Vector2(ENEMY_BACK_X, ROW_3_Y)
+	enemy_panel_6.size = Vector2(PANEL_WIDTH, ENEMY_HEIGHT)
 
-	ally_panel_3.position = DEFAULT_POSITIONS.ally_panel_3.position
-	ally_panel_3.size = DEFAULT_POSITIONS.ally_panel_3.size
+	# Reset ally panels with EXACT positions
+	ally_panel_1.position = Vector2(ALLY_FRONT_X, ROW_1_Y)
+	ally_panel_1.size = Vector2(PANEL_WIDTH, ALLY_HEIGHT)
 
-	ally_panel_4.position = DEFAULT_POSITIONS.ally_panel_4.position
-	ally_panel_4.size = DEFAULT_POSITIONS.ally_panel_4.size
+	ally_panel_2.position = Vector2(ALLY_FRONT_X, ROW_2_Y)
+	ally_panel_2.size = Vector2(PANEL_WIDTH, ALLY_HEIGHT)
 
-	ally_panel_5.position = DEFAULT_POSITIONS.ally_panel_5.position
-	ally_panel_5.size = DEFAULT_POSITIONS.ally_panel_5.size
+	ally_panel_3.position = Vector2(ALLY_FRONT_X, ROW_3_Y)
+	ally_panel_3.size = Vector2(PANEL_WIDTH, ALLY_HEIGHT)
 
-	ally_panel_6.position = DEFAULT_POSITIONS.ally_panel_6.position
-	ally_panel_6.size = DEFAULT_POSITIONS.ally_panel_6.size
+	ally_panel_4.position = Vector2(ALLY_BACK_X, ROW_1_Y)
+	ally_panel_4.size = Vector2(PANEL_WIDTH, ALLY_HEIGHT)
+
+	ally_panel_5.position = Vector2(ALLY_BACK_X, ROW_2_Y)
+	ally_panel_5.size = Vector2(PANEL_WIDTH, ALLY_HEIGHT)
+
+	ally_panel_6.position = Vector2(ALLY_BACK_X, ROW_3_Y)
+	ally_panel_6.size = Vector2(PANEL_WIDTH, ALLY_HEIGHT)
 
 	# Reset UI panel
-	ui_panel.position = DEFAULT_POSITIONS.ui_panel.position
-	ui_panel.size = DEFAULT_POSITIONS.ui_panel.size
+	ui_panel.position = Vector2(300, 500)
+	ui_panel.size = Vector2(680, 180)
+
+	# Don't lock - enforce_panel_alignment() maintains positions every frame
 
 	print("✓ All panels reset to default positions")
 
+func auto_lock_all_panels():
+	"""Lock all battle panels to prevent movement"""
+	var panels = [
+		enemy_panel_1, enemy_panel_2, enemy_panel_3,
+		enemy_panel_4, enemy_panel_5, enemy_panel_6,
+		ally_panel_1, ally_panel_2, ally_panel_3,
+		ally_panel_4, ally_panel_5, ally_panel_6
+	]
+
+	for panel in panels:
+		if panel and "is_locked" in panel:
+			panel.is_locked = true
+			panel.update_visual_state()
+
+func auto_align_all_panels():
+	"""Force all panels into perfect grid alignment based on container dimensions"""
+	# WINDOW: 1280x720
+	# Combat area layout: LeftSpacer(50) + EnemyArea(600) + MiddleSpacer(100) + PlayerArea(600) + RightSpacer(50)
+
+	# PERFECT SYMMETRICAL LAYOUT - BOTH AREAS 600px WIDE:
+	# Panel width: 170px
+	# Panel height: Enemy=290px, Ally=320px
+
+	# ENEMY AREA (600px wide):
+	# Back column: x=65 (left side)
+	# Front column: x=265 (moved even closer to center for tight formation)
+	const ENEMY_BACK_X = 65.0     # Back row (further from allies)
+	const ENEMY_FRONT_X = 265.0   # Front row (closer to allies) - moved 100px left
+
+	# ALLY AREA (600px wide) - SYMMETRICAL SPACING:
+	# Front column: x=165 (moved closer to center to face enemies)
+	# Back column: x=365 (right side)
+	const ALLY_FRONT_X = 165.0    # Front row (closer to enemies) - moved 100px right
+	const ALLY_BACK_X = 365.0     # Back row (further from enemies)
+
+	# VERTICAL POSITIONS - Positioned to clear top menus:
+	# Start at y=90 for good spacing below action buttons
+	# 3 rows with 160px spacing between each
+	const ROW_1_Y = 90.0          # Top row
+	const ROW_2_Y = 250.0         # Middle row (90 + 160)
+	const ROW_3_Y = 410.0         # Bottom row (250 + 160)
+
+	# EXACT sizes
+	const ENEMY_SIZE = Vector2(170.0, 290.0)
+	const ALLY_SIZE = Vector2(170.0, 320.0)
+
+	# Use POSITION property (layout_mode = 0 uses position for visual rendering, not offset!)
+	const PANEL_WIDTH = 170.0
+	const ENEMY_HEIGHT = 290.0
+	const ALLY_HEIGHT = 320.0
+
+	# ===== ENEMY FRONT ROW =====
+	enemy_panel_1.position = Vector2(ENEMY_FRONT_X, ROW_1_Y)
+	enemy_panel_1.size = Vector2(PANEL_WIDTH, ENEMY_HEIGHT)
+
+	enemy_panel_2.position = Vector2(ENEMY_FRONT_X, ROW_2_Y)
+	enemy_panel_2.size = Vector2(PANEL_WIDTH, ENEMY_HEIGHT)
+
+	enemy_panel_3.position = Vector2(ENEMY_FRONT_X, ROW_3_Y)
+	enemy_panel_3.size = Vector2(PANEL_WIDTH, ENEMY_HEIGHT)
+
+	# ===== ENEMY BACK ROW =====
+	enemy_panel_4.position = Vector2(ENEMY_BACK_X, ROW_1_Y)
+	enemy_panel_4.size = Vector2(PANEL_WIDTH, ENEMY_HEIGHT)
+
+	enemy_panel_5.position = Vector2(ENEMY_BACK_X, ROW_2_Y)
+	enemy_panel_5.size = Vector2(PANEL_WIDTH, ENEMY_HEIGHT)
+
+	enemy_panel_6.position = Vector2(ENEMY_BACK_X, ROW_3_Y)
+	enemy_panel_6.size = Vector2(PANEL_WIDTH, ENEMY_HEIGHT)
+
+	# ===== ALLY FRONT ROW =====
+	ally_panel_1.position = Vector2(ALLY_FRONT_X, ROW_1_Y)
+	ally_panel_1.size = Vector2(PANEL_WIDTH, ALLY_HEIGHT)
+
+	ally_panel_2.position = Vector2(ALLY_FRONT_X, ROW_2_Y)
+	ally_panel_2.size = Vector2(PANEL_WIDTH, ALLY_HEIGHT)
+
+	ally_panel_3.position = Vector2(ALLY_FRONT_X, ROW_3_Y)
+	ally_panel_3.size = Vector2(PANEL_WIDTH, ALLY_HEIGHT)
+
+	# ===== ALLY BACK ROW =====
+	ally_panel_4.position = Vector2(ALLY_BACK_X, ROW_1_Y)
+	ally_panel_4.size = Vector2(PANEL_WIDTH, ALLY_HEIGHT)
+
+	ally_panel_5.position = Vector2(ALLY_BACK_X, ROW_2_Y)
+	ally_panel_5.size = Vector2(PANEL_WIDTH, ALLY_HEIGHT)
+
+	ally_panel_6.position = Vector2(ALLY_BACK_X, ROW_3_Y)
+	ally_panel_6.size = Vector2(PANEL_WIDTH, ALLY_HEIGHT)
+
+func enforce_panel_alignment():
+	"""Silently enforce perfect alignment every frame to prevent any drift"""
+	# MUST match auto_align_all_panels() constants EXACTLY
+	# Both EnemyArea and PlayerArea are 600px wide for perfect symmetry
+	const ENEMY_BACK_X = 65.0
+	const ENEMY_FRONT_X = 265.0    # Moved 100px left toward center
+	const ALLY_FRONT_X = 165.0     # Moved 100px right toward center
+	const ALLY_BACK_X = 365.0
+	const ROW_1_Y = 90.0
+	const ROW_2_Y = 250.0
+	const ROW_3_Y = 410.0
+
+	const PANEL_WIDTH = 170.0
+	const ENEMY_PANEL_HEIGHT = 290.0
+	const ALLY_PANEL_HEIGHT = 320.0
+
+	# First, disable dragging on all panels to prevent interference
+	for panel in [enemy_panel_1, enemy_panel_2, enemy_panel_3, enemy_panel_4, enemy_panel_5, enemy_panel_6,
+				  ally_panel_1, ally_panel_2, ally_panel_3, ally_panel_4, ally_panel_5, ally_panel_6]:
+		if panel and "is_dragging" in panel:
+			panel.is_dragging = false
+		if panel and "is_resizing" in panel:
+			panel.is_resizing = false
+
+	# FORCE positions using POSITION property (layout_mode = 0 uses position, not offset!)
+	if enemy_panel_1:
+		enemy_panel_1.position = Vector2(ENEMY_FRONT_X, ROW_1_Y)
+		enemy_panel_1.size = Vector2(PANEL_WIDTH, ENEMY_PANEL_HEIGHT)
+	if enemy_panel_2:
+		enemy_panel_2.position = Vector2(ENEMY_FRONT_X, ROW_2_Y)
+		enemy_panel_2.size = Vector2(PANEL_WIDTH, ENEMY_PANEL_HEIGHT)
+	if enemy_panel_3:
+		enemy_panel_3.position = Vector2(ENEMY_FRONT_X, ROW_3_Y)
+		enemy_panel_3.size = Vector2(PANEL_WIDTH, ENEMY_PANEL_HEIGHT)
+	if enemy_panel_4:
+		enemy_panel_4.position = Vector2(ENEMY_BACK_X, ROW_1_Y)
+		enemy_panel_4.size = Vector2(PANEL_WIDTH, ENEMY_PANEL_HEIGHT)
+	if enemy_panel_5:
+		enemy_panel_5.position = Vector2(ENEMY_BACK_X, ROW_2_Y)
+		enemy_panel_5.size = Vector2(PANEL_WIDTH, ENEMY_PANEL_HEIGHT)
+	if enemy_panel_6:
+		enemy_panel_6.position = Vector2(ENEMY_BACK_X, ROW_3_Y)
+		enemy_panel_6.size = Vector2(PANEL_WIDTH, ENEMY_PANEL_HEIGHT)
+
+	if ally_panel_1:
+		ally_panel_1.position = Vector2(ALLY_FRONT_X, ROW_1_Y)
+		ally_panel_1.size = Vector2(PANEL_WIDTH, ALLY_PANEL_HEIGHT)
+	if ally_panel_2:
+		ally_panel_2.position = Vector2(ALLY_FRONT_X, ROW_2_Y)
+		ally_panel_2.size = Vector2(PANEL_WIDTH, ALLY_PANEL_HEIGHT)
+	if ally_panel_3:
+		ally_panel_3.position = Vector2(ALLY_FRONT_X, ROW_3_Y)
+		ally_panel_3.size = Vector2(PANEL_WIDTH, ALLY_PANEL_HEIGHT)
+	if ally_panel_4:
+		ally_panel_4.position = Vector2(ALLY_BACK_X, ROW_1_Y)
+		ally_panel_4.size = Vector2(PANEL_WIDTH, ALLY_PANEL_HEIGHT)
+	if ally_panel_5:
+		ally_panel_5.position = Vector2(ALLY_BACK_X, ROW_2_Y)
+		ally_panel_5.size = Vector2(PANEL_WIDTH, ALLY_PANEL_HEIGHT)
+	if ally_panel_6:
+		ally_panel_6.position = Vector2(ALLY_BACK_X, ROW_3_Y)
+		ally_panel_6.size = Vector2(PANEL_WIDTH, ALLY_PANEL_HEIGHT)
+
 func spawn_impact_particles(hit_position: Vector2):
 	"""Spawn particle effect at attack impact location"""
-	var impact_scene = preload("res://effects/attack_impact.tscn")
+	# Check if impact effect exists before loading
+	if not ResourceLoader.exists("res://effects/attack_impact.tscn"):
+		return
+
+	var impact_scene = load("res://effects/attack_impact.tscn")
+	if not impact_scene:
+		return
+
 	var particles_node = impact_scene.instantiate()
 	if particles_node:
 		particles_node.position = hit_position

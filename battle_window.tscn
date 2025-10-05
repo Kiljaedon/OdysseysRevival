@@ -1,0 +1,1052 @@
+[gd_scene load_steps=5 format=3 uid="uid://battle_window_001"]
+
+[ext_resource type="Script" path="res://battle_window.gd" id="1"]
+[ext_resource type="Script" path="res://battle_panel.gd" id="2"]
+[ext_resource type="Material" path="res://shaders/smooth_material.tres" id="3"]
+[ext_resource type="Texture2D" path="res://assets/battle_backgrounds/grassy_field.png" id="4"]
+
+[node name="BattleWindow" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+
+[node name="Background" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -288.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("4")
+expand_mode = 1
+stretch_mode = 1
+
+[node name="BattleContainer" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="TopSpacer" type="Control" parent="BattleContainer"]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+
+[node name="BattleTitle" type="Label" parent="BattleContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "BATTLE"
+horizontal_alignment = 1
+
+[node name="CombatArea" type="HBoxContainer" parent="BattleContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+alignment = 1
+
+[node name="LeftSpacer" type="Control" parent="BattleContainer/CombatArea"]
+custom_minimum_size = Vector2(50, 0)
+layout_mode = 2
+
+[node name="EnemyArea" type="Control" parent="BattleContainer/CombatArea"]
+custom_minimum_size = Vector2(600, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="EnemyPanel1" type="Panel" parent="BattleContainer/CombatArea/EnemyArea"]
+layout_mode = 0
+offset_left = 380.0
+offset_top = 100.0
+offset_right = 550.0
+offset_bottom = 390.0
+script = ExtResource("2")
+panel_title = "Enemy 1"
+can_resize = false
+
+[node name="EnemyUnit1" type="VBoxContainer" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel1"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 55.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 5
+
+[node name="EnemySprite1" type="TextureRect" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel1/EnemyUnit1"]
+material = ExtResource("3")
+custom_minimum_size = Vector2(120, 120)
+layout_mode = 2
+size_flags_horizontal = 4
+expand_mode = 1
+stretch_mode = 5
+texture_filter = 1
+
+[node name="EnemyName1" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel1/EnemyUnit1"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Enemy 1"
+horizontal_alignment = 1
+
+[node name="EnemyHPBar1" type="ProgressBar" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel1/EnemyUnit1"]
+custom_minimum_size = Vector2(160, 24)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="EnemyHPLabel1" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel1/EnemyUnit1"]
+layout_mode = 2
+text = "HP: 100 / 100"
+horizontal_alignment = 1
+
+[node name="EnemyMPBar1" type="ProgressBar" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel1/EnemyUnit1"]
+custom_minimum_size = Vector2(160, 20)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="EnemyMPLabel1" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel1/EnemyUnit1"]
+layout_mode = 2
+text = "MP: 50 / 50"
+horizontal_alignment = 1
+
+[node name="EnemyEnergyBar1" type="ProgressBar" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel1/EnemyUnit1"]
+custom_minimum_size = Vector2(160, 20)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="EnemyEnergyLabel1" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel1/EnemyUnit1"]
+layout_mode = 2
+text = "Energy: 100 / 100"
+horizontal_alignment = 1
+
+[node name="EnemyPanel2" type="Panel" parent="BattleContainer/CombatArea/EnemyArea"]
+layout_mode = 0
+offset_left = 380.0
+offset_top = 260.0
+offset_right = 550.0
+offset_bottom = 550.0
+script = ExtResource("2")
+panel_title = "Enemy 2"
+can_resize = false
+
+[node name="EnemyUnit2" type="VBoxContainer" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel2"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 55.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 5
+
+[node name="EnemySprite2" type="TextureRect" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel2/EnemyUnit2"]
+material = ExtResource("3")
+custom_minimum_size = Vector2(120, 120)
+layout_mode = 2
+size_flags_horizontal = 4
+expand_mode = 1
+stretch_mode = 5
+texture_filter = 1
+
+[node name="EnemyName2" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel2/EnemyUnit2"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Enemy 2"
+horizontal_alignment = 1
+
+[node name="EnemyHPBar2" type="ProgressBar" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel2/EnemyUnit2"]
+custom_minimum_size = Vector2(160, 24)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="EnemyHPLabel2" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel2/EnemyUnit2"]
+layout_mode = 2
+text = "HP: 100 / 100"
+horizontal_alignment = 1
+
+[node name="EnemyMPBar2" type="ProgressBar" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel2/EnemyUnit2"]
+custom_minimum_size = Vector2(160, 20)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="EnemyMPLabel2" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel2/EnemyUnit2"]
+layout_mode = 2
+text = "MP: 50 / 50"
+horizontal_alignment = 1
+
+[node name="EnemyEnergyBar2" type="ProgressBar" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel2/EnemyUnit2"]
+custom_minimum_size = Vector2(160, 20)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="EnemyEnergyLabel2" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel2/EnemyUnit2"]
+layout_mode = 2
+text = "Energy: 100 / 100"
+horizontal_alignment = 1
+
+[node name="EnemyPanel3" type="Panel" parent="BattleContainer/CombatArea/EnemyArea"]
+layout_mode = 0
+offset_left = 380.0
+offset_top = 420.0
+offset_right = 550.0
+offset_bottom = 710.0
+script = ExtResource("2")
+panel_title = "Enemy 3"
+can_resize = false
+
+[node name="EnemyUnit3" type="VBoxContainer" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel3"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 55.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 5
+
+[node name="EnemySprite3" type="TextureRect" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel3/EnemyUnit3"]
+material = ExtResource("3")
+custom_minimum_size = Vector2(120, 120)
+layout_mode = 2
+size_flags_horizontal = 4
+expand_mode = 1
+stretch_mode = 5
+texture_filter = 1
+
+[node name="EnemyName3" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel3/EnemyUnit3"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Enemy 3"
+horizontal_alignment = 1
+
+[node name="EnemyHPBar3" type="ProgressBar" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel3/EnemyUnit3"]
+custom_minimum_size = Vector2(160, 24)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="EnemyHPLabel3" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel3/EnemyUnit3"]
+layout_mode = 2
+text = "HP: 100 / 100"
+horizontal_alignment = 1
+
+[node name="EnemyMPBar3" type="ProgressBar" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel3/EnemyUnit3"]
+custom_minimum_size = Vector2(160, 20)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="EnemyMPLabel3" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel3/EnemyUnit3"]
+layout_mode = 2
+text = "MP: 50 / 50"
+horizontal_alignment = 1
+
+[node name="EnemyEnergyBar3" type="ProgressBar" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel3/EnemyUnit3"]
+custom_minimum_size = Vector2(160, 20)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="EnemyEnergyLabel3" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel3/EnemyUnit3"]
+layout_mode = 2
+text = "Energy: 100 / 100"
+horizontal_alignment = 1
+
+[node name="EnemyPanel4" type="Panel" parent="BattleContainer/CombatArea/EnemyArea"]
+layout_mode = 0
+offset_left = 520.0
+offset_top = 100.0
+offset_right = 690.0
+offset_bottom = 390.0
+script = ExtResource("2")
+panel_title = "Enemy 4"
+can_resize = false
+
+[node name="EnemyUnit4" type="VBoxContainer" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel4"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 55.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 5
+
+[node name="EnemySprite4" type="TextureRect" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel4/EnemyUnit4"]
+material = ExtResource("3")
+custom_minimum_size = Vector2(120, 120)
+layout_mode = 2
+size_flags_horizontal = 4
+expand_mode = 1
+stretch_mode = 5
+texture_filter = 1
+
+[node name="EnemyName4" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel4/EnemyUnit4"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Enemy 4"
+horizontal_alignment = 1
+
+[node name="EnemyHPBar4" type="ProgressBar" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel4/EnemyUnit4"]
+custom_minimum_size = Vector2(160, 24)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="EnemyHPLabel4" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel4/EnemyUnit4"]
+layout_mode = 2
+text = "HP: 100 / 100"
+horizontal_alignment = 1
+
+[node name="EnemyMPBar4" type="ProgressBar" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel4/EnemyUnit4"]
+custom_minimum_size = Vector2(160, 20)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="EnemyMPLabel4" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel4/EnemyUnit4"]
+layout_mode = 2
+text = "MP: 50 / 50"
+horizontal_alignment = 1
+
+[node name="EnemyEnergyBar4" type="ProgressBar" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel4/EnemyUnit4"]
+custom_minimum_size = Vector2(160, 20)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="EnemyEnergyLabel4" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel4/EnemyUnit4"]
+layout_mode = 2
+text = "Energy: 100 / 100"
+horizontal_alignment = 1
+
+[node name="EnemyPanel5" type="Panel" parent="BattleContainer/CombatArea/EnemyArea"]
+layout_mode = 0
+offset_left = 520.0
+offset_top = 260.0
+offset_right = 690.0
+offset_bottom = 550.0
+script = ExtResource("2")
+panel_title = "Enemy 5"
+can_resize = false
+
+[node name="EnemyUnit5" type="VBoxContainer" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel5"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 55.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 5
+
+[node name="EnemySprite5" type="TextureRect" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel5/EnemyUnit5"]
+material = ExtResource("3")
+custom_minimum_size = Vector2(120, 120)
+layout_mode = 2
+size_flags_horizontal = 4
+expand_mode = 1
+stretch_mode = 5
+texture_filter = 1
+
+[node name="EnemyName5" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel5/EnemyUnit5"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Enemy 5"
+horizontal_alignment = 1
+
+[node name="EnemyHPBar5" type="ProgressBar" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel5/EnemyUnit5"]
+custom_minimum_size = Vector2(160, 24)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="EnemyHPLabel5" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel5/EnemyUnit5"]
+layout_mode = 2
+text = "HP: 100 / 100"
+horizontal_alignment = 1
+
+[node name="EnemyMPBar5" type="ProgressBar" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel5/EnemyUnit5"]
+custom_minimum_size = Vector2(160, 20)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="EnemyMPLabel5" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel5/EnemyUnit5"]
+layout_mode = 2
+text = "MP: 50 / 50"
+horizontal_alignment = 1
+
+[node name="EnemyEnergyBar5" type="ProgressBar" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel5/EnemyUnit5"]
+custom_minimum_size = Vector2(160, 20)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="EnemyEnergyLabel5" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel5/EnemyUnit5"]
+layout_mode = 2
+text = "Energy: 100 / 100"
+horizontal_alignment = 1
+
+[node name="EnemyPanel6" type="Panel" parent="BattleContainer/CombatArea/EnemyArea"]
+layout_mode = 0
+offset_left = 520.0
+offset_top = 420.0
+offset_right = 690.0
+offset_bottom = 710.0
+script = ExtResource("2")
+panel_title = "Enemy 6"
+can_resize = false
+
+[node name="EnemyUnit6" type="VBoxContainer" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel6"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 55.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 5
+
+[node name="EnemySprite6" type="TextureRect" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel6/EnemyUnit6"]
+material = ExtResource("3")
+custom_minimum_size = Vector2(120, 120)
+layout_mode = 2
+size_flags_horizontal = 4
+expand_mode = 1
+stretch_mode = 5
+texture_filter = 1
+
+[node name="EnemyName6" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel6/EnemyUnit6"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Enemy 6"
+horizontal_alignment = 1
+
+[node name="EnemyHPBar6" type="ProgressBar" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel6/EnemyUnit6"]
+custom_minimum_size = Vector2(160, 24)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="EnemyHPLabel6" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel6/EnemyUnit6"]
+layout_mode = 2
+text = "HP: 100 / 100"
+horizontal_alignment = 1
+
+[node name="EnemyMPBar6" type="ProgressBar" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel6/EnemyUnit6"]
+custom_minimum_size = Vector2(160, 20)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="EnemyMPLabel6" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel6/EnemyUnit6"]
+layout_mode = 2
+text = "MP: 50 / 50"
+horizontal_alignment = 1
+
+[node name="EnemyEnergyBar6" type="ProgressBar" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel6/EnemyUnit6"]
+custom_minimum_size = Vector2(160, 20)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="EnemyEnergyLabel6" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel6/EnemyUnit6"]
+layout_mode = 2
+text = "Energy: 100 / 100"
+horizontal_alignment = 1
+
+[node name="MiddleSpacer" type="Control" parent="BattleContainer/CombatArea"]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="PlayerArea" type="Control" parent="BattleContainer/CombatArea"]
+custom_minimum_size = Vector2(600, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Ally5Panel" type="Panel" parent="BattleContainer/CombatArea/PlayerArea"]
+layout_mode = 0
+offset_left = -50.0
+offset_top = 260.0
+offset_right = 120.0
+offset_bottom = 580.0
+script = ExtResource("2")
+panel_title = "Ally 5"
+can_resize = false
+
+[node name="Ally5Unit" type="VBoxContainer" parent="BattleContainer/CombatArea/PlayerArea/Ally5Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 60.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 5
+
+[node name="Ally5Sprite" type="TextureRect" parent="BattleContainer/CombatArea/PlayerArea/Ally5Panel/Ally5Unit"]
+material = ExtResource("3")
+custom_minimum_size = Vector2(120, 120)
+layout_mode = 2
+size_flags_horizontal = 4
+expand_mode = 1
+stretch_mode = 5
+texture_filter = 1
+
+[node name="Ally5Name" type="Label" parent="BattleContainer/CombatArea/PlayerArea/Ally5Panel/Ally5Unit"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Ally 5"
+horizontal_alignment = 1
+
+[node name="Ally5HPBar" type="ProgressBar" parent="BattleContainer/CombatArea/PlayerArea/Ally5Panel/Ally5Unit"]
+custom_minimum_size = Vector2(160, 24)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="Ally5HPLabel" type="Label" parent="BattleContainer/CombatArea/PlayerArea/Ally5Panel/Ally5Unit"]
+layout_mode = 2
+text = "HP: 100 / 100"
+horizontal_alignment = 1
+
+[node name="Ally5MPBar" type="ProgressBar" parent="BattleContainer/CombatArea/PlayerArea/Ally5Panel/Ally5Unit"]
+custom_minimum_size = Vector2(160, 20)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="Ally5MPLabel" type="Label" parent="BattleContainer/CombatArea/PlayerArea/Ally5Panel/Ally5Unit"]
+layout_mode = 2
+text = "MP: 50 / 50"
+horizontal_alignment = 1
+
+[node name="Ally1Panel" type="Panel" parent="BattleContainer/CombatArea/PlayerArea"]
+layout_mode = 0
+offset_left = 90.0
+offset_top = 100.0
+offset_right = 260.0
+offset_bottom = 420.0
+script = ExtResource("2")
+panel_title = "Ally 1"
+can_resize = false
+
+[node name="Ally1Unit" type="VBoxContainer" parent="BattleContainer/CombatArea/PlayerArea/Ally1Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 60.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 5
+
+[node name="Ally1Sprite" type="TextureRect" parent="BattleContainer/CombatArea/PlayerArea/Ally1Panel/Ally1Unit"]
+material = ExtResource("3")
+custom_minimum_size = Vector2(120, 120)
+layout_mode = 2
+size_flags_horizontal = 4
+expand_mode = 1
+stretch_mode = 5
+texture_filter = 1
+
+[node name="Ally1Name" type="Label" parent="BattleContainer/CombatArea/PlayerArea/Ally1Panel/Ally1Unit"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Ally 1"
+horizontal_alignment = 1
+
+[node name="Ally1HPBar" type="ProgressBar" parent="BattleContainer/CombatArea/PlayerArea/Ally1Panel/Ally1Unit"]
+custom_minimum_size = Vector2(160, 24)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="Ally1HPLabel" type="Label" parent="BattleContainer/CombatArea/PlayerArea/Ally1Panel/Ally1Unit"]
+layout_mode = 2
+text = "HP: 100 / 100"
+horizontal_alignment = 1
+
+[node name="Ally1MPBar" type="ProgressBar" parent="BattleContainer/CombatArea/PlayerArea/Ally1Panel/Ally1Unit"]
+custom_minimum_size = Vector2(160, 20)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="Ally1MPLabel" type="Label" parent="BattleContainer/CombatArea/PlayerArea/Ally1Panel/Ally1Unit"]
+layout_mode = 2
+text = "MP: 50 / 50"
+horizontal_alignment = 1
+
+[node name="Ally2Panel" type="Panel" parent="BattleContainer/CombatArea/PlayerArea"]
+layout_mode = 0
+offset_left = 90.0
+offset_top = 260.0
+offset_right = 260.0
+offset_bottom = 580.0
+script = ExtResource("2")
+panel_title = "Ally 2"
+can_resize = false
+
+[node name="Ally2Unit" type="VBoxContainer" parent="BattleContainer/CombatArea/PlayerArea/Ally2Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 60.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 5
+
+[node name="Ally2Sprite" type="TextureRect" parent="BattleContainer/CombatArea/PlayerArea/Ally2Panel/Ally2Unit"]
+material = ExtResource("3")
+custom_minimum_size = Vector2(120, 120)
+layout_mode = 2
+size_flags_horizontal = 4
+expand_mode = 1
+stretch_mode = 5
+texture_filter = 1
+
+[node name="Ally2Name" type="Label" parent="BattleContainer/CombatArea/PlayerArea/Ally2Panel/Ally2Unit"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Ally 2"
+horizontal_alignment = 1
+
+[node name="Ally2HPBar" type="ProgressBar" parent="BattleContainer/CombatArea/PlayerArea/Ally2Panel/Ally2Unit"]
+custom_minimum_size = Vector2(160, 24)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="Ally2HPLabel" type="Label" parent="BattleContainer/CombatArea/PlayerArea/Ally2Panel/Ally2Unit"]
+layout_mode = 2
+text = "HP: 100 / 100"
+horizontal_alignment = 1
+
+[node name="Ally2MPBar" type="ProgressBar" parent="BattleContainer/CombatArea/PlayerArea/Ally2Panel/Ally2Unit"]
+custom_minimum_size = Vector2(160, 20)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="Ally2MPLabel" type="Label" parent="BattleContainer/CombatArea/PlayerArea/Ally2Panel/Ally2Unit"]
+layout_mode = 2
+text = "MP: 50 / 50"
+horizontal_alignment = 1
+
+[node name="Ally3Panel" type="Panel" parent="BattleContainer/CombatArea/PlayerArea"]
+layout_mode = 0
+offset_left = 90.0
+offset_top = 420.0
+offset_right = 260.0
+offset_bottom = 740.0
+script = ExtResource("2")
+panel_title = "Ally 3"
+can_resize = false
+
+[node name="Ally3Unit" type="VBoxContainer" parent="BattleContainer/CombatArea/PlayerArea/Ally3Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 60.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 5
+
+[node name="Ally3Sprite" type="TextureRect" parent="BattleContainer/CombatArea/PlayerArea/Ally3Panel/Ally3Unit"]
+material = ExtResource("3")
+custom_minimum_size = Vector2(120, 120)
+layout_mode = 2
+size_flags_horizontal = 4
+expand_mode = 1
+stretch_mode = 5
+texture_filter = 1
+
+[node name="Ally3Name" type="Label" parent="BattleContainer/CombatArea/PlayerArea/Ally3Panel/Ally3Unit"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Ally 3"
+horizontal_alignment = 1
+
+[node name="Ally3HPBar" type="ProgressBar" parent="BattleContainer/CombatArea/PlayerArea/Ally3Panel/Ally3Unit"]
+custom_minimum_size = Vector2(160, 24)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="Ally3HPLabel" type="Label" parent="BattleContainer/CombatArea/PlayerArea/Ally3Panel/Ally3Unit"]
+layout_mode = 2
+text = "HP: 100 / 100"
+horizontal_alignment = 1
+
+[node name="Ally3MPBar" type="ProgressBar" parent="BattleContainer/CombatArea/PlayerArea/Ally3Panel/Ally3Unit"]
+custom_minimum_size = Vector2(160, 20)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="Ally3MPLabel" type="Label" parent="BattleContainer/CombatArea/PlayerArea/Ally3Panel/Ally3Unit"]
+layout_mode = 2
+text = "MP: 50 / 50"
+horizontal_alignment = 1
+
+[node name="Ally4Panel" type="Panel" parent="BattleContainer/CombatArea/PlayerArea"]
+layout_mode = 0
+offset_left = -50.0
+offset_top = 100.0
+offset_right = 120.0
+offset_bottom = 420.0
+script = ExtResource("2")
+panel_title = "Ally 4"
+can_resize = false
+
+[node name="Ally4Unit" type="VBoxContainer" parent="BattleContainer/CombatArea/PlayerArea/Ally4Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 60.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 5
+
+[node name="Ally4Sprite" type="TextureRect" parent="BattleContainer/CombatArea/PlayerArea/Ally4Panel/Ally4Unit"]
+material = ExtResource("3")
+custom_minimum_size = Vector2(120, 120)
+layout_mode = 2
+size_flags_horizontal = 4
+expand_mode = 1
+stretch_mode = 5
+texture_filter = 1
+
+[node name="Ally4Name" type="Label" parent="BattleContainer/CombatArea/PlayerArea/Ally4Panel/Ally4Unit"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Ally 4"
+horizontal_alignment = 1
+
+[node name="Ally4HPBar" type="ProgressBar" parent="BattleContainer/CombatArea/PlayerArea/Ally4Panel/Ally4Unit"]
+custom_minimum_size = Vector2(160, 24)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="Ally4HPLabel" type="Label" parent="BattleContainer/CombatArea/PlayerArea/Ally4Panel/Ally4Unit"]
+layout_mode = 2
+text = "HP: 100 / 100"
+horizontal_alignment = 1
+
+[node name="Ally4MPBar" type="ProgressBar" parent="BattleContainer/CombatArea/PlayerArea/Ally4Panel/Ally4Unit"]
+custom_minimum_size = Vector2(160, 20)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="Ally4MPLabel" type="Label" parent="BattleContainer/CombatArea/PlayerArea/Ally4Panel/Ally4Unit"]
+layout_mode = 2
+text = "MP: 50 / 50"
+horizontal_alignment = 1
+
+[node name="Ally6Panel" type="Panel" parent="BattleContainer/CombatArea/PlayerArea"]
+layout_mode = 0
+offset_left = -50.0
+offset_top = 420.0
+offset_right = 120.0
+offset_bottom = 740.0
+script = ExtResource("2")
+panel_title = "Ally 6"
+can_resize = false
+
+[node name="Ally6Unit" type="VBoxContainer" parent="BattleContainer/CombatArea/PlayerArea/Ally6Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 60.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 5
+
+[node name="Ally6Sprite" type="TextureRect" parent="BattleContainer/CombatArea/PlayerArea/Ally6Panel/Ally6Unit"]
+material = ExtResource("3")
+custom_minimum_size = Vector2(120, 120)
+layout_mode = 2
+size_flags_horizontal = 4
+expand_mode = 1
+stretch_mode = 5
+texture_filter = 1
+
+[node name="Ally6Name" type="Label" parent="BattleContainer/CombatArea/PlayerArea/Ally6Panel/Ally6Unit"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Ally 6"
+horizontal_alignment = 1
+
+[node name="Ally6HPBar" type="ProgressBar" parent="BattleContainer/CombatArea/PlayerArea/Ally6Panel/Ally6Unit"]
+custom_minimum_size = Vector2(160, 24)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="Ally6HPLabel" type="Label" parent="BattleContainer/CombatArea/PlayerArea/Ally6Panel/Ally6Unit"]
+layout_mode = 2
+text = "HP: 100 / 100"
+horizontal_alignment = 1
+
+[node name="Ally6MPBar" type="ProgressBar" parent="BattleContainer/CombatArea/PlayerArea/Ally6Panel/Ally6Unit"]
+custom_minimum_size = Vector2(160, 20)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="Ally6MPLabel" type="Label" parent="BattleContainer/CombatArea/PlayerArea/Ally6Panel/Ally6Unit"]
+layout_mode = 2
+text = "MP: 50 / 50"
+horizontal_alignment = 1
+
+[node name="RightSpacer" type="Control" parent="BattleContainer/CombatArea"]
+custom_minimum_size = Vector2(50, 0)
+layout_mode = 2
+
+[node name="UIPanel" type="Panel" parent="."]
+layout_mode = 0
+offset_left = 300.0
+offset_top = 500.0
+offset_right = 980.0
+offset_bottom = 680.0
+script = ExtResource("2")
+panel_title = "Battle Commands"
+can_resize = false
+
+[node name="UIArea" type="VBoxContainer" parent="UIPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 55.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 10
+
+[node name="TurnInfo" type="Label" parent="UIPanel/UIArea"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Waiting for turn..."
+horizontal_alignment = 1
+
+[node name="ActionButtons" type="HBoxContainer" parent="UIPanel/UIArea"]
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+theme_override_constants/separation = 15
+
+[node name="AttackButton" type="Button" parent="UIPanel/UIArea/ActionButtons"]
+custom_minimum_size = Vector2(150, 60)
+layout_mode = 2
+text = "Attack"
+
+[node name="DefendButton" type="Button" parent="UIPanel/UIArea/ActionButtons"]
+custom_minimum_size = Vector2(150, 60)
+layout_mode = 2
+text = "Defend"
+
+[node name="SkillsButton" type="Button" parent="UIPanel/UIArea/ActionButtons"]
+custom_minimum_size = Vector2(150, 60)
+layout_mode = 2
+text = "Skills"
+
+[node name="ItemsButton" type="Button" parent="UIPanel/UIArea/ActionButtons"]
+custom_minimum_size = Vector2(150, 60)
+layout_mode = 2
+text = "Items"
+
+[node name="LayoutButtons" type="HBoxContainer" parent="UIPanel/UIArea"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/separation = 10
+
+[node name="SaveLayoutButton" type="Button" parent="UIPanel/UIArea/LayoutButtons"]
+custom_minimum_size = Vector2(120, 30)
+layout_mode = 2
+text = "Save Layout"
+
+[node name="ResetLayoutButton" type="Button" parent="UIPanel/UIArea/LayoutButtons"]
+custom_minimum_size = Vector2(120, 30)
+layout_mode = 2
+text = "Reset Layout"
+
+[node name="PauseButton" type="Button" parent="UIPanel/UIArea/LayoutButtons"]
+custom_minimum_size = Vector2(120, 30)
+layout_mode = 2
+text = "Pause"
+
+[node name="BottomSpacer" type="Control" parent="BattleContainer"]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+
+[node name="HideUIButton" type="Button" parent="."]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -50.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = 50.0
+grow_horizontal = 0
+text = "👁"
+flat = true
+
+[node name="ResultPopup" type="Panel" parent="."]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -250.0
+offset_top = -200.0
+offset_right = 250.0
+offset_bottom = 200.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PopupContent" type="VBoxContainer" parent="ResultPopup"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = -20.0
+theme_override_constants/separation = 15
+
+[node name="ResultTitle" type="Label" parent="ResultPopup/PopupContent"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 36
+text = "VICTORY!"
+horizontal_alignment = 1
+
+[node name="Separator1" type="HSeparator" parent="ResultPopup/PopupContent"]
+layout_mode = 2
+
+[node name="RewardsLabel" type="Label" parent="ResultPopup/PopupContent"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Rewards:"
+horizontal_alignment = 1
+
+[node name="XPLabel" type="Label" parent="ResultPopup/PopupContent"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "XP Gained: 0"
+horizontal_alignment = 1
+
+[node name="GoldLabel" type="Label" parent="ResultPopup/PopupContent"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Gold Earned: 0"
+horizontal_alignment = 1
+
+[node name="Spacer" type="Control" parent="ResultPopup/PopupContent"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ContinueButton" type="Button" parent="ResultPopup/PopupContent"]
+custom_minimum_size = Vector2(200, 50)
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 20
+text = "Continue"
+
+[node name="TargetCursor" type="Panel" parent="."]
+visible = false
+z_index = 200
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 100.0
+offset_bottom = 100.0
+
+[node name="CursorBorder" type="ColorRect" parent="TargetCursor"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(1, 1, 0, 0)
+
+[node name="TopBorder" type="ColorRect" parent="TargetCursor"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 100.0
+offset_bottom = 4.0
+color = Color(1, 1, 0, 1)
+
+[node name="BottomBorder" type="ColorRect" parent="TargetCursor"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 96.0
+offset_right = 100.0
+offset_bottom = 100.0
+color = Color(1, 1, 0, 1)
+
+[node name="LeftBorder" type="ColorRect" parent="TargetCursor"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 4.0
+offset_bottom = 100.0
+color = Color(1, 1, 0, 1)
+
+[node name="RightBorder" type="ColorRect" parent="TargetCursor"]
+layout_mode = 0
+offset_left = 96.0
+offset_top = 0.0
+offset_right = 100.0
+offset_bottom = 100.0
+color = Color(1, 1, 0, 1)
