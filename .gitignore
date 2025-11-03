@@ -1,0 +1,20 @@
+# Godot
+.godot/
+.import/
+builds/
+*.translation
+
+# System
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Saved layouts
+saved_layouts/
+
+# Temp files
+nul
+*.tmp
+*.bak
