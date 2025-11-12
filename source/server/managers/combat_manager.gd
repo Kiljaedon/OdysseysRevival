@@ -5,9 +5,11 @@ class_name CombatManager
 ## Handles NPC combat initialization, player actions, enemy AI, and round execution
 ## PHASE 1 SECURITY: Added server-side action timeout and stats validation
 ## REFACTOR STEP 1.1: Using EnemySquadBuilder for squad generation
+## REFACTOR STEP 1.2: Using TurnOrderCalculator for initiative order
 
 # Refactored components
 const EnemySquadBuilder = preload("res://source/server/managers/combat/enemy_squad_builder.gd")
+const TurnOrderCalculator = preload("res://source/server/managers/combat/turn_order_calculator.gd")
 
 # Dependencies (injected from ServerWorld)
 var server_world: Node = null
@@ -126,21 +128,8 @@ func handle_npc_attack_request(peer_id: int, npc_id: int):
 		"pre_battle_position": pre_battle_position  # SAVE OVERWORLD POSITION
 	}
 
-	# Calculate turn order (player + allies + enemies sorted by DEX)
-	var turn_order = []
-	# Add player as index 0
-	turn_order.append({"type": "player", "squad_index": 0, "name": player.get("name", "Player"), "dex": player.get("stats", {}).get("DEX", 10)})
-	# Add allies
-	for i in range(ally_squad.size()):
-		var ally = ally_squad[i]
-		turn_order.append({"type": "ally", "squad_index": i, "name": ally.get("name", "Ally"), "dex": ally.get("stats", {}).get("DEX", 10)})
-	# Add enemies
-	for i in range(enemy_squad.size()):
-		var enemy = enemy_squad[i]
-		turn_order.append({"type": "enemy", "squad_index": i, "name": enemy.get("name", "Enemy"), "dex": enemy.get("stats", {}).get("DEX", 10)})
-	# Sort by DEX (highest first)
-	turn_order.sort_custom(func(a, b): return a.dex > b.dex)
-	
+	# REFACTOR STEP 1.2: Use TurnOrderCalculator to calculate initiative order
+	var turn_order = TurnOrderCalculator.calculate_turn_order(player, ally_squad, enemy_squad)
 	npc_combat_instances[combat_id]["turn_order"] = turn_order
 
 	# SECURITY: Start action timer for this combat
