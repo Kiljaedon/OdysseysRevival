@@ -11,6 +11,7 @@ var network_client: BattleNetworkClient
 var choreography: BattleChoreography
 var node_provider: BattleNodeProvider
 var floating_overlays: BattleFloatingOverlays
+var input_handler: BattleInputHandler
 
 # Squad data
 var enemy_squad: Array = []
@@ -38,9 +39,7 @@ var player_character: Dictionary = {}
 @onready var skills_button = $UIPanel/UIArea/ActionButtons/SkillsButton
 @onready var items_button = $UIPanel/UIArea/ActionButtons/ItemsButton
 
-# Action button navigation
-var action_buttons: Array = []
-var selected_button_index: int = 0
+# Action button navigation (managed by input_handler)
 
 # UI elements
 @onready var ui_panel = $UIPanel
@@ -77,10 +76,9 @@ func _ready():
 	if ui_panel:
 		ui_panel.visible = true
 
-	# Initialize action buttons array for keyboard navigation
-	action_buttons = [attack_button, defend_button, skills_button, items_button]
-	selected_button_index = 0
-	update_button_selection()  # Highlight first button
+	# Initialize input handler with action buttons
+	var action_buttons = [attack_button, defend_button, skills_button, items_button]
+	input_handler.initialize(combat_controller, ui_manager, action_buttons, result_popup)
 
 	# Create floating overlay containers (will be populated after squads load)
 	floating_overlays.create_overlays(self)
@@ -109,6 +107,7 @@ func initialize_subsystems():
 	choreography = BattleChoreography.new()
 	node_provider = BattleNodeProvider.new()
 	floating_overlays = BattleFloatingOverlays.new()
+	input_handler = BattleInputHandler.new()
 
 	# Add as children
 	add_child(combat_controller)
@@ -118,6 +117,7 @@ func initialize_subsystems():
 	add_child(choreography)
 	add_child(node_provider)
 	add_child(floating_overlays)
+	add_child(input_handler)
 
 	# Initialize BattleNodeProvider with panel references AND all UI element references
 	var enemy_panel_array = [enemy_panel_1, enemy_panel_2, enemy_panel_3, enemy_panel_4, enemy_panel_5, enemy_panel_6]
@@ -387,7 +387,17 @@ func connect_subsystem_signals():
 	network_client.server_result_received.connect(_on_server_result_received)
 	network_client.server_error.connect(_on_server_error)
 
-	# Button connections
+	# Input Handler signals
+	input_handler.attack_requested.connect(_on_attack_pressed)
+	input_handler.defend_requested.connect(_on_defend_pressed)
+	input_handler.skills_requested.connect(_on_skills_pressed)
+	input_handler.items_requested.connect(_on_items_pressed)
+	input_handler.target_navigation.connect(_on_target_navigation)
+	input_handler.target_confirmed.connect(_on_input_target_confirmed)
+	input_handler.target_cancelled.connect(_on_target_cancelled)
+	input_handler.continue_pressed.connect(_on_continue_button_pressed)
+
+	# Button connections (mouse clicks still work)
 	attack_button.pressed.connect(_on_attack_pressed)
 	defend_button.pressed.connect(_on_defend_pressed)
 	skills_button.pressed.connect(_on_skills_pressed)
@@ -403,13 +413,13 @@ func connect_subsystem_signals():
 	if continue_button:
 		continue_button.pressed.connect(_on_continue_button_pressed)
 
-	# Enemy panel mouse click connections
-	enemy_panel_1.gui_input.connect(_on_enemy_panel_clicked.bind(0))
-	enemy_panel_2.gui_input.connect(_on_enemy_panel_clicked.bind(1))
-	enemy_panel_3.gui_input.connect(_on_enemy_panel_clicked.bind(2))
-	enemy_panel_4.gui_input.connect(_on_enemy_panel_clicked.bind(3))
-	enemy_panel_5.gui_input.connect(_on_enemy_panel_clicked.bind(4))
-	enemy_panel_6.gui_input.connect(_on_enemy_panel_clicked.bind(5))
+	# Enemy panel mouse click connections (delegated to input_handler)
+	enemy_panel_1.gui_input.connect(input_handler.handle_enemy_panel_click.bind(0))
+	enemy_panel_2.gui_input.connect(input_handler.handle_enemy_panel_click.bind(1))
+	enemy_panel_3.gui_input.connect(input_handler.handle_enemy_panel_click.bind(2))
+	enemy_panel_4.gui_input.connect(input_handler.handle_enemy_panel_click.bind(3))
+	enemy_panel_5.gui_input.connect(input_handler.handle_enemy_panel_click.bind(4))
+	enemy_panel_6.gui_input.connect(input_handler.handle_enemy_panel_click.bind(5))
 
 ## ========== BATTLE SETUP ==========
 
@@ -592,125 +602,20 @@ func _on_save_ui_button_pressed():
 	"""Player clicked Save UI button (top-right corner icon)"""
 	save_ui_layout()
 
-func _on_enemy_panel_clicked(event: InputEvent, enemy_index: int):
-	"""Handle mouse clicks on enemy panels during target selection"""
-	if not event is InputEventMouseButton:
-		return
-	if not event.pressed or event.button_index != MOUSE_BUTTON_LEFT:
-		return
+## ========== INPUT HANDLER SIGNALS ==========
+## Input handling delegated to BattleInputHandler
 
-	# Only process during TARGET_SELECTION state
-	var battle_state = combat_controller.get_battle_state() if combat_controller else -1
-	if battle_state != 1:  # 1 = TARGET_SELECTION
-		return
+func _on_target_navigation(direction: String):
+	"""Input handler requested target navigation"""
+	ui_manager.navigate_target_direction(direction)
 
-	# Check if enemy is alive
-	var enemy_squad = combat_controller.get_enemy_squad() if combat_controller else []
-	if enemy_index >= enemy_squad.size():
-		return
-	if enemy_squad[enemy_index].get("hp", 0) <= 0:
-		return
+func _on_input_target_confirmed():
+	"""Input handler confirmed target selection"""
+	ui_manager.confirm_target_selection()
 
-	# Select and auto-confirm target
-	ui_manager.selected_target_index = enemy_index
-	ui_manager.show_target_cursor(enemy_index)
-	ui_manager.confirm_target_selection()  # Auto-confirm on click
-
-## ========== INPUT HANDLING ==========
-
-func _input(event: InputEvent):
-	"""Handle keyboard input for battle"""
-	if not event is InputEventKey or not event.pressed:
-		return
-
-	# BLOCK ESCAPE KEY - Don't allow exiting battle mid-fight
-	if event.keycode == KEY_ESCAPE:
-		# Only allow Escape to cancel target selection
-		var battle_state = combat_controller.get_battle_state() if combat_controller else -1
-		if battle_state == 1:  # TARGET_SELECTION - allow cancel
-			ui_manager.cancel_target_selection()
-		# Block Escape during all other battle phases
-		get_viewport().set_input_as_handled()
-		return
-
-	# Allow SPACE to close victory/defeat popup
-	if event.keycode == KEY_SPACE:
-		if result_popup and result_popup.visible:
-			get_viewport().set_input_as_handled()
-			_on_continue_button_pressed()
-			return
-
-	# Get battle state from combat controller
-	var battle_state = combat_controller.get_battle_state() if combat_controller else -1
-
-	# SELECTION_PHASE: Navigate action buttons (Attack/Defend/Skills/Items)
-	if battle_state == 0:  # SELECTION_PHASE state
-		match event.keycode:
-			KEY_W, KEY_UP, KEY_A, KEY_LEFT:
-				# Cycle to previous button
-				selected_button_index = (selected_button_index - 1 + action_buttons.size()) % action_buttons.size()
-				update_button_selection()
-				get_viewport().set_input_as_handled()
-			KEY_S, KEY_DOWN, KEY_D, KEY_RIGHT:
-				# Cycle to next button
-				selected_button_index = (selected_button_index + 1) % action_buttons.size()
-				update_button_selection()
-				get_viewport().set_input_as_handled()
-			KEY_SPACE, KEY_ENTER:
-				# Activate selected button
-				if selected_button_index < action_buttons.size() and action_buttons[selected_button_index]:
-					if not action_buttons[selected_button_index].disabled:
-						action_buttons[selected_button_index].emit_signal("pressed")
-						get_viewport().set_input_as_handled()
-			KEY_1:
-				if attack_button and not attack_button.disabled:
-					_on_attack_pressed()
-					get_viewport().set_input_as_handled()
-			KEY_2:
-				if defend_button and not defend_button.disabled:
-					_on_defend_pressed()
-					get_viewport().set_input_as_handled()
-			KEY_3:
-				if skills_button and not skills_button.disabled:
-					_on_skills_pressed()
-					get_viewport().set_input_as_handled()
-			KEY_4:
-				if items_button and not items_button.disabled:
-					_on_items_pressed()
-					get_viewport().set_input_as_handled()
-
-	# TARGET_SELECTION: Navigate enemy targets
-	elif battle_state == 1:  # TARGET_SELECTION state
-		match event.keycode:
-			KEY_W, KEY_UP:
-				ui_manager.navigate_target_direction("up")
-				get_viewport().set_input_as_handled()
-			KEY_S, KEY_DOWN:
-				ui_manager.navigate_target_direction("down")
-				get_viewport().set_input_as_handled()
-			KEY_A, KEY_LEFT:
-				ui_manager.navigate_target_direction("left")
-				get_viewport().set_input_as_handled()
-			KEY_D, KEY_RIGHT:
-				ui_manager.navigate_target_direction("right")
-				get_viewport().set_input_as_handled()
-			KEY_ENTER, KEY_SPACE:
-				ui_manager.confirm_target_selection()
-				get_viewport().set_input_as_handled()
-		return  # IMPORTANT: Prevent other input processing
-
-func update_button_selection():
-	"""Update visual feedback for selected action button"""
-	for i in range(action_buttons.size()):
-		if action_buttons[i]:
-			if i == selected_button_index:
-				action_buttons[i].grab_focus()
-				# Yellow highlight for selected button
-				action_buttons[i].modulate = Color(1.5, 1.5, 0.5)
-			else:
-				action_buttons[i].release_focus()
-				# Normal color
-				action_buttons[i].modulate = Color(1, 1, 1)
+func _on_target_cancelled():
+	"""Input handler cancelled target selection"""
+	ui_manager.cancel_target_selection()
 
 ## ========== PROCESS ==========
 
