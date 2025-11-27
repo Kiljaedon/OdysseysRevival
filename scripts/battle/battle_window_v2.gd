@@ -12,6 +12,7 @@ var choreography: BattleChoreography
 var node_provider: BattleNodeProvider
 var floating_overlays: BattleFloatingOverlays
 var input_handler: BattleInputHandler
+var turn_executor: BattleTurnExecutor
 
 # Squad data
 var enemy_squad: Array = []
@@ -108,6 +109,7 @@ func initialize_subsystems():
 	node_provider = BattleNodeProvider.new()
 	floating_overlays = BattleFloatingOverlays.new()
 	input_handler = BattleInputHandler.new()
+	turn_executor = BattleTurnExecutor.new()
 
 	# Add as children
 	add_child(combat_controller)
@@ -118,6 +120,7 @@ func initialize_subsystems():
 	add_child(node_provider)
 	add_child(floating_overlays)
 	add_child(input_handler)
+	add_child(turn_executor)
 
 	# Initialize BattleNodeProvider with panel references AND all UI element references
 	var enemy_panel_array = [enemy_panel_1, enemy_panel_2, enemy_panel_3, enemy_panel_4, enemy_panel_5, enemy_panel_6]
@@ -249,6 +252,16 @@ func initialize_subsystems():
 
 	# Initialize Choreography with references
 	choreography.initialize_references(get_choreography_references())
+
+	# Initialize Turn Executor with references
+	turn_executor.initialize({
+		"ui_manager": ui_manager,
+		"animations": animations,
+		"combat_controller": combat_controller,
+		"network_client": network_client,
+		"floating_overlays": floating_overlays,
+		"end_battle_callback": Callable(self, "end_battle")
+	})
 
 	# Load sprite atlases
 	BattleDataLoader.load_sprite_atlases()
@@ -451,8 +464,9 @@ func setup_server_battle(server_data: Dictionary):
 	combat_controller.initialize_battle(enemy_squad, ally_squad, player_character, true, combat_id)
 	combat_controller.set_battle_initiator(player_initiated)
 
-	# Set squad references in UI manager
+	# Set squad references in UI manager and turn executor
 	ui_manager.set_squad_references(enemy_squad, ally_squad)
+	turn_executor.set_squads(enemy_squad, ally_squad, player_character)
 
 	# Update all UI
 	ui_manager.update_all_enemies_ui()
@@ -489,8 +503,9 @@ func setup_local_battle():
 	combat_controller.initialize_battle(enemy_squad, ally_squad, player_character, false, -1)
 	combat_controller.set_battle_initiator(true)  # Player initiated local battle
 
-	# Set squad references in UI manager
+	# Set squad references in UI manager and turn executor
 	ui_manager.set_squad_references(enemy_squad, ally_squad)
+	turn_executor.set_squads(enemy_squad, ally_squad, player_character)
 
 	# Update all UI
 	ui_manager.update_all_enemies_ui()
@@ -520,18 +535,18 @@ func _on_selection_phase_started(round: int):
 	ui_manager.enable_action_buttons()
 	ui_manager.update_turn_info("Choose your action!")
 
-func _on_turn_started(unit_type: String, unit_data: Dictionary, unit_index: int):
-	"""Combat controller started a unit's turn"""
+func _on_turn_started(unit_type: String, unit_data: Dictionary, _unit_index: int):
+	"""Combat controller started a unit's turn - delegate to turn_executor"""
 	var unit_name = unit_data.get("character_name", "Unknown")
 	ui_manager.update_turn_info("%s's turn!" % unit_name)
 
-	# Execute the turn based on unit type
+	# Delegate turn execution to turn_executor
 	if unit_type == "player":
-		execute_player_turn()
+		turn_executor.execute_player_turn()
 	elif unit_type == "ally":
-		execute_ally_turn(unit_data)
+		turn_executor.execute_ally_turn(unit_data)
 	else:
-		execute_enemy_turn(unit_data)
+		turn_executor.execute_enemy_turn(unit_data)
 
 func _on_action_queued(action: String, target_id: int):
 	"""Combat controller queued an action"""
@@ -633,186 +648,6 @@ func _process(delta: float):
 	# Update floating overlay positions every frame
 	if floating_overlays:
 		floating_overlays.update_positions()
-
-## ========== TURN EXECUTION ==========
-
-func execute_player_turn():
-	"""Execute player's queued action"""
-	var queued = combat_controller.get_player_queued_action()
-	var action = queued.get("action", "defend")
-	var target_id = queued.get("target_id", -1)
-
-	if action == "attack" and target_id >= 0:
-		execute_player_attack(target_id)
-	else:
-		# Defend or invalid action
-		var player_name = player_character.get("character_name", "Player")
-		ui_manager.update_turn_info("🛡️ %s's turn!" % player_name)
-		await get_tree().create_timer(0.5).timeout
-		ui_manager.update_turn_info("🛡️ %s defends!" % player_name)
-		await get_tree().create_timer(1.0).timeout
-		combat_controller.advance_turn()
-
-func execute_player_attack(target_index: int):
-	"""Player attacks enemy - send to server for authoritative calculation"""
-	var player_name = player_character.get("character_name", "Player")
-	var target = enemy_squad[target_index]
-	var target_name = target.get("character_name", "Enemy")
-
-	# SHOW whose turn it is
-	ui_manager.update_turn_info("⚔️ %s's turn!" % player_name)
-	await get_tree().create_timer(0.5).timeout
-
-	# PLAY ATTACK ANIMATION
-	var ally_sprites = ui_manager.get_ally_sprites()
-	var enemy_sprites = ui_manager.get_enemy_sprites()
-	var player_sprite = ally_sprites[0] if ally_sprites.size() > 0 else null
-	var target_sprite = enemy_sprites[target_index] if target_index < enemy_sprites.size() else null
-	if player_sprite and target_sprite and animations:
-		animations.play_attack_animation(player_sprite, player_character, "attack_left", target_sprite)
-		await animations.animation_completed
-
-	# FOR SERVER BATTLES: Send action to server
-	if combat_controller.is_server_battle and network_client:
-		network_client.send_player_action("attack", target_index)
-		# Response handled by _on_server_result_received via signal
-	else:
-		# LOCAL BATTLE: Client-side calculation
-		var damage = calculate_damage(player_character, target, 0, target_index, false)
-		target.hp -= damage
-		target.hp = max(0, target.hp)
-
-		ui_manager.update_turn_info("⚔️ %s attacks %s for %d damage!" % [player_name, target_name, damage])
-		ui_manager.update_enemy_ui(target_index)
-		floating_overlays.update_overlays()
-
-		if target.hp <= 0:
-			var enemy_panels = ui_manager.get_enemy_panels() if ui_manager else []
-			if target_index < enemy_panels.size() and enemy_panels[target_index]:
-				enemy_panels[target_index].visible = false
-			floating_overlays.hide_overlay(true, target_index)
-
-	# Check battle end
-	var battle_end = combat_controller.check_battle_end()
-	if battle_end.ended:
-		end_battle(battle_end.victory)
-		return
-
-	await get_tree().create_timer(1.5).timeout
-	combat_controller.advance_turn()
-
-func execute_ally_turn(ally_data: Dictionary):
-	"""Execute ally NPC's turn (AI)"""
-	var ally_name = ally_data.get("character_name", "Unknown")
-
-	# SHOW whose turn it is
-	ui_manager.update_turn_info("⚔️ %s's turn!" % ally_name)
-	await get_tree().create_timer(0.5).timeout  # Pause so user can see whose turn it is
-
-	# Simple AI: attack random enemy
-	var alive_enemies = []
-	for i in range(enemy_squad.size()):
-		if enemy_squad[i].get("hp", 0) > 0:
-			alive_enemies.append(i)
-
-	if alive_enemies.is_empty():
-		combat_controller.advance_turn()
-		return
-
-	var target_index = alive_enemies[randi() % alive_enemies.size()]
-	var target = enemy_squad[target_index]
-
-	# PLAY ATTACK ANIMATION
-	var ally_index = ally_squad.find(ally_data)
-	var ally_sprites = ui_manager.get_ally_sprites()
-	var enemy_sprites = ui_manager.get_enemy_sprites()
-	var ally_sprite = ally_sprites[ally_index] if ally_index >= 0 and ally_index < ally_sprites.size() else null
-	var target_sprite = enemy_sprites[target_index] if target_index < enemy_sprites.size() else null
-	if ally_sprite and target_sprite and animations:
-		animations.play_attack_animation(ally_sprite, ally_data, "attack_left", target_sprite)
-		await animations.animation_completed
-
-	# Calculate damage with position indices for range penalty system
-	# ally_index is attacker position, is_attacker_enemy = false
-	var damage = calculate_damage(ally_data, target, ally_index, target_index, false)
-
-	target.hp -= damage
-	target.hp = max(0, target.hp)
-
-	var target_name = target.get("character_name", "Enemy")
-	ui_manager.update_turn_info("⚔️ %s attacks %s for %d damage!" % [ally_name, target_name, damage])
-	ui_manager.update_enemy_ui(target_index)
-	floating_overlays.update_overlays()  # Update floating HP bars
-
-	# Check if target defeated
-	if target.hp <= 0:
-		# Hide defeated enemy panel
-		var enemy_panels = ui_manager.get_enemy_panels() if ui_manager else []
-		if target_index < enemy_panels.size() and enemy_panels[target_index]:
-			enemy_panels[target_index].visible = false
-		# Hide defeated enemy overlay
-		floating_overlays.hide_overlay(true, target_index)
-
-	# Check battle end
-	var battle_end = combat_controller.check_battle_end()
-	if battle_end.ended:
-		end_battle(battle_end.victory)
-		return
-
-	await get_tree().create_timer(1.5).timeout
-	combat_controller.advance_turn()
-
-func execute_enemy_turn(enemy_data: Dictionary):
-	"""Execute enemy's turn (AI)"""
-	var enemy_name = enemy_data.get("character_name", "Unknown")
-
-	# SHOW whose turn it is
-	ui_manager.update_turn_info("💀 %s's turn!" % enemy_name)
-	await get_tree().create_timer(0.5).timeout  # Pause so user can see whose turn it is
-
-	# Simple AI: attack player (ally index 0)
-	var player_index = 0
-	var player_name = ally_squad[player_index].get("character_name", "Player")
-
-	# PLAY ATTACK ANIMATION
-	var enemy_index = enemy_squad.find(enemy_data)
-	var enemy_sprites = ui_manager.get_enemy_sprites()
-	var ally_sprites = ui_manager.get_ally_sprites()
-	var enemy_sprite = enemy_sprites[enemy_index] if enemy_index >= 0 and enemy_index < enemy_sprites.size() else null
-	var player_sprite = ally_sprites[player_index] if player_index < ally_sprites.size() else null
-	if enemy_sprite and player_sprite and animations:
-		animations.play_attack_animation(enemy_sprite, enemy_data, "attack_right", player_sprite)
-		await animations.animation_completed
-
-	# Calculate damage with position indices for range penalty system
-	# enemy_index is attacker position, player_index is defender, is_attacker_enemy = true
-	var damage = calculate_damage(enemy_data, ally_squad[player_index], enemy_index, player_index, true)
-
-	ally_squad[player_index].hp -= damage
-	ally_squad[player_index].hp = max(0, ally_squad[player_index].hp)
-
-	ui_manager.update_turn_info("💀 %s attacks %s for %d damage!" % [enemy_name, player_name, damage])
-	ui_manager.update_ally_ui(player_index)
-	floating_overlays.update_overlays()  # Update floating HP bars
-
-	# Check if player defeated
-	if ally_squad[player_index].hp <= 0:
-		# Hide defeated ally panel
-		var ally_panels = ui_manager.get_ally_panels() if ui_manager else []
-		if player_index < ally_panels.size() and ally_panels[player_index]:
-			ally_panels[player_index].visible = false
-		# Hide defeated ally overlay
-		floating_overlays.hide_overlay(false, player_index)
-
-	# Check battle end
-	var battle_end = combat_controller.check_battle_end()
-	if battle_end.ended:
-		end_battle(battle_end.victory)
-		return
-
-	await get_tree().create_timer(1.5).timeout
-	combat_controller.advance_turn()
-
 
 ## ========== SERVER RESULT HANDLING ==========
 
