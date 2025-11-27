@@ -125,124 +125,10 @@ func initialize_subsystems():
 	add_child(turn_executor)
 	add_child(result_handler)
 
-	# Initialize BattleNodeProvider with panel references AND all UI element references
+	# Initialize BattleNodeProvider - it auto-extracts all UI elements from panels
 	var enemy_panel_array = [enemy_panel_1, enemy_panel_2, enemy_panel_3, enemy_panel_4, enemy_panel_5, enemy_panel_6]
 	var ally_panel_array = [ally_panel_1, ally_panel_2, ally_panel_3, ally_panel_4, ally_panel_5, ally_panel_6]
-
-	# Collect UI references DIRECTLY from scene nodes (NOT through node_provider which isn't initialized yet)
-	# Extract sprites from panels
-	var enemy_sprites_array = []
-	var ally_sprites_array = []
-	for i in range(enemy_panel_array.size()):
-		var panel = enemy_panel_array[i]
-		if panel:
-			var unit_node = panel.get_node_or_null("EnemyUnit%d" % (i + 1))
-			if unit_node:
-				var sprite = unit_node.get_node_or_null("EnemySprite%d" % (i + 1))
-				if sprite:
-					enemy_sprites_array.append(sprite)
-
-	for i in range(ally_panel_array.size()):
-		var panel = ally_panel_array[i]
-		if panel:
-			var unit_node = panel.get_node_or_null("Ally%dUnit" % (i + 1))
-			if unit_node:
-				var sprite = unit_node.get_node_or_null("Ally%dSprite" % (i + 1))
-				if sprite:
-					ally_sprites_array.append(sprite)
-
-	# Extract all other UI elements similarly
-	var enemy_names_array = []
-	var ally_names_array = []
-	var enemy_hp_bars_array = []
-	var ally_hp_bars_array = []
-	var enemy_hp_labels_array = []
-	var ally_hp_labels_array = []
-	var enemy_mp_bars_array = []
-	var ally_mp_bars_array = []
-	var enemy_mp_labels_array = []
-	var ally_mp_labels_array = []
-	var enemy_energy_bars_array = []
-	var ally_energy_bars_array = []
-	var enemy_energy_labels_array = []
-	var ally_energy_labels_array = []
-
-	for i in range(enemy_panel_array.size()):
-		var panel = enemy_panel_array[i]
-		if panel:
-			var unit_node = panel.get_node_or_null("EnemyUnit%d" % (i + 1))
-			if unit_node:
-				var name_label = unit_node.get_node_or_null("EnemyName%d" % (i + 1))
-				if name_label:
-					enemy_names_array.append(name_label)
-				var hp_bar = unit_node.get_node_or_null("EnemyHPBar%d" % (i + 1))
-				if hp_bar:
-					enemy_hp_bars_array.append(hp_bar)
-				var hp_label = unit_node.get_node_or_null("EnemyHPLabel%d" % (i + 1))
-				if hp_label:
-					enemy_hp_labels_array.append(hp_label)
-				var mp_bar = unit_node.get_node_or_null("EnemyMPBar%d" % (i + 1))
-				if mp_bar:
-					enemy_mp_bars_array.append(mp_bar)
-				var mp_label = unit_node.get_node_or_null("EnemyMPLabel%d" % (i + 1))
-				if mp_label:
-					enemy_mp_labels_array.append(mp_label)
-				var energy_bar = unit_node.get_node_or_null("EnemyEnergyBar%d" % (i + 1))
-				if energy_bar:
-					enemy_energy_bars_array.append(energy_bar)
-				var energy_label = unit_node.get_node_or_null("EnemyEnergyLabel%d" % (i + 1))
-				if energy_label:
-					enemy_energy_labels_array.append(energy_label)
-
-	for i in range(ally_panel_array.size()):
-		var panel = ally_panel_array[i]
-		if panel:
-			var unit_node = panel.get_node_or_null("Ally%dUnit" % (i + 1))
-			if unit_node:
-				var name_label = unit_node.get_node_or_null("Ally%dName" % (i + 1))
-				if name_label:
-					ally_names_array.append(name_label)
-				var hp_bar = unit_node.get_node_or_null("Ally%dHPBar" % (i + 1))
-				if hp_bar:
-					ally_hp_bars_array.append(hp_bar)
-				var hp_label = unit_node.get_node_or_null("Ally%dHPLabel" % (i + 1))
-				if hp_label:
-					ally_hp_labels_array.append(hp_label)
-				var mp_bar = unit_node.get_node_or_null("Ally%dMPBar" % (i + 1))
-				if mp_bar:
-					ally_mp_bars_array.append(mp_bar)
-				var mp_label = unit_node.get_node_or_null("Ally%dMPLabel" % (i + 1))
-				if mp_label:
-					ally_mp_labels_array.append(mp_label)
-				var energy_bar = unit_node.get_node_or_null("Ally%dEnergyBar" % (i + 1))
-				if energy_bar:
-					ally_energy_bars_array.append(energy_bar)
-				var energy_label = unit_node.get_node_or_null("Ally%dEnergyLabel" % (i + 1))
-				if energy_label:
-					ally_energy_labels_array.append(energy_label)
-
-	# Now assemble the UI references dictionary
-	var ui_refs = {
-		"enemy_sprites": enemy_sprites_array,
-		"ally_sprites": ally_sprites_array,
-		"enemy_names": enemy_names_array,
-		"ally_names": ally_names_array,
-		"enemy_hp_bars": enemy_hp_bars_array,
-		"ally_hp_bars": ally_hp_bars_array,
-		"enemy_hp_labels": enemy_hp_labels_array,
-		"ally_hp_labels": ally_hp_labels_array,
-		"enemy_mp_bars": enemy_mp_bars_array,
-		"ally_mp_bars": ally_mp_bars_array,
-		"enemy_mp_labels": enemy_mp_labels_array,
-		"ally_mp_labels": ally_mp_labels_array,
-		"enemy_energy_bars": enemy_energy_bars_array,
-		"ally_energy_bars": ally_energy_bars_array,
-		"enemy_energy_labels": enemy_energy_labels_array,
-		"ally_energy_labels": ally_energy_labels_array,
-	}
-
-	# Initialize node_provider with both panels and UI references
-	node_provider.initialize(enemy_panel_array, ally_panel_array, ui_refs)
+	node_provider.initialize(enemy_panel_array, ally_panel_array)
 
 	# Initialize Animations with references first (needed by UI manager)
 	animations.initialize_references(get_animation_references())
@@ -683,33 +569,6 @@ func save_ui_layout():
 func load_ui_layout():
 	"""Load panel positions and sizes from user:// directory"""
 	BattleLayoutManager.load_layout(get_enemy_panels(), get_ally_panels(), ui_panel)
-
-## ========== DAMAGE CALCULATION SYSTEM ==========
-## Delegations to BattleDamageCalculator (extracted in Phase 2)
-
-func is_front_row(panel_index: int, is_enemy: bool) -> bool:
-	"""Wrapper for BattleDamageCalculator.is_front_row()"""
-	return BattleDamageCalculator.is_front_row(panel_index, is_enemy)
-
-func get_character_attack_type(character_data: Dictionary) -> String:
-	"""Wrapper for BattleDamageCalculator.get_character_attack_type()"""
-	return BattleDamageCalculator.get_character_attack_type(character_data)
-
-func calculate_range_penalty(attacker_data: Dictionary, attacker_index: int, defender_index: int, is_attacker_enemy: bool, is_defender_enemy: bool) -> float:
-	"""Wrapper for BattleDamageCalculator.calculate_range_penalty()"""
-	return BattleDamageCalculator.calculate_range_penalty(attacker_data, attacker_index, defender_index, is_attacker_enemy, is_defender_enemy)
-
-func get_defensive_modifier(combat_role: String) -> float:
-	"""Wrapper for BattleDamageCalculator.get_defensive_modifier()"""
-	return BattleDamageCalculator.get_defensive_modifier(combat_role)
-
-func calculate_damage(attacker: Dictionary, defender: Dictionary, attacker_index: int = -1, defender_index: int = -1, is_attacker_enemy: bool = false) -> int:
-	"""Wrapper for BattleDamageCalculator.calculate_damage()"""
-	return BattleDamageCalculator.calculate_damage(attacker, defender, attacker_index, defender_index, is_attacker_enemy)
-
-func calculate_basic_damage(attacker: Dictionary, defender: Dictionary) -> int:
-	"""Wrapper for BattleDamageCalculator.calculate_basic_damage()"""
-	return BattleDamageCalculator.calculate_basic_damage(attacker, defender)
 
 ## ========== BATTLE END ==========
 ## Delegated to BattleResultHandler
