@@ -3,6 +3,8 @@ extends Node
 ## Network handler for server/client RPC routing at root level
 ## This ensures RPCs can be found at /root path on both server and client
 
+const Log = preload("res://source/common/utils/logger.gd")
+
 var server_world: Node
 var world_client: Node
 
@@ -14,19 +16,17 @@ func _ready():
 			# Pass reference to self so server_world can send responses
 			if server_world.has_method("set_network_handler"):
 				server_world.set_network_handler(self)
-			print("[NetworkHandler] Found ServerWorld node: %s" % server_world)
+			Log.debug("Found ServerWorld node", "Network")
 			break
 
 	if not server_world:
-		print("[NetworkHandler] WARNING: ServerWorld not found in root children")
+		Log.debug("ServerWorld not found (client mode)", "Network")
 
 	# Find world_client via group if it exists (on client side)
 	var found_client = find_world_client()
 	if found_client:
 		self.world_client = found_client
-		print("[NetworkHandler] Found WorldClient node: %s" % world_client)
-	else:
-		print("[NetworkHandler] WorldClient not found - will search via group later if needed")
+		Log.debug("Found WorldClient node", "Network")
 
 
 func _find_server_world() -> void:
@@ -34,9 +34,9 @@ func _find_server_world() -> void:
 	for child in get_tree().root.get_children():
 		if child.name == "ServerWorld":
 			server_world = child
-			print("[NetworkHandler] Found ServerWorld node via lazy search: %s" % server_world)
+			Log.debug("Found ServerWorld via lazy search", "Network")
 			return
-	print("[NetworkHandler] WARNING: Could not find ServerWorld node in lazy search")
+	Log.warn("Could not find ServerWorld node", "Network")
 
 
 # ========== SERVER REQUEST RPCs (routed to server_world) ==========
@@ -53,19 +53,14 @@ func request_create_account(username: String, password: String):
 @rpc("any_peer")
 func request_login(username: String, password: String):
 	"""Route to server_world"""
-	# Lazy-load server_world if not found yet
 	if not server_world:
 		_find_server_world()
 
-	print("[NetworkHandler] request_login RPC received! username=%s, server_world=%s" % [username, server_world])
-	if server_world:
-		print("[NetworkHandler] Routing to server_world.request_login()")
-		if server_world.has_method("request_login"):
-			server_world.request_login(username, password)
-		else:
-			print("[NetworkHandler] ERROR: server_world does not have request_login method")
+	Log.debug("Login request for: %s" % username, "Network")
+	if server_world and server_world.has_method("request_login"):
+		server_world.request_login(username, password)
 	else:
-		print("[NetworkHandler] ERROR: server_world is null!")
+		Log.error("Cannot route login - server_world not available", "Network")
 
 @rpc("any_peer")
 func request_create_character(username: String, character_data: Dictionary):
@@ -73,11 +68,11 @@ func request_create_character(username: String, character_data: Dictionary):
 	if not server_world:
 		_find_server_world()
 
-	print("[NetworkHandler] request_create_character RPC received! username=%s" % username)
+	Log.debug("Create character request for: %s" % username, "Network")
 	if server_world and server_world.has_method("request_create_character"):
 		server_world.request_create_character(username, character_data)
 	else:
-		print("[NetworkHandler] ERROR: server_world doesn't have request_create_character method")
+		Log.error("Cannot route create_character - server_world not available", "Network")
 
 @rpc("any_peer")
 func request_delete_character(username: String, character_id: String):
@@ -85,7 +80,7 @@ func request_delete_character(username: String, character_id: String):
 	if not server_world:
 		_find_server_world()
 
-	print("[NetworkHandler] request_delete_character RPC received! username=%s, char_id=%s" % [username, character_id])
+	Log.debug("Delete character request: %s/%s" % [username, character_id], "Network")
 	if server_world and server_world.has_method("request_delete_character"):
 		server_world.request_delete_character(username, character_id)
 
@@ -126,7 +121,7 @@ func send_player_battle_action(combat_id: int, action_type: String, target_id: i
 	if server_world and server_world.has_method("receive_player_battle_action"):
 		server_world.receive_player_battle_action(peer_id, combat_id, action_type, target_id)
 	else:
-		print("[NetworkHandler] ERROR: server_world doesn't have receive_player_battle_action method")
+		Log.error("Cannot route battle_action - server_world not available", "Network")
 
 @rpc("any_peer")
 func request_npc_attack(npc_id: int):
@@ -137,7 +132,7 @@ func request_npc_attack(npc_id: int):
 	if server_world and server_world.has_method("handle_npc_attack_request"):
 		server_world.handle_npc_attack_request(npc_id)
 	else:
-		print("[NetworkHandler] ERROR: server_world doesn't have handle_npc_attack_request method")
+		Log.error("Cannot route npc_attack - server_world not available", "Network")
 
 
 # ========== SERVER RESPONSE RPCs (called by server, executed on client) ==========
@@ -146,7 +141,6 @@ func find_world_client(_node: Node = null) -> Node:
 	"""Find WorldClient using groups (robust, doesn't depend on script paths)"""
 	var nodes = get_tree().get_nodes_in_group("world_client")
 	if nodes.size() > 0:
-		print("[NetworkHandler] find_world_client: Found via group at path %s" % nodes[0].get_path())
 		return nodes[0]
 	return null
 
@@ -165,7 +159,6 @@ func find_character_select_screen(_node: Node = null) -> Node:
 	"""Find character select screen using groups (robust, doesn't depend on script paths)"""
 	var nodes = get_tree().get_nodes_in_group("character_select_screen")
 	if nodes.size() > 0:
-		print("[NetworkHandler] find_character_select_screen: Found via group at path %s" % nodes[0].get_path())
 		return nodes[0]
 	return null
 
@@ -173,75 +166,66 @@ func find_character_creator(_node: Node = null) -> Node:
 	"""Find character creator using groups (robust, doesn't depend on script paths)"""
 	var nodes = get_tree().get_nodes_in_group("character_creator")
 	if nodes.size() > 0:
-		print("[NetworkHandler] find_character_creator: Found via group at path %s" % nodes[0].get_path())
 		return nodes[0]
 	return null
 
 @rpc
 func account_creation_response(success: bool, message: String):
 	"""Server response - relay to WorldClient"""
-	# Search for WorldClient via group if not cached yet
 	if not world_client:
 		world_client = find_world_client()
-		if world_client:
-			print("[NetworkHandler] Found WorldClient (delayed): %s" % world_client)
 
 	if world_client:
-		print("[NetworkHandler] Relaying account_creation_response to WorldClient: success=%s, msg=%s" % [success, message])
 		world_client.account_creation_response_received.emit(success, message)
 	else:
-		print("[NetworkHandler] ERROR: Cannot relay account_creation_response - WorldClient not found!")
+		Log.error("Cannot relay account_creation_response - WorldClient not found!", "Network")
 
 @rpc
 func login_response(success: bool, message: String, data: Dictionary):
 	"""Server response - relay to WorldClient"""
-	print("[NetworkHandler CLIENT] login_response RPC received!")
-	print("[NetworkHandler CLIENT] success: %s, message: %s" % [success, message])
-	print("[NetworkHandler CLIENT] data keys: %s" % str(data.keys()))
+	Log.debug("login_response RPC received: success=%s" % success, "Network")
 	if data.has("characters"):
-		print("[NetworkHandler CLIENT] Characters received: %d" % data.characters.size())
-		if data.characters.size() > 0:
-			print("[NetworkHandler CLIENT] First character: %s" % JSON.stringify(data.characters[0]))
+		Log.debug("Characters received: %d" % data.characters.size(), "Network")
 	else:
-		print("[NetworkHandler CLIENT] WARNING: No 'characters' key in data!")
+		Log.warn("No 'characters' key in login response data", "Network")
 
 	# Search for WorldClient via group if not cached yet
 	if not world_client:
 		world_client = find_world_client()
 		if world_client:
-			print("[NetworkHandler] Found WorldClient (delayed): %s" % world_client)
+			Log.debug("Found WorldClient (delayed)", "Network")
 
 	if world_client:
-		print("[NetworkHandler] Relaying login_response to WorldClient: success=%s" % success)
+		Log.debug("Relaying login_response to WorldClient", "Network")
 		world_client.login_response_received.emit(success, message, data)
 	else:
-		print("[NetworkHandler] ERROR: Cannot relay login_response - WorldClient not found!")
+		Log.error("Cannot relay login_response - WorldClient not found!", "Network")
 
 @rpc
 func character_creation_response(success: bool, message: String, character_data: Dictionary):
 	"""Server response - find and call character_creator's handler"""
-	print("[NetworkHandler] Received character_creation_response: success=%s, msg=%s, data=%s" % [success, message, character_data])
+	Log.debug("Received character_creation_response: success=%s" % success, "Network")
 
 	# Find character_creator via group
 	var char_creator = find_character_creator()
 	if char_creator:
-		print("[NetworkHandler] Relaying to character_creator at %s" % char_creator.get_path())
+		Log.debug("Relaying to character_creator", "Network")
 		char_creator.character_creation_response(success, message, character_data)
 	else:
-		print("[NetworkHandler] WARNING: character_creator not found via group")
+		Log.warn("character_creator not found via group", "Network")
 
 @rpc
 func character_deletion_response(success: bool, message: String):
 	"""Server response - find and call character select's handler"""
-	print("[NetworkHandler] Received character_deletion_response: success=%s, msg=%s" % [success, message])
+	Log.debug("Received character_deletion_response: success=%s" % success, "Network")
 
 	# Find character select screen via group
 	var char_select = find_character_select_screen()
 	if char_select:
-		print("[NetworkHandler] Relaying to character_select at %s" % char_select.get_path())
+		Log.debug("Relaying to character_select", "Network")
 		char_select.character_deletion_response(success, message)
 	else:
-		print("[NetworkHandler] WARNING: character_select not found via group")
+		Log.warn("character_select not found via group", "Network")
 
 
 # ========== SERVER RESPONSE SENDERS (called by server_world, send RPC from NetworkHandler context) ==========
@@ -252,14 +236,11 @@ func send_account_creation_response(peer_id: int, success: bool, message: String
  
 func send_login_response(peer_id: int, success: bool, message: String, data: Dictionary):
 	"""Send login response to specific peer (called from server_world)"""
-	print("[NetworkHandler] send_login_response called - peer_id: %d, success: %s" % [peer_id, success])
-	print("[NetworkHandler] Data keys: %s" % str(data.keys()))
+	Log.debug("send_login_response: peer=%d, success=%s" % [peer_id, success], "Network")
 	if data.has("characters"):
-		print("[NetworkHandler] Characters in data: %d" % data.characters.size())
-		if data.characters.size() > 0:
-			print("[NetworkHandler] First character name: %s" % data.characters[0].get("name", "Unknown"))
+		Log.debug("Characters in response: %d" % data.characters.size(), "Network")
 	else:
-		print("[NetworkHandler] WARNING: 'characters' key not found in data!")
+		Log.warn("'characters' key not found in login response data", "Network")
 	rpc_id(peer_id, "login_response", success, message, data)
 
 func send_character_creation_response(peer_id: int, success: bool, message: String, character_id: String):
@@ -315,7 +296,7 @@ func spawn_accepted(player_data: Dictionary):
 	if handler and handler != self:
 		handler.handle_spawn_accepted(player_data)
 	else:
-		print("[NetworkHandler] WARNING: No handler found for spawn_accepted")
+		Log.warn("No handler found for spawn_accepted", "Network")
 
 @rpc
 func spawn_rejected(reason: String):
@@ -324,7 +305,7 @@ func spawn_rejected(reason: String):
 	if handler and handler != self:
 		handler.handle_spawn_rejected(reason)
 	else:
-		print("[NetworkHandler] WARNING: No handler found for spawn_rejected")
+		Log.warn("No handler found for spawn_rejected", "Network")
 
 @rpc
 func player_spawned(spawned_peer_id: int, player_data: Dictionary):
@@ -333,7 +314,7 @@ func player_spawned(spawned_peer_id: int, player_data: Dictionary):
 	if handler and handler != self:
 		handler.handle_player_spawned(spawned_peer_id, player_data)
 	else:
-		print("[NetworkHandler] WARNING: No handler found for player_spawned")
+		Log.warn("No handler found for player_spawned", "Network")
 
 @rpc
 func player_despawned(despawned_peer_id: int):
@@ -342,7 +323,7 @@ func player_despawned(despawned_peer_id: int):
 	if handler and handler != self:
 		handler.handle_player_despawned(despawned_peer_id)
 	else:
-		print("[NetworkHandler] WARNING: No handler found for player_despawned")
+		Log.warn("No handler found for player_despawned", "Network")
 
 @rpc
 func sync_positions(positions: Dictionary):
@@ -358,7 +339,7 @@ func receive_chat_message(player_name: String, message: String):
 	if handler and handler != self:
 		handler.handle_chat_message(player_name, message)
 	else:
-		print("[NetworkHandler] WARNING: No handler found for receive_chat_message")
+		Log.warn("No handler found for receive_chat_message", "Network")
 
 @rpc
 func npc_spawned(npc_id: int, npc_data: Dictionary):
