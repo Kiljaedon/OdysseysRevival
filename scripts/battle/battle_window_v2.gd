@@ -13,6 +13,7 @@ var node_provider: BattleNodeProvider
 var floating_overlays: BattleFloatingOverlays
 var input_handler: BattleInputHandler
 var turn_executor: BattleTurnExecutor
+var result_handler: BattleResultHandler
 
 # Squad data
 var enemy_squad: Array = []
@@ -110,6 +111,7 @@ func initialize_subsystems():
 	floating_overlays = BattleFloatingOverlays.new()
 	input_handler = BattleInputHandler.new()
 	turn_executor = BattleTurnExecutor.new()
+	result_handler = BattleResultHandler.new()
 
 	# Add as children
 	add_child(combat_controller)
@@ -121,6 +123,7 @@ func initialize_subsystems():
 	add_child(floating_overlays)
 	add_child(input_handler)
 	add_child(turn_executor)
+	add_child(result_handler)
 
 	# Initialize BattleNodeProvider with panel references AND all UI element references
 	var enemy_panel_array = [enemy_panel_1, enemy_panel_2, enemy_panel_3, enemy_panel_4, enemy_panel_5, enemy_panel_6]
@@ -261,6 +264,16 @@ func initialize_subsystems():
 		"network_client": network_client,
 		"floating_overlays": floating_overlays,
 		"end_battle_callback": Callable(self, "end_battle")
+	})
+
+	# Initialize Result Handler with UI references
+	result_handler.initialize({
+		"result_popup": result_popup,
+		"result_title": result_title,
+		"xp_label": xp_label,
+		"gold_label": gold_label,
+		"action_buttons": [attack_button, defend_button, skills_button, items_button],
+		"ui_manager": ui_manager
 	})
 
 	# Load sprite atlases
@@ -464,9 +477,10 @@ func setup_server_battle(server_data: Dictionary):
 	combat_controller.initialize_battle(enemy_squad, ally_squad, player_character, true, combat_id)
 	combat_controller.set_battle_initiator(player_initiated)
 
-	# Set squad references in UI manager and turn executor
+	# Set squad references in UI manager, turn executor, and result handler
 	ui_manager.set_squad_references(enemy_squad, ally_squad)
 	turn_executor.set_squads(enemy_squad, ally_squad, player_character)
+	result_handler.set_enemy_squad(enemy_squad)
 
 	# Update all UI
 	ui_manager.update_all_enemies_ui()
@@ -503,9 +517,10 @@ func setup_local_battle():
 	combat_controller.initialize_battle(enemy_squad, ally_squad, player_character, false, -1)
 	combat_controller.set_battle_initiator(true)  # Player initiated local battle
 
-	# Set squad references in UI manager and turn executor
+	# Set squad references in UI manager, turn executor, and result handler
 	ui_manager.set_squad_references(enemy_squad, ally_squad)
 	turn_executor.set_squads(enemy_squad, ally_squad, player_character)
+	result_handler.set_enemy_squad(enemy_squad)
 
 	# Update all UI
 	ui_manager.update_all_enemies_ui()
@@ -696,85 +711,13 @@ func calculate_basic_damage(attacker: Dictionary, defender: Dictionary) -> int:
 	"""Wrapper for BattleDamageCalculator.calculate_basic_damage()"""
 	return BattleDamageCalculator.calculate_basic_damage(attacker, defender)
 
-## ========== FLOATING HP BAR OVERLAYS ==========
-
 ## ========== BATTLE END ==========
+## Delegated to BattleResultHandler
 
 func end_battle(victory: bool):
-	"""End battle with victory or defeat"""
-	# Disable all buttons
-	if attack_button:
-		attack_button.disabled = true
-	if defend_button:
-		defend_button.disabled = true
-	if skills_button:
-		skills_button.disabled = true
-	if items_button:
-		items_button.disabled = true
-
-	if victory:
-		ui_manager.update_turn_info("VICTORY! You defeated all enemies!")
-
-		# Calculate rewards
-		var rewards = calculate_rewards()
-
-		# Update popup text
-		if result_title:
-			result_title.text = "VICTORY!"
-			result_title.modulate = Color(0.2, 1.0, 0.2)  # Green
-		if xp_label:
-			xp_label.text = "XP Gained: " + str(rewards.xp)
-		if gold_label:
-			gold_label.text = "Gold Earned: " + str(rewards.gold)
-
-		# Show popup
-		if result_popup:
-			result_popup.visible = true
-	else:
-		ui_manager.update_turn_info("DEFEAT! You were defeated...")
-
-		# Update popup text
-		if result_title:
-			result_title.text = "DEFEAT!"
-			result_title.modulate = Color(1.0, 0.2, 0.2)  # Red
-		if xp_label:
-			xp_label.text = "XP Gained: 0"
-		if gold_label:
-			gold_label.text = "Gold Earned: 0"
-
-		# Show popup
-		if result_popup:
-			result_popup.visible = true
-
-func calculate_rewards() -> Dictionary:
-	"""Calculate XP and gold rewards based on enemies defeated"""
-	var total_xp = 0
-	var total_gold = 0
-
-	# Base rewards per enemy (can be customized per enemy later)
-	for enemy in enemy_squad:
-		# Base XP: 10-50 depending on enemy level/stats
-		var enemy_level = 1
-		if enemy.has("level"):
-			enemy_level = enemy.level
-		var base_xp = 10 + (enemy_level * 5)
-		total_xp += base_xp
-
-		# Base gold: 5-25 depending on enemy level
-		var base_gold = 5 + (enemy_level * 2)
-		total_gold += base_gold
-
-	return {"xp": total_xp, "gold": total_gold}
+	"""End battle - delegate to result handler"""
+	result_handler.show_result(victory)
 
 func _on_continue_button_pressed():
-	"""Return to dev client when continue button is pressed"""
-	if result_popup:
-		result_popup.visible = false
-
-	# Clear battle flag in GameState
-	var game_state = get_node_or_null("/root/GameState")
-	if game_state:
-		game_state.set_meta("in_server_battle", false)
-
-	# Return to dev_client scene (position will be automatically restored by map_manager)
-	get_tree().change_scene_to_file("res://dev_client.tscn")
+	"""Return to dev client - delegate to result handler"""
+	result_handler.on_continue_pressed()
