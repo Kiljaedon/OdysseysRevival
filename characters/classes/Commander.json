@@ -1,0 +1,121 @@
+{
+	"animations": {
+		"attack_down": [
+			{
+				"atlas_index": 0.0,
+				"col": 5.0,
+				"row": 16.0
+			}
+		],
+		"attack_left": [
+			{
+				"atlas_index": 0.0,
+				"col": 8.0,
+				"row": 16.0
+			}
+		],
+		"attack_right": [
+			{
+				"atlas_index": 0.0,
+				"col": 11.0,
+				"row": 16.0
+			}
+		],
+		"attack_up": [
+			{
+				"atlas_index": 0.0,
+				"col": 2.0,
+				"row": 16.0
+			}
+		],
+		"walk_down_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 3.0,
+				"row": 16.0
+			}
+		],
+		"walk_down_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 4.0,
+				"row": 16.0
+			}
+		],
+		"walk_left_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 6.0,
+				"row": 16.0
+			}
+		],
+		"walk_left_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 7.0,
+				"row": 16.0
+			}
+		],
+		"walk_right_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 9.0,
+				"row": 16.0
+			}
+		],
+		"walk_right_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 10.0,
+				"row": 16.0
+			}
+		],
+		"walk_up_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 0.0,
+				"row": 16.0
+			}
+		],
+		"walk_up_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 1.0,
+				"row": 16.0
+			}
+		]
+	},
+	"base_stats": {
+		"cha": 18,
+		"dex": 12,
+		"int": 10,
+		"str": 14,
+		"vit": 13,
+		"wis": 10
+	},
+	"character_name": "Commander",
+	"combat_role": "Melee",
+	"created_date": "2025-11-13T06:41:06",
+	"derived_stats": {
+		"mag_def": 10,
+		"mag_dmg": 30.0,
+		"max_ep": 66,
+		"max_hp": 193,
+		"max_mp": 120,
+		"phys_def": 8,
+		"phys_dmg": 34
+	},
+	"element": "None",
+	"flavor_text": {
+		"backstory": "",
+		"description": "Natural leader who inspires allies and commands the battlefield with tactical brilliance."
+	},
+	"level": 1,
+	"manual_stats": {
+		"ep": -1,
+		"hp": -1,
+		"mp": -1
+	},
+	"type": "class",
+	"xp": 0
+}

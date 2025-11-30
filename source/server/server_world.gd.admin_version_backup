@@ -1,0 +1,398 @@
+extends Node
+class_name ServerWorld
+
+## Main server controller - handles all login, account, and gameplay RPCs
+## Rate-limits all authentication requests to prevent brute force attacks
+const AuthManager = preload("res://source/server/managers/auth_manager.gd")
+var auth_manager
+var game_database: GameDatabase
+var network_handler: Node
+
+## Rate limiting: tracks login/account attempts per peer_id
+var login_attempts: Dictionary = {}  # {peer_id: {attempts: int, last_attempt: float, locked_until: float}}
+const MAX_LOGIN_ATTEMPTS = 3
+const LOGIN_ATTEMPT_WINDOW = 60.0  # seconds
+const LOGIN_LOCKOUT_DURATION = 60.0  # seconds
+
+func _ready():
+	print("[ServerWorld] Initializing...")
+
+	# Initialize managers
+	auth_manager = AuthManager.new()
+	add_child(auth_manager)
+
+	game_database = GameDatabase.new()
+	add_child(game_database)
+
+	# Initialize database (JSON or SQLite)
+	# Start network server
+	var peer = ENetMultiplayerPeer.new()
+	var error = peer.create_server(9043, 32)
+	if error != OK:
+		print("[ServerWorld] FAILED to start server: ", error)
+		return
+	multiplayer.multiplayer_peer = peer
+	print("[ServerWorld] Server started on port 9043")
+	GameDatabase.init_database()
+
+	# Move ServerConnection to /root for RPC routing
+	var server_conn = get_node_or_null("ServerConnection")
+	if server_conn:
+		remove_child(server_conn)
+		get_tree().root.add_child(server_conn)
+		print("[ServerWorld] Moved ServerConnection to /root")
+
+	print("[ServerWorld] Ready - auth and database systems initialized")
+
+## Called by NetworkHandler to pass itself for sending responses
+func set_network_handler(handler: Node) -> void:
+	network_handler = handler
+	print("[ServerWorld] NetworkHandler reference set: %s" % handler)
+
+# ========== AUTHENTICATION RPCS ==========
+
+## Handle login requests from clients
+## @rpc request_login(username: String, password: String)
+func request_login(username: String, password: String) -> void:
+	var peer_id = multiplayer.get_remote_sender_id()
+	
+	print("[ServerWorld] Login attempt from peer %d: '%s'" % [peer_id, username])
+	
+	# Validate rate limiting
+	if not _check_rate_limit(peer_id):
+		print("[ServerWorld] Login attempt blocked - peer %d rate limited" % peer_id)
+		_send_login_response(peer_id, false, "Too many login attempts. Please try again later.")
+		return
+	
+	# Validate input
+	if username.is_empty() or password.is_empty():
+		print("[ServerWorld] Login failed - empty credentials from peer %d" % peer_id)
+		_record_failed_login_attempt(peer_id)
+		_send_login_response(peer_id, false, "Username and password required")
+		return
+	
+	# Load account from database
+	var account_result = GameDatabase.get_account(username)
+	if not account_result.get("success", false):
+		print("[ServerWorld] Login failed - account not found: %s" % username)
+		_record_failed_login_attempt(peer_id)
+		_send_login_response(peer_id, false, "Account not found")
+		return
+	
+	var account = account_result.get("account", {})
+	
+	# Verify password
+	if not GameDatabase.verify_password(password, account.get("password_hash", "")):
+		print("[ServerWorld] Login failed - invalid password for account: %s" % username)
+		_record_failed_login_attempt(peer_id)
+		_send_login_response(peer_id, false, "Invalid password")
+		return
+	
+	# Login successful - authenticate peer
+	var admin_level = account.get("admin_level", 0)
+	auth_manager.authenticate_peer(peer_id, username, admin_level)
+	print("[ServerWorld] Login successful - peer %d authenticated as '%s' (admin_level: %d)" % [peer_id, username, admin_level])
+	
+	# Update last login time
+	account["last_login"] = Time.get_datetime_string_from_system()
+	GameDatabase.save_account(username, account)
+	
+	# Get account characters
+	var chars_result = GameDatabase.get_account_characters(username)
+	var characters = []
+	if chars_result.get("success", false):
+		characters = chars_result.get("characters", [])
+	
+	# Build success response
+	var response_data = {
+		"username": username,
+		"admin_level": admin_level,
+		"characters": characters
+	}
+	
+	# Clear rate limit tracking on successful login
+	login_attempts.erase(peer_id)
+	
+	# Send success response
+	_send_login_response(peer_id, true, "Login successful", response_data)
+
+## Handle account creation requests
+## @rpc request_create_account(username: String, password: String)
+func request_create_account(username: String, password: String) -> void:
+	var peer_id = multiplayer.get_remote_sender_id()
+	
+	print("[ServerWorld] Account creation request from peer %d: '%s'" % [peer_id, username])
+	
+	# Validate rate limiting (same rate limit as login)
+	if not _check_rate_limit(peer_id):
+		print("[ServerWorld] Account creation blocked - peer %d rate limited" % peer_id)
+		_send_account_creation_response(peer_id, false, "Too many attempts. Please try again later.")
+		return
+	
+	# Validate input
+	if username.is_empty() or password.is_empty():
+		print("[ServerWorld] Account creation failed - empty credentials from peer %d" % peer_id)
+		_record_failed_login_attempt(peer_id)
+		_send_account_creation_response(peer_id, false, "Username and password required")
+		return
+	
+	# Validate username format
+	if not _is_valid_username(username):
+		print("[ServerWorld] Account creation failed - invalid username format: %s" % username)
+		_record_failed_login_attempt(peer_id)
+		_send_account_creation_response(peer_id, false, "Invalid username (3-16 characters, alphanumeric and underscore only)")
+		return
+	
+	# Validate password strength
+	if not _is_valid_password(password):
+		print("[ServerWorld] Account creation failed - weak password from peer %d" % peer_id)
+		_record_failed_login_attempt(peer_id)
+		_send_account_creation_response(peer_id, false, "Password must be at least 6 characters")
+		return
+	
+	# Check if account already exists
+	var account_result = GameDatabase.get_account(username)
+	if account_result.get("success", false):
+		print("[ServerWorld] Account creation failed - username already exists: %s" % username)
+		_record_failed_login_attempt(peer_id)
+		_send_account_creation_response(peer_id, false, "Username already exists")
+		return
+	
+	# Create account
+	var create_result = GameDatabase.create_account(username, password)
+	if not create_result.get("success", false):
+		print("[ServerWorld] Account creation failed - database error: %s" % create_result.get("error", "unknown"))
+		_record_failed_login_attempt(peer_id)
+		_send_account_creation_response(peer_id, false, "Failed to create account")
+		return
+	
+	print("[ServerWorld] Account created successfully: %s" % username)
+	_send_account_creation_response(peer_id, true, "Account created successfully")
+# ========== RATE LIMITING ==========
+
+## Check if peer is rate limited for login/account attempts
+func _check_rate_limit(peer_id: int) -> bool:
+	var now = Time.get_ticks_msec() / 1000.0
+	
+	if not login_attempts.has(peer_id):
+		return true  # Not rate limited yet
+	
+	var attempt_data = login_attempts[peer_id]
+	
+	# Check if peer is locked out
+	if attempt_data.get("locked_until", 0.0) > now:
+		print("[ServerWorld] Peer %d is locked out (%.1f seconds remaining)" % [peer_id, attempt_data["locked_until"] - now])
+		return false
+	
+	# Check if attempt window has expired
+	if now - attempt_data.get("last_attempt", now) > LOGIN_ATTEMPT_WINDOW:
+		# Reset attempts
+		login_attempts[peer_id] = {"attempts": 0, "last_attempt": now, "locked_until": 0.0}
+		return true
+	
+	# Check if max attempts exceeded
+	if attempt_data.get("attempts", 0) >= MAX_LOGIN_ATTEMPTS:
+		# Lock out peer
+		attempt_data["locked_until"] = now + LOGIN_LOCKOUT_DURATION
+		print("[ServerWorld] Peer %d locked out after %d failed attempts" % [peer_id, attempt_data["attempts"]])
+		return false
+	
+	return true
+
+## Record a failed login attempt
+func _record_failed_login_attempt(peer_id: int) -> void:
+	var now = Time.get_ticks_msec() / 1000.0
+	
+	if not login_attempts.has(peer_id):
+		login_attempts[peer_id] = {"attempts": 0, "last_attempt": now, "locked_until": 0.0}
+	
+	var attempt_data = login_attempts[peer_id]
+	
+	# Check if attempt window has expired and reset if needed
+	if now - attempt_data.get("last_attempt", now) > LOGIN_ATTEMPT_WINDOW:
+		attempt_data["attempts"] = 1
+	else:
+		attempt_data["attempts"] += 1
+	
+	attempt_data["last_attempt"] = now
+	
+	print("[ServerWorld] Failed login attempt recorded for peer %d (attempts: %d/%d)" % [peer_id, attempt_data["attempts"], MAX_LOGIN_ATTEMPTS])
+
+# ========== VALIDATION ==========
+
+## Validate username format
+func _is_valid_username(username: String) -> bool:
+	if username.length() < 3 or username.length() > 16:
+		return false
+	
+	# Check alphanumeric and underscore only
+	var regex = RegEx.new()
+	regex.compile("^[a-zA-Z0-9_]+$")
+	return regex.search(username) != null
+
+## Validate password strength
+func _is_valid_password(password: String) -> bool:
+	# Minimum 6 characters
+	return password.length() >= 6
+
+# ========== RESPONSE SENDERS ==========
+
+## Send login response to client
+func _send_login_response(peer_id: int, success: bool, message: String, data: Dictionary = {}) -> void:
+	if not network_handler:
+		print("[ServerWorld] ERROR: Cannot send login response - NetworkHandler not set!")
+		return
+	
+	var response_data = {
+		"success": success,
+		"message": message
+	}
+	response_data.merge(data)
+	
+	print("[ServerWorld] Sending login response to peer %d: success=%s" % [peer_id, success])
+	network_handler.send_login_response(peer_id, success, message, response_data)
+
+## Send account creation response to client
+func _send_account_creation_response(peer_id: int, success: bool, message: String) -> void:
+	if not network_handler:
+		print("[ServerWorld] ERROR: Cannot send account creation response - NetworkHandler not set!")
+		return
+	
+	print("[ServerWorld] Sending account creation response to peer %d: success=%s" % [peer_id, success])
+	network_handler.send_account_creation_response(peer_id, success, message)
+
+# ========== PEER MANAGEMENT ==========
+
+## Handle peer disconnect
+func _on_peer_disconnected(peer_id: int) -> void:
+	print("[ServerWorld] Peer %d disconnected" % peer_id)
+	auth_manager.remove_peer(peer_id)
+	login_attempts.erase(peer_id)
+
+## Called when server shuts down
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		print("[ServerWorld] Shutting down...")
+		GameDatabase.clear_caches()
+
+# ========== ADMIN CONTENT UPLOAD RPCS ==========
+
+## Handle class upload from admin client
+## @rpc upload_class(player_class: String, class_data: Dictionary)
+@rpc("any_peer")
+func upload_class(player_class: String, class_data: Dictionary) -> void:
+	var peer_id = multiplayer.get_remote_sender_id()
+
+	# Validate admin permission
+	if not auth_manager.is_admin(peer_id):
+		print("[ServerWorld] DENIED: Non-admin attempted class upload (peer %d)" % peer_id)
+		_send_upload_response(peer_id, false, "Admin privileges required")
+		return
+
+	# Validate class data
+	if player_class.is_empty() or class_data.is_empty():
+		_send_upload_response(peer_id, false, "Invalid class data")
+		return
+
+	# Validate class name format (alphanumeric and underscore only)
+	if not _is_valid_content_name(player_class):
+		_send_upload_response(peer_id, false, "Invalid class name format")
+		return
+
+	# Save class to server
+	var file_path = "res://characters/classes/%s.json" % player_class
+	var file = FileAccess.open(file_path, FileAccess.WRITE)
+	if file:
+		file.store_string(JSON.stringify(class_data, "\t"))
+		file.close()
+		print("[ServerWorld] Class uploaded: %s by %s (peer %d)" % [player_class, auth_manager.get_username(peer_id), peer_id])
+		_send_upload_response(peer_id, true, "Class '%s' uploaded successfully" % player_class)
+	else:
+		print("[ServerWorld] ERROR: Failed to save class %s" % player_class)
+		_send_upload_response(peer_id, false, "Server error: Failed to save class")
+
+## Handle NPC/Monster upload from admin client
+## @rpc upload_npc(npc_name: String, npc_data: Dictionary)
+@rpc("any_peer")
+func upload_npc(npc_name: String, npc_data: Dictionary) -> void:
+	var peer_id = multiplayer.get_remote_sender_id()
+
+	# Validate admin permission
+	if not auth_manager.is_admin(peer_id):
+		print("[ServerWorld] DENIED: Non-admin attempted NPC upload (peer %d)" % peer_id)
+		_send_upload_response(peer_id, false, "Admin privileges required")
+		return
+
+	# Validate NPC data
+	if npc_name.is_empty() or npc_data.is_empty():
+		_send_upload_response(peer_id, false, "Invalid NPC data")
+		return
+
+	# Validate NPC name format
+	if not _is_valid_content_name(npc_name):
+		_send_upload_response(peer_id, false, "Invalid NPC name format")
+		return
+
+	# Save NPC to server
+	var file_path = "res://characters/npcs/%s.json" % npc_name
+	var file = FileAccess.open(file_path, FileAccess.WRITE)
+	if file:
+		file.store_string(JSON.stringify(npc_data, "\t"))
+		file.close()
+		print("[ServerWorld] NPC uploaded: %s by %s (peer %d)" % [npc_name, auth_manager.get_username(peer_id), peer_id])
+		_send_upload_response(peer_id, true, "NPC '%s' uploaded successfully" % npc_name)
+	else:
+		print("[ServerWorld] ERROR: Failed to save NPC %s" % npc_name)
+		_send_upload_response(peer_id, false, "Server error: Failed to save NPC")
+
+## Handle map upload from admin client
+## @rpc upload_map(map_name: String, map_data: String)
+@rpc("any_peer")
+func upload_map(map_name: String, map_data: String) -> void:
+	var peer_id = multiplayer.get_remote_sender_id()
+
+	# Validate admin permission
+	if not auth_manager.is_admin(peer_id):
+		print("[ServerWorld] DENIED: Non-admin attempted map upload (peer %d)" % peer_id)
+		_send_upload_response(peer_id, false, "Admin privileges required")
+		return
+
+	# Validate map data
+	if map_name.is_empty() or map_data.is_empty():
+		_send_upload_response(peer_id, false, "Invalid map data")
+		return
+
+	# Validate map name format
+	if not _is_valid_content_name(map_name):
+		_send_upload_response(peer_id, false, "Invalid map name format")
+		return
+
+	# Save map to server
+	var file_path = "res://maps/%s.tmx" % map_name
+	var file = FileAccess.open(file_path, FileAccess.WRITE)
+	if file:
+		file.store_string(map_data)
+		file.close()
+		print("[ServerWorld] Map uploaded: %s by %s (peer %d)" % [map_name, auth_manager.get_username(peer_id), peer_id])
+		_send_upload_response(peer_id, true, "Map '%s' uploaded successfully" % map_name)
+	else:
+		print("[ServerWorld] ERROR: Failed to save map %s" % map_name)
+		_send_upload_response(peer_id, false, "Server error: Failed to save map")
+
+## Send upload response to client
+func _send_upload_response(peer_id: int, success: bool, message: String) -> void:
+	if not network_handler:
+		print("[ServerWorld] ERROR: Cannot send upload response - NetworkHandler not set!")
+		return
+
+	print("[ServerWorld] Sending upload response to peer %d: success=%s, message=%s" % [peer_id, success, message])
+	network_handler.send_upload_response(peer_id, success, message)
+
+## Validate content name format (alphanumeric and underscore only)
+func _is_valid_content_name(name: String) -> bool:
+	if name.length() < 1 or name.length() > 64:
+		return false
+
+	var regex = RegEx.new()
+	regex.compile("^[a-zA-Z0-9_]+$")
+	return regex.search(name) != null

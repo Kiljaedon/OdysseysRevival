@@ -573,8 +573,21 @@ func load_ui_layout():
 ## ========== BATTLE END ==========
 ## Delegated to BattleResultHandler
 
+func handle_battle_end(_combat_id: int, result: Dictionary):
+	"""Called by CombatNetworkService when server signals battle end"""
+	var victory = result.get("victory", false)
+	var rewards = result.get("rewards", {})
+	
+	if victory:
+		ui_manager.update_turn_info("Victory! Rewards received.")
+	else:
+		ui_manager.update_turn_info("Defeated...")
+		
+	# Show result popup with server-authoritative rewards
+	result_handler.show_result(victory, rewards)
+
 func end_battle(victory: bool):
-	"""End battle - delegate to result handler"""
+	"""End battle - local fallback (delegate to result handler)"""
 	result_handler.show_result(victory)
 
 func _on_continue_button_pressed():

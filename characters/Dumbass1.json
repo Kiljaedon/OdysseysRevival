@@ -1,0 +1,95 @@
+{
+	"animations": {
+		"attack_down": [
+			{
+				"atlas_index": 0,
+				"col": 5,
+				"row": 0
+			},
+			{
+				"atlas_index": 0,
+				"col": 5,
+				"row": 0
+			}
+		],
+		"attack_left": [
+			{
+				"atlas_index": 0,
+				"col": 8,
+				"row": 0
+			}
+		],
+		"attack_right": [
+			{
+				"atlas_index": 0,
+				"col": 11,
+				"row": 0
+			}
+		],
+		"attack_up": [
+			{
+				"atlas_index": 0,
+				"col": 2,
+				"row": 0
+			}
+		],
+		"walk_down_1": [
+			{
+				"atlas_index": 0,
+				"col": 3,
+				"row": 0
+			}
+		],
+		"walk_down_2": [
+			{
+				"atlas_index": 0,
+				"col": 4,
+				"row": 0
+			}
+		],
+		"walk_left_1": [
+			{
+				"atlas_index": 0,
+				"col": 6,
+				"row": 0
+			}
+		],
+		"walk_left_2": [
+			{
+				"atlas_index": 0,
+				"col": 7,
+				"row": 0
+			}
+		],
+		"walk_right_1": [
+			{
+				"atlas_index": 0,
+				"col": 9,
+				"row": 0
+			}
+		],
+		"walk_right_2": [
+			{
+				"atlas_index": 0,
+				"col": 10,
+				"row": 0
+			}
+		],
+		"walk_up_1": [
+			{
+				"atlas_index": 0,
+				"col": 0,
+				"row": 0
+			}
+		],
+		"walk_up_2": [
+			{
+				"atlas_index": 0,
+				"col": 1,
+				"row": 0
+			}
+		]
+	},
+	"character_name": "Dumbass1",
+	"created_date": "2025-09-30T07:09:16"
+}

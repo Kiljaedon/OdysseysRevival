@@ -1,0 +1,16 @@
+[gd_resource type="ShaderMaterial" load_steps=2 format=3]
+
+[ext_resource type="Shader" path="res://shaders/smooth_only.gdshader" id="1"]
+
+[resource]
+shader = ExtResource("1")
+shader_parameter/smoothing_strength = 0.35
+shader_parameter/smoothing_enabled = true
+shader_parameter/posterize_levels = 12.0
+shader_parameter/posterize_enabled = true
+shader_parameter/saturation = 0.7
+shader_parameter/saturation_enabled = true
+shader_parameter/contrast = 1.15
+shader_parameter/contrast_enabled = true
+shader_parameter/dithering_enabled = true
+shader_parameter/dither_strength = 0.2

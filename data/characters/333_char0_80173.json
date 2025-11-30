@@ -1,0 +1,111 @@
+{
+	"account": "333",
+	"animations": {
+		"attack_down": [
+			{
+				"atlas_index": 0.0,
+				"col": 5.0,
+				"row": 4.0
+			}
+		],
+		"attack_left": [
+			{
+				"atlas_index": 0.0,
+				"col": 8.0,
+				"row": 4.0
+			}
+		],
+		"attack_right": [
+			{
+				"atlas_index": 0.0,
+				"col": 11.0,
+				"row": 4.0
+			}
+		],
+		"attack_up": [
+			{
+				"atlas_index": 0.0,
+				"col": 2.0,
+				"row": 4.0
+			}
+		],
+		"walk_down_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 3.0,
+				"row": 4.0
+			}
+		],
+		"walk_down_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 4.0,
+				"row": 4.0
+			}
+		],
+		"walk_left_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 6.0,
+				"row": 4.0
+			}
+		],
+		"walk_left_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 7.0,
+				"row": 4.0
+			}
+		],
+		"walk_right_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 9.0,
+				"row": 4.0
+			}
+		],
+		"walk_right_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 10.0,
+				"row": 4.0
+			}
+		],
+		"walk_up_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 0.0,
+				"row": 4.0
+			}
+		],
+		"walk_up_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 1.0,
+				"row": 4.0
+			}
+		]
+	},
+	"character_id": "333_char0_80173",
+	"class_name": "Rogue",
+	"created_at": "2025-10-29T08:00:22",
+	"current_ep": 84.0,
+	"element": "Water",
+	"max_ep": 84.0,
+	"name": "Yo Yo Ma",
+	"position": {
+		"x": 400,
+		"y": 300
+	},
+	"sprite_col": 3.0,
+	"sprite_row": 4.0,
+	"stats": {
+		"cha": 12.0,
+		"dex": 18.0,
+		"int": 12.0,
+		"str": 13.0,
+		"vit": 10.0,
+		"wis": 11.0
+	},
+	"xp": 0
+}

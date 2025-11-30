@@ -1,0 +1,131 @@
+{
+	"ai_archetype": "AGGRESSIVE",
+	"animations": {
+		"attack_down": [
+			{
+				"atlas_index": 0.0,
+				"col": 5.0,
+				"row": 10.0
+			}
+		],
+		"attack_left": [
+			{
+				"atlas_index": 0.0,
+				"col": 8.0,
+				"row": 10.0
+			}
+		],
+		"attack_right": [
+			{
+				"atlas_index": 0.0,
+				"col": 11.0,
+				"row": 10.0
+			}
+		],
+		"attack_up": [
+			{
+				"atlas_index": 0.0,
+				"col": 2.0,
+				"row": 10.0
+			}
+		],
+		"walk_down_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 3.0,
+				"row": 10.0
+			}
+		],
+		"walk_down_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 4.0,
+				"row": 10.0
+			}
+		],
+		"walk_left_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 6.0,
+				"row": 10.0
+			}
+		],
+		"walk_left_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 7.0,
+				"row": 10.0
+			}
+		],
+		"walk_right_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 9.0,
+				"row": 10.0
+			}
+		],
+		"walk_right_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 10.0,
+				"row": 10.0
+			}
+		],
+		"walk_up_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 0.0,
+				"row": 10.0
+			}
+		],
+		"walk_up_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 1.0,
+				"row": 10.0
+			}
+		]
+	},
+	"base_stats": {
+		"cha": 8,
+		"dex": 10,
+		"int": 16,
+		"str": 7,
+		"vit": 8,
+		"wis": 13
+	},
+	"character_name": "DarkMage",
+	"combat_role": "Caster",
+	"created_date": "2025-11-28T15:39:11",
+	"derived_stats": {
+		"mag_def": 13,
+		"mag_dmg": 46.0,
+		"max_ep": 60,
+		"max_hp": 77,
+		"max_mp": 156,
+		"phys_def": 5,
+		"phys_dmg": 19
+	},
+	"element": "Fire",
+	"flavor_text": {
+		"backstory": "",
+		"description": "Corrupted mage wielding dark magic. Glass cannon with devastating spells."
+	},
+	"level": 1,
+	"level_range": {
+		"max": 3,
+		"min": 1
+	},
+	"loot_table": {
+		"gold_reward": 10,
+		"items": [],
+		"xp_reward": 50
+	},
+	"manual_stats": {
+		"ep": -1,
+		"hp": -1,
+		"mp": -1
+	},
+	"type": "npc",
+	"xp": 0
+}

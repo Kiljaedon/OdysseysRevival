@@ -1,0 +1,120 @@
+{
+	"account": "123",
+	"animations": {
+		"attack_down": [
+			{
+				"atlas_index": 0.0,
+				"col": 5.0,
+				"row": 102.0
+			}
+		],
+		"attack_left": [
+			{
+				"atlas_index": 0.0,
+				"col": 8.0,
+				"row": 102.0
+			}
+		],
+		"attack_right": [
+			{
+				"atlas_index": 0.0,
+				"col": 11.0,
+				"row": 102.0
+			}
+		],
+		"attack_up": [
+			{
+				"atlas_index": 0.0,
+				"col": 2.0,
+				"row": 102.0
+			}
+		],
+		"walk_down_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 3.0,
+				"row": 102.0
+			}
+		],
+		"walk_down_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 4.0,
+				"row": 102.0
+			}
+		],
+		"walk_left_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 6.0,
+				"row": 102.0
+			}
+		],
+		"walk_left_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 7.0,
+				"row": 102.0
+			}
+		],
+		"walk_right_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 9.0,
+				"row": 102.0
+			}
+		],
+		"walk_right_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 10.0,
+				"row": 102.0
+			}
+		],
+		"walk_up_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 0.0,
+				"row": 102.0
+			}
+		],
+		"walk_up_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 1.0,
+				"row": 102.0
+			}
+		]
+	},
+	"character_id": "123_char0_32932",
+	"class_name": "Cleric",
+	"created_at": "2025-10-22T11:32:14",
+	"current_ep": 60.0,
+	"current_hp": 176.0,
+	"current_mp": 172.0,
+	"element": "Water",
+	"level": 1.0,
+	"mag_def": 19,
+	"mag_dmg": 50.0,
+	"max_ep": 60.0,
+	"max_hp": 176.0,
+	"max_mp": 172.0,
+	"name": "asdfasdf",
+	"phys_def": 7,
+	"phys_dmg": 21.0,
+	"position": {
+		"x": 400,
+		"y": 300
+	},
+	"sprite_col": 3.0,
+	"sprite_row": 102.0,
+	"stats": {
+		"cha": 11.0,
+		"dex": 10.0,
+		"int": 16.0,
+		"str": 8.0,
+		"vit": 12.0,
+		"wis": 21.0
+	},
+	"xp": 0
+}

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<template>
+ <object name="NPC_Spawn" width="32" height="32">
+  <properties>
+   <property name="npc_name" type="string" value="Rogue"/>
+   <property name="wander_radius" type="int" value="3"/>
+  </properties>
+ </object>
+</template>

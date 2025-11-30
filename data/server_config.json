@@ -1,0 +1,6 @@
+{
+	"max_players": 100,
+	"port": 9043,
+	"server_name": "Odysseys Revival - Development Server",
+	"tick_rate": 0.05
+}

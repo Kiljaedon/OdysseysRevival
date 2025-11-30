@@ -33,6 +33,7 @@ var current_zoom: float = 2.0
 @onready var attack_hitbox: Area2D = $GameWorld/TestCharacter/AttackHitbox
 @onready var attack_hitbox_shape: CollisionShape2D = $GameWorld/TestCharacter/AttackHitbox/CollisionShape2D
 @onready var game_world: Node2D = $GameWorld
+@onready var character_sheet: Panel = $DevUI/CharacterSheet
 
 # Map and collision system now managed by Phase 4 managers
 # (map_manager and collision_system_manager)
@@ -90,6 +91,9 @@ var multiplayer_manager: MultiplayerManager
 var npc_manager: NPCManager
 var character_setup_manager: CharacterSetupManager
 
+# Realtime Battle
+var battle_launcher = null  # RealtimeBattleLauncher
+
 # Multiplayer variables (maintained for backward compatibility, delegated to managers)
 var server_npcs: Dictionary = {}  # Delegated to npc_manager
 
@@ -125,6 +129,18 @@ func _ready():
 
 	# Disable collision shape visual debugging
 	get_tree().debug_collisions_hint = false
+
+	# Add beige/cream background to DevUI to match Kenny theme
+	var dev_ui = $DevUI
+	if dev_ui:
+		var bg_fill = ColorRect.new()
+		bg_fill.name = "BackgroundFill"
+		bg_fill.color = Color(0.85, 0.75, 0.60, 1.0)  # Beige/cream to match Kenny UI
+		bg_fill.set_anchors_preset(Control.PRESET_FULL_RECT)
+		bg_fill.z_index = -100  # Behind everything
+		dev_ui.add_child(bg_fill)
+		dev_ui.move_child(bg_fill, 0)  # Move to first position
+		print("[DevClient] Beige/cream background added to DevUI")
 
 	# Create draggable UI system
 	create_draggable_ui()
@@ -217,7 +233,7 @@ func _initialize_managers() -> void:
 	input_handler_manager = InputHandlerManager.new()
 	add_child(input_handler_manager)
 	input_handler_manager.initialize(test_character, camera, animation_control_manager,
-									   animated_sprite, attack_hitbox)
+									   animated_sprite, attack_hitbox, character_sheet)
 	input_handler_manager.movement_speed = movement_speed
 	input_handler_manager.attack_duration = attack_duration
 	input_handler_manager.zoom_min = zoom_min
@@ -249,6 +265,12 @@ func _initialize_managers() -> void:
 	add_child(map_manager)
 	map_manager.initialize(bottom_layer, middle_layer, top_layer, game_world, test_character)
 
+	# Connect map_manager to input_handler for transition detection
+	input_handler_manager.set_map_manager(map_manager)
+
+	# Connect transition signal to handle map changes
+	map_manager.transition_triggered.connect(_on_map_transition)
+
 	# Collision System Manager (Phase 4)
 	collision_system_manager = CollisionSystemManager.new()
 	add_child(collision_system_manager)
@@ -274,6 +296,20 @@ func _initialize_managers() -> void:
 	# Sync server_npcs reference between managers
 	server_npcs = npc_manager.get_server_npcs()
 	input_handler_manager.server_npcs = server_npcs
+
+	# Initialize realtime battle launcher
+	var BattleLauncherScript = load("res://scripts/realtime_battle/realtime_battle_launcher.gd")
+	if BattleLauncherScript:
+		battle_launcher = Node.new()
+		battle_launcher.set_script(BattleLauncherScript)
+		battle_launcher.name = "BattleLauncher"
+		add_child(battle_launcher)
+		battle_launcher.initialize(game_world)
+		# Register with ServerConnection
+		var server_conn = get_tree().root.get_node_or_null("ServerConnection")
+		if server_conn:
+			server_conn.set_meta("realtime_battle_launcher", battle_launcher)
+		print("[DevClient] ✓ Realtime battle launcher initialized")
 
 ## ============================================================================
 ## UI CONNECTIONS AND INITIALIZATION
@@ -432,10 +468,30 @@ func initiate_combat(npc: WanderingNPC):
 		print("  ERROR: Could not find NPC ID in server_npcs")
 		return
 
+	# DEBUG: Check multiplayer connection status
+	print("[COMBAT DEBUG] Checking multiplayer status...")
+	print("[COMBAT DEBUG] - multiplayer.has_multiplayer_peer(): ", multiplayer.has_multiplayer_peer())
+	if multiplayer.has_multiplayer_peer():
+		print("[COMBAT DEBUG] - multiplayer.is_server(): ", multiplayer.is_server())
+		print("[COMBAT DEBUG] - multiplayer.get_unique_id(): ", multiplayer.get_unique_id())
+		print("[COMBAT DEBUG] - multiplayer.get_peers(): ", multiplayer.get_peers())
+		var peer = multiplayer.multiplayer_peer
+		if peer:
+			print("[COMBAT DEBUG] - peer connection status: ", peer.get_connection_status())
+			print("[COMBAT DEBUG] - peer is ENetMultiplayerPeer: ", peer is ENetMultiplayerPeer)
+	else:
+		print("[COMBAT DEBUG] - NO MULTIPLAYER PEER SET!")
+
 	# Send request to server via ServerConnection
 	var server_conn = get_tree().root.get_node_or_null("ServerConnection")
 	if server_conn:
-		server_conn.rpc("request_npc_attack", npc_id)
+		print("[COMBAT] ServerConnection found at: ", server_conn.get_path())
+		print("[COMBAT] Sending RPC: rt_start_battle(npc_id=%d)" % npc_id)
+
+		# Use new realtime battle system
+		server_conn.rt_start_battle.rpc_id(1, npc_id)
+
+		print("[COMBAT] Realtime battle RPC sent to server")
 	else:
 		print("  ERROR: ServerConnection not found!")
 
@@ -559,6 +615,75 @@ func create_default_test_map():
 		map_manager.create_default_test_map()
 	else:
 		print("WARNING: Map manager not initialized")
+
+## ============================================================================
+## MAP TRANSITION HANDLING
+## ============================================================================
+
+func _on_map_transition(target_map: String, spawn_x: int, spawn_y: int) -> void:
+	"""Handle map transition triggered by player walking into transition zone"""
+	print("[DevClient] === MAP TRANSITION ===")
+	print("  Target map: ", target_map)
+	print("  Spawn position: (", spawn_x, ", ", spawn_y, ") tiles")
+
+	# Check if the target map exists
+	var tmx_path = "res://maps/" + target_map + ".tmx"
+	if not FileAccess.file_exists(tmx_path):
+		print("[DevClient] ERROR: Target map not found: ", tmx_path)
+		return
+
+	# Calculate spawn position in pixels (tiles * 128px per tile, centered in tile)
+	var spawn_pos = Vector2(
+		spawn_x * 128 + 64,  # Center of tile
+		spawn_y * 128 + 64
+	)
+
+	# Store spawn position for after map loads
+	var game_state = get_node_or_null("/root/GameState")
+	if game_state:
+		# Use pre_battle_position to store spawn (reusing existing field)
+		game_state.pre_battle_position = spawn_pos
+		print("  Stored spawn position: ", spawn_pos)
+
+	# Load the new map
+	load_selected_map(target_map)
+
+	# Position the player at spawn location
+	if test_character:
+		test_character.position = spawn_pos
+		print("  Player positioned at: ", spawn_pos)
+
+	# Update map dropdown to reflect new map
+	_update_map_dropdown_selection(target_map)
+
+	# Notify server of map change (if connected)
+	_notify_server_map_change(target_map, spawn_pos)
+
+	print("[DevClient] === TRANSITION COMPLETE ===")
+
+func _update_map_dropdown_selection(map_name: String) -> void:
+	"""Update the map dropdown to show the current map"""
+	if not map_dropdown:
+		return
+
+	for i in range(available_maps.size()):
+		if available_maps[i] == map_name:
+			map_dropdown.selected = i
+			break
+
+func _notify_server_map_change(map_name: String, position: Vector2) -> void:
+	"""Notify server that player changed maps"""
+	var server_conn = get_tree().root.get_node_or_null("ServerConnection")
+	if not server_conn:
+		print("[DevClient] No server connection - skipping map change notification")
+		return
+
+	# Check if we have a map_change RPC
+	if server_conn.has_method("request_map_change"):
+		server_conn.request_map_change.rpc_id(1, map_name, position.x, position.y)
+		print("[DevClient] Sent map change request to server")
+	else:
+		print("[DevClient] Server doesn't support map change RPC yet")
 
 ## ============================================================================
 ## ANIMATION CONTROL HANDLERS
@@ -1052,10 +1177,16 @@ func handle_sync_npc_positions(npc_positions: Dictionary):
 
 func handle_binary_combat_start(packet: PackedByteArray):
 	"""Delegation wrapper for MultiplayerManager.handle_binary_combat_start()"""
+	print("[DEV_CONTROLLER] handle_binary_combat_start called! Packet size: %d" % packet.size())
+	print("[DEV_CONTROLLER] multiplayer_manager: %s, npc_manager: %s" % [multiplayer_manager != null, npc_manager != null])
+
 	if multiplayer_manager and npc_manager:
+		print("[DEV_CONTROLLER] ✓ Forwarding to multiplayer_manager...")
 		multiplayer_manager.handle_binary_combat_start(packet, npc_manager.get_server_npcs())
+		print("[DEV_CONTROLLER] ✓ multiplayer_manager.handle_binary_combat_start() completed")
 	else:
-		print("WARNING: Multiplayer or NPC manager not initialized")
+		print("[DEV_CONTROLLER] ✗ ERROR: Multiplayer or NPC manager not initialized!")
+		print("[DEV_CONTROLLER] multiplayer_manager=%s, npc_manager=%s" % [multiplayer_manager, npc_manager])
 
 func handle_combat_round_results(combat_id: int, results: Dictionary):
 	"""Delegation wrapper for MultiplayerManager.handle_combat_round_results()"""

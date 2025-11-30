@@ -1,0 +1,113 @@
+{
+	"account": "123",
+	"animations": {
+		"attack_down": [
+			{
+				"atlas_index": 0.0,
+				"col": 5.0,
+				"row": 2.0
+			}
+		],
+		"attack_left": [
+			{
+				"atlas_index": 0.0,
+				"col": 8.0,
+				"row": 2.0
+			}
+		],
+		"attack_right": [
+			{
+				"atlas_index": 0.0,
+				"col": 11.0,
+				"row": 2.0
+			}
+		],
+		"attack_up": [
+			{
+				"atlas_index": 0.0,
+				"col": 2.0,
+				"row": 2.0
+			}
+		],
+		"walk_down_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 3.0,
+				"row": 2.0
+			}
+		],
+		"walk_down_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 4.0,
+				"row": 2.0
+			}
+		],
+		"walk_left_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 6.0,
+				"row": 2.0
+			}
+		],
+		"walk_left_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 7.0,
+				"row": 2.0
+			}
+		],
+		"walk_right_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 9.0,
+				"row": 2.0
+			}
+		],
+		"walk_right_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 10.0,
+				"row": 2.0
+			}
+		],
+		"walk_up_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 0.0,
+				"row": 2.0
+			}
+		],
+		"walk_up_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 1.0,
+				"row": 2.0
+			}
+		]
+	},
+	"character_id": "123_char0_61155",
+	"class_name": "Mage",
+	"created_at": "2025-11-26T18:35:43",
+	"current_ep": 75.0,
+	"element": "None",
+	"hp": 87.0,
+	"level": 1.0,
+	"max_ep": 75.0,
+	"max_hp": 87.0,
+	"max_mp": 187.0,
+	"mp": 187.0,
+	"name": "Kilj",
+	"position": "(904.9182, 1438.044)",
+	"position_x": 512.0,
+	"position_y": 512.0,
+	"stats": {
+		"cha": 12.0,
+		"dex": 15.0,
+		"int": 19.0,
+		"str": 10.0,
+		"vit": 11.0,
+		"wis": 21.0
+	},
+	"xp": 0.0
+}

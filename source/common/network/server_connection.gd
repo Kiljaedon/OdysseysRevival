@@ -14,6 +14,7 @@ const AuthNetworkService = preload("res://source/common/network/services/auth_ne
 const CharacterNetworkService = preload("res://source/common/network/services/character_network_service.gd")
 const WorldNetworkService = preload("res://source/common/network/services/world_network_service.gd")
 const CombatNetworkService = preload("res://source/common/network/services/combat_network_service.gd")
+const RealtimeCombatNetworkService = preload("res://source/common/network/services/realtime_combat_network_service.gd")
 const ChatNetworkService = preload("res://source/common/network/services/chat_network_service.gd")
 const AdminNetworkService = preload("res://source/common/network/services/admin_network_service.gd")
 
@@ -22,6 +23,7 @@ var auth_service: Node
 var character_service: Node
 var world_service: Node
 var combat_service: Node
+var rt_combat_service: Node
 var chat_service: Node
 var admin_service: Node
 
@@ -69,6 +71,10 @@ func _init_services():
 	combat_service.name = "CombatService"
 	add_child(combat_service)
 
+	rt_combat_service = RealtimeCombatNetworkService.new()
+	rt_combat_service.name = "RealtimeCombatService"
+	add_child(rt_combat_service)
+
 	chat_service = ChatNetworkService.new()
 	chat_service.name = "ChatService"
 	add_child(chat_service)
@@ -83,6 +89,7 @@ func _propagate_server_world():
 	character_service.server_world = server_world
 	world_service.server_world = server_world
 	combat_service.server_world = server_world
+	rt_combat_service.server_world = server_world
 	chat_service.server_world = server_world
 	admin_service.server_world = server_world
 
@@ -175,6 +182,15 @@ func npc_spawned(npc_id: int, npc_data: Dictionary):
 func sync_npc_positions(npc_positions: Dictionary):
 	world_service.on_sync_npc_positions(npc_positions)
 
+@rpc("any_peer")
+func request_map_change(map_name: String, x: float, y: float):
+	var peer_id = multiplayer.get_remote_sender_id()
+	world_service.handle_map_change_request(peer_id, map_name, x, y)
+
+@rpc
+func map_changed(map_name: String, spawn_x: float, spawn_y: float):
+	world_service.on_map_changed(map_name, spawn_x, spawn_y)
+
 
 # ==================== COMBAT RPCs ====================
 
@@ -217,6 +233,49 @@ func start_action_selection(round_number: int):
 @rpc("any_peer")
 func round_complete_request_ready(round_number: int):
 	combat_service.on_round_complete_request_ready(round_number)
+
+
+# ==================== REALTIME COMBAT RPCs ====================
+
+@rpc("any_peer")
+func rt_start_battle(npc_id: int):
+	rt_combat_service.handle_rt_start_battle(npc_id)
+
+@rpc("any_peer", "unreliable")
+func rt_player_move(velocity_x: float, velocity_y: float):
+	rt_combat_service.handle_rt_player_move(velocity_x, velocity_y)
+
+@rpc("any_peer")
+func rt_player_attack(target_id: String):
+	rt_combat_service.handle_rt_player_attack(target_id)
+
+@rpc("any_peer")
+func rt_player_defend():
+	rt_combat_service.handle_rt_player_defend()
+
+@rpc
+func rt_battle_start(battle_data: Dictionary):
+	rt_combat_service.on_rt_battle_start(battle_data)
+
+@rpc("unreliable")
+func rt_state_update(units_state: Array):
+	rt_combat_service.on_rt_state_update(units_state)
+
+@rpc
+func rt_damage_event(attacker_id: String, target_id: String, damage: int, flank_type: String):
+	rt_combat_service.on_rt_damage_event(attacker_id, target_id, damage, flank_type)
+
+@rpc
+func rt_unit_death(unit_id: String):
+	rt_combat_service.on_rt_unit_death(unit_id)
+
+@rpc
+func rt_defend_event(unit_id: String):
+	rt_combat_service.on_rt_defend_event(unit_id)
+
+@rpc
+func rt_battle_end(battle_id: int, result: String, rewards: Dictionary):
+	rt_combat_service.on_rt_battle_end(battle_id, result, rewards)
 
 
 # ==================== CHAT RPCs ====================
@@ -305,6 +364,23 @@ func _find_world_client() -> Node:
 	var nodes = get_tree().get_nodes_in_group("world_client")
 	if nodes.size() > 0:
 		return nodes[0]
+	return null
+
+func _find_node_with_script(script_name: String) -> Node:
+	return _search_tree(get_tree().root, script_name)
+
+func _search_tree(node: Node, script_name: String) -> Node:
+	var script = node.get_script()
+	if script:
+		var script_path = script.resource_path if script.resource_path else ""
+		if script_path.ends_with(script_name):
+			return node
+
+	for child in node.get_children():
+		var found = _search_tree(child, script_name)
+		if found:
+			return found
+
 	return null
 
 

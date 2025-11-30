@@ -1,0 +1,116 @@
+{
+	"animations": {
+		"attack_down": [
+			{
+				"atlas_index": 0.0,
+				"col": 5.0,
+				"row": 102.0
+			}
+		],
+		"attack_left": [
+			{
+				"atlas_index": 0.0,
+				"col": 8.0,
+				"row": 102.0
+			}
+		],
+		"attack_right": [
+			{
+				"atlas_index": 0.0,
+				"col": 11.0,
+				"row": 102.0
+			}
+		],
+		"attack_up": [
+			{
+				"atlas_index": 0.0,
+				"col": 2.0,
+				"row": 102.0
+			}
+		],
+		"walk_down_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 3.0,
+				"row": 102.0
+			}
+		],
+		"walk_down_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 4.0,
+				"row": 102.0
+			}
+		],
+		"walk_left_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 6.0,
+				"row": 102.0
+			}
+		],
+		"walk_left_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 7.0,
+				"row": 102.0
+			}
+		],
+		"walk_right_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 9.0,
+				"row": 102.0
+			}
+		],
+		"walk_right_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 10.0,
+				"row": 102.0
+			}
+		],
+		"walk_up_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 0.0,
+				"row": 102.0
+			}
+		],
+		"walk_up_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 1.0,
+				"row": 102.0
+			}
+		]
+	},
+	"base_stats": {
+		"cha": 11.0,
+		"dex": 10.0,
+		"int": 16.0,
+		"str": 11.0,
+		"vit": 12.0,
+		"wis": 18.0
+	},
+	"character_name": "Krausus",
+	"class_template": "Cleric",
+	"created_date": "2025-10-19T18:01:00",
+	"derived_stats": {
+		"mag_def": 17,
+		"mag_dmg": 49.0,
+		"max_ep": 60.0,
+		"max_hp": 182.0,
+		"max_mp": 166.0,
+		"phys_def": 8,
+		"phys_dmg": 27.0
+	},
+	"element": "Fire",
+	"flavor_text": {
+		"backstory": "",
+		"description": "Divine healer and protector, channeling sacred powers to aid allies."
+	},
+	"level": 1.0,
+	"type": "player",
+	"xp": 0
+}

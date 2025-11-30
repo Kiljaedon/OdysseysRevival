@@ -32,6 +32,44 @@ func _ready():
 	# Call this after a frame to ensure everything is set up
 	call_deferred("_setup_dragging")
 
+	# Apply Kenny panel texture
+	call_deferred("apply_panel_styling")
+
+func create_styled_button(text: String) -> Button:
+	"""Creates Kenny-styled button for panel controls"""
+	var button = Button.new()
+	button.text = text
+	button.custom_minimum_size = Vector2(30, 25)
+	button.focus_mode = Control.FOCUS_NONE
+
+	# Load Kenny button textures
+	var normal_texture = load("res://assets/ui/kenney/rpg-expansion/buttonSquare_brown.png")
+	var pressed_texture = load("res://assets/ui/kenney/rpg-expansion/buttonSquare_brown_pressed.png")
+
+	if normal_texture:
+		var stylebox_normal = StyleBoxTexture.new()
+		stylebox_normal.texture = normal_texture
+		stylebox_normal.texture_margin_left = 8
+		stylebox_normal.texture_margin_top = 8
+		stylebox_normal.texture_margin_right = 8
+		stylebox_normal.texture_margin_bottom = 8
+		button.add_theme_stylebox_override("normal", stylebox_normal)
+
+		if pressed_texture:
+			var stylebox_pressed = StyleBoxTexture.new()
+			stylebox_pressed.texture = pressed_texture
+			stylebox_pressed.texture_margin_left = 8
+			stylebox_pressed.texture_margin_top = 8
+			stylebox_pressed.texture_margin_right = 8
+			stylebox_pressed.texture_margin_bottom = 8
+			button.add_theme_stylebox_override("pressed", stylebox_pressed)
+
+	# Style button text
+	button.add_theme_font_size_override("font_size", 12)
+	button.add_theme_color_override("font_color", Color(0.95, 0.84, 0.0))
+
+	return button
+
 func create_title_bar():
 	# Create title bar
 	title_bar = Panel.new()  # Use Panel instead of Control for better input handling
@@ -44,8 +82,19 @@ func create_title_bar():
 	add_child(title_bar)
 	move_child(title_bar, get_child_count() - 1)  # Move to end (renders on top)
 
-	# Set background color
-	title_bar.modulate = Color(0.3, 0.3, 0.3, 0.8)
+	# Apply Kenny title bar texture
+	var title_texture = load("res://assets/ui/kenney/rpg-expansion/panel_brown.png")
+	if title_texture:
+		var title_stylebox = StyleBoxTexture.new()
+		title_stylebox.texture = title_texture
+		title_stylebox.texture_margin_left = 16
+		title_stylebox.texture_margin_top = 16
+		title_stylebox.texture_margin_right = 16
+		title_stylebox.texture_margin_bottom = 16
+		title_bar.add_theme_stylebox_override("panel", title_stylebox)
+	else:
+		# Fallback to gray if texture unavailable
+		title_bar.modulate = Color(0.3, 0.3, 0.3, 0.8)
 
 	# Connect title bar input to handle dragging
 	title_bar.gui_input.connect(_on_title_bar_input)
@@ -59,25 +108,23 @@ func create_title_bar():
 	title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Let clicks pass through to title bar
 	title_bar.add_child(title_label)
 
+	# Style title text with Kenny gold color
+	title_label.add_theme_color_override("font_color", Color(0.95, 0.84, 0.0))
+	title_label.add_theme_font_size_override("font_size", 14)
+
 	# Create hide button (left of lock button)
-	hide_button = Button.new()
-	hide_button.text = "👁"
-	hide_button.custom_minimum_size = Vector2(30, 25)
+	hide_button = create_styled_button("👁")
 	hide_button.set_anchors_and_offsets_preset(Control.PRESET_CENTER_RIGHT)
 	hide_button.offset_right = -40
 	hide_button.offset_left = -70
-	hide_button.focus_mode = Control.FOCUS_NONE
 	hide_button.pressed.connect(_on_hide_button_pressed)
 	title_bar.add_child(hide_button)
 
 	# Create lock button
-	lock_button = Button.new()
-	lock_button.text = "🔓"
-	lock_button.custom_minimum_size = Vector2(30, 25)
+	lock_button = create_styled_button("🔓")
 	lock_button.set_anchors_and_offsets_preset(Control.PRESET_CENTER_RIGHT)
 	lock_button.offset_right = -5
 	lock_button.offset_left = -35
-	lock_button.focus_mode = Control.FOCUS_NONE  # Don't steal focus
 	lock_button.pressed.connect(_on_lock_button_pressed)
 	title_bar.add_child(lock_button)
 
@@ -124,6 +171,20 @@ func _setup_dragging():
 	focus_mode = Control.FOCUS_ALL
 	mouse_filter = Control.MOUSE_FILTER_PASS
 
+func apply_panel_styling():
+	"""Apply Kenny RPG texture to panel background"""
+	var panel_texture = load("res://assets/ui/kenney/rpg-expansion/panel_brown.png")
+	if panel_texture:
+		var stylebox = StyleBoxTexture.new()
+		stylebox.texture = panel_texture
+		stylebox.texture_margin_left = 16
+		stylebox.texture_margin_top = 16
+		stylebox.texture_margin_right = 16
+		stylebox.texture_margin_bottom = 16
+		add_theme_stylebox_override("panel", stylebox)
+	else:
+		print("[DraggablePanel] ERROR: Panel texture failed to load")
+
 func _on_title_bar_input(event):
 	"""Handle input events from title bar for dragging"""
 	if is_locked:
@@ -167,6 +228,9 @@ func _gui_input(event):
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
+				# Bring to front when clicked
+				move_to_front()
+				
 				# Get mouse position relative to this panel
 				var local_pos = event.position
 

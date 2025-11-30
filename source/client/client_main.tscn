@@ -1,0 +1,17 @@
+[gd_scene load_steps=4 format=3 uid="uid://bmbm8el3rcejb"]
+
+[ext_resource type="Script" uid="uid://bfybdk1kgy125" path="res://source/client/client_main.gd" id="1_hoyng"]
+[ext_resource type="Script" uid="uid://siq7b6qqrjyq" path="res://source/client/network/world_client.gd" id="2_ey548"]
+[ext_resource type="PackedScene" uid="uid://5wv1gfwppcnf" path="res://source/client/gateway/gateway.tscn" id="4_s85jl"]
+
+[node name="ClientMain" type="Node"]
+script = ExtResource("1_hoyng")
+
+[node name="WorldClient" type="Node" parent="."]
+script = ExtResource("2_ey548")
+
+[node name="UILayer" type="CanvasLayer" parent="."]
+follow_viewport_enabled = false
+
+[node name="Gateway" parent="UILayer" node_paths=PackedStringArray("world_server") instance=ExtResource("4_s85jl")]
+world_server = NodePath("../../WorldClient")

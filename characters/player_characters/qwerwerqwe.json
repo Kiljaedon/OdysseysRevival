@@ -1,0 +1,42 @@
+{
+	"account": "123",
+	"character_id": "123_char0_71015",
+	"character_name": "qwerwerqwe",
+	"class_name": "Mage",
+	"type": "player",
+	"element": "Water",
+	"level": 1,
+	"xp": 0,
+	"base_stats": {
+		"str": 7,
+		"dex": 10,
+		"int": 20,
+		"vit": 8,
+		"wis": 18,
+		"cha": 10
+	},
+	"derived_stats": {
+		"max_hp": 154,
+		"max_mp": 186,
+		"max_ep": 60,
+		"phys_def": 5,
+		"mag_def": 18,
+		"phys_dmg": 19,
+		"mag_dmg": 59
+	},
+	"animations": {
+		"walk_up_1": [{"atlas_index": 0, "col": 0, "row": 2}],
+		"walk_up_2": [{"atlas_index": 0, "col": 1, "row": 2}],
+		"attack_up": [{"atlas_index": 0, "col": 2, "row": 2}],
+		"walk_down_1": [{"atlas_index": 0, "col": 3, "row": 2}],
+		"walk_down_2": [{"atlas_index": 0, "col": 4, "row": 2}],
+		"attack_down": [{"atlas_index": 0, "col": 5, "row": 2}],
+		"walk_left_1": [{"atlas_index": 0, "col": 6, "row": 2}],
+		"walk_left_2": [{"atlas_index": 0, "col": 7, "row": 2}],
+		"attack_left": [{"atlas_index": 0, "col": 8, "row": 2}],
+		"walk_right_1": [{"atlas_index": 0, "col": 9, "row": 2}],
+		"walk_right_2": [{"atlas_index": 0, "col": 10, "row": 2}],
+		"attack_right": [{"atlas_index": 0, "col": 11, "row": 2}]
+	},
+	"position": {"x": 400, "y": 300}
+}

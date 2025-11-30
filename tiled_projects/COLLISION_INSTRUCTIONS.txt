@@ -1,0 +1,64 @@
+═══════════════════════════════════════════════════════════════
+  COLLISION SYSTEM - HOW TO USE
+═══════════════════════════════════════════════════════════════
+
+The blue "Collision Blocks (Invisible)" tileset is DEPRECATED.
+Use Object Layers with resizable rectangles instead!
+
+───────────────────────────────────────────────────────────────
+  STEP-BY-STEP INSTRUCTIONS
+───────────────────────────────────────────────────────────────
+
+1. CREATE OBJECT LAYER
+   ▸ Right-click in Layers panel
+   ▸ Select "New → Object Layer"
+   ▸ Name it "Collision"
+
+2. DRAW COLLISION BOXES
+   ▸ Make sure "Collision" layer is selected
+   ▸ Press R key (Rectangle tool)
+   ▸ Click and drag to create collision box
+   ▸ Create as many as you need!
+
+3. RESIZE/MOVE BOXES
+   ▸ Press S key (Select Objects tool)
+   ▸ Click on a box to select it
+   ▸ Drag corners to resize
+   ▸ Drag center to move
+   ▸ Press Delete to remove
+
+4. DESELECT
+   ▸ Press S key (if not already in Select mode)
+   ▸ Click on empty gray space
+   ▸ Box is now deselected
+
+───────────────────────────────────────────────────────────────
+  KEYBOARD SHORTCUTS
+───────────────────────────────────────────────────────────────
+
+R = Rectangle tool (draw new collision boxes)
+S = Select tool (edit existing boxes)
+Delete = Remove selected box
+Drag corners = Resize box
+Drag center = Move box
+
+───────────────────────────────────────────────────────────────
+  WHY USE OBJECT LAYERS?
+───────────────────────────────────────────────────────────────
+
+✓ Any size collision box (not stuck to 32×32 grid)
+✓ Precise collision around objects
+✓ 64×32 box for tree trunk instead of 2 tiles
+✓ Create doorways, thin walls, L-shapes
+✓ No wasted blocked space
+
+───────────────────────────────────────────────────────────────
+  TECHNICAL DETAILS
+───────────────────────────────────────────────────────────────
+
+• Each rectangle becomes a StaticBody2D in Godot
+• Exact dimensions preserved (scaled 4x for game)
+• Player cannot walk through these areas
+• Invisible in-game but solid collision
+
+───────────────────────────────────────────────────────────────

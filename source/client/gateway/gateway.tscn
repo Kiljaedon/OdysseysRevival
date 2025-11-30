@@ -1,0 +1,149 @@
+[gd_scene load_steps=17 format=3 uid="uid://5wv1gfwppcnf"]
+
+[ext_resource type="Theme" uid="uid://cf1ayo3dckj67" path="res://source/client/gateway/ui/theme_navy.tres" id="1_sg1qr"]
+[ext_resource type="Script" path="res://source/client/gateway/gateway.gd" id="2_74q4y"]
+[ext_resource type="Texture2D" uid="uid://cfihbj71a4y35" path="res://assets/sprites/gui/backgrounds/desert.png" id="3_1c3kr"]
+[ext_resource type="Script" path="res://source/client/map/game_map.gd" id="5_game_map_script"]
+[ext_resource type="FontFile" uid="uid://cehc3gujked8x" path="res://assets/fonts/Cinzel/static/Cinzel-Bold.ttf" id="6_opc3y"]
+[ext_resource type="FontFile" uid="uid://cr1d4ugttxggp" path="res://assets/fonts/Atkinson_Hyperlegible/AtkinsonHyperlegible-Bold.ttf" id="7_tnybn"]
+[ext_resource type="StyleBox" uid="uid://bi8r7kxlh83no" path="res://source/client/gateway/ui/gradient_button.tres" id="8_waovh"]
+[ext_resource type="PackedScene" uid="uid://hy5zj1f0r3def" path="res://odyssey_character.tscn" id="9_character"]
+[ext_resource type="Script" uid="uid://q5rsjtg6nsto" path="res://source/client/gateway/ui/popup_panel.gd" id="10_4rdug"]
+[ext_resource type="Script" path="res://addons/scaling_canvas_layer/scaling_canvas_layer.gd" id="12_scaling"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_q35d6"]
+[sub_resource type="CanvasItemMaterial" id="CanvasItemMaterial_q35d6"]
+blend_mode = 1
+[sub_resource type="Gradient" id="Gradient_1gybq"]
+offsets = PackedFloat32Array(0, 0.25, 1)
+colors = PackedColorArray(0, 0, 0, 0.1, 0.23, 0.23, 0.23, 0.4, 1, 1, 1, 0)
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_rk5g7"]
+gradient = SubResource("Gradient_1gybq")
+fill_from = Vector2(0, 0.465812)
+fill_to = Vector2(1, 0.491453)
+[sub_resource type="StyleBoxLine" id="StyleBoxLine_fnfxe"]
+color = Color(0.2317, 0.427629, 0.468198, 0.84)
+thickness = 3
+[sub_resource type="LabelSettings" id="LabelSettings_rky0m"]
+font = ExtResource("7_tnybn")
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_dfj0q"]
+content_margin_left = 12.0
+content_margin_top = 12.0
+content_margin_right = 16.0
+content_margin_bottom = 16.0
+bg_color = Color(0, 0, 0, 0.9)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.692304, 0.737968, 0.839943, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+shadow_color = Color(0, 0, 0, 0.25)
+shadow_size = 12
+shadow_offset = Vector2(0, 4)
+
+[node name="Gateway" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("1_sg1qr")
+script = ExtResource("2_74q4y")
+
+[node name="Background" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("3_1c3kr")
+expand_mode = 2
+stretch_mode = 5
+
+[node name="GameMap" type="TileMap" parent="."]
+position = Vector2(0, -2)
+script = ExtResource("5_game_map_script")
+format = 2
+layer_0/name = "Ground"
+layer_1/name = "Background"
+layer_2/name = "Foreground"
+
+[node name="MainPanel" type="PanelContainer" parent="."]
+custom_minimum_size = Vector2(400, 250)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -175.0
+offset_right = 200.0
+offset_bottom = 75.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxEmpty_q35d6")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MainPanel"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Label" type="Label" parent="MainPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("6_opc3y")
+theme_override_font_sizes/font_size = 24
+text = "Odysseys Revival"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="MainPanel/VBoxContainer"]
+custom_minimum_size = Vector2(336, 0)
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_styles/separator = SubResource("StyleBoxLine_fnfxe")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MainPanel/VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/separation = 16
+
+[node name="LoginButton" type="Button" parent="MainPanel/VBoxContainer/VBoxContainer"]
+custom_minimum_size = Vector2(420, 56)
+layout_mode = 2
+focus_mode = 2
+focus_neighbor_bottom = NodePath("../CreateAccountButton")
+theme_override_fonts/font = ExtResource("7_tnybn")
+theme_override_font_sizes/font_size = 18
+text = "Login"
+
+[node name="CreateAccountButton" type="Button" parent="MainPanel/VBoxContainer/VBoxContainer"]
+custom_minimum_size = Vector2(420, 56)
+layout_mode = 2
+focus_mode = 2
+focus_neighbor_top = NodePath("../LoginButton")
+focus_neighbor_bottom = NodePath("../LoginButton")
+theme_override_fonts/font = ExtResource("7_tnybn")
+theme_override_font_sizes/font_size = 18
+text = "Create Account"
+
+[node name="GuestButton" type="Button" parent="MainPanel/VBoxContainer/VBoxContainer"]
+custom_minimum_size = Vector2(420, 56)
+layout_mode = 2
+focus_mode = 2
+focus_neighbor_top = NodePath("../CreateAccountButton")
+focus_neighbor_bottom = NodePath("../LoginButton")
+theme_override_fonts/font = ExtResource("7_tnybn")
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = ExtResource("8_waovh")
+text = "Development Tools"
+
+[node name="HTTPRequest" type="HTTPRequest" parent="."]
+
+[connection signal="pressed" from="MainPanel/VBoxContainer/VBoxContainer/LoginButton" to="." method="_on_login_button_pressed"]
+[connection signal="pressed" from="MainPanel/VBoxContainer/VBoxContainer/CreateAccountButton" to="." method="_on_create_account_button_pressed"]
+[connection signal="pressed" from="MainPanel/VBoxContainer/VBoxContainer/GuestButton" to="." method="_on_guest_button_pressed"]

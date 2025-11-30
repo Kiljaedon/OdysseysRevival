@@ -1,0 +1,121 @@
+{
+	"animations": {
+		"attack_down": [
+			{
+				"atlas_index": 0.0,
+				"col": 5.0,
+				"row": 2.0
+			}
+		],
+		"attack_left": [
+			{
+				"atlas_index": 0.0,
+				"col": 8.0,
+				"row": 2.0
+			}
+		],
+		"attack_right": [
+			{
+				"atlas_index": 0.0,
+				"col": 11.0,
+				"row": 2.0
+			}
+		],
+		"attack_up": [
+			{
+				"atlas_index": 0.0,
+				"col": 2.0,
+				"row": 2.0
+			}
+		],
+		"walk_down_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 3.0,
+				"row": 2.0
+			}
+		],
+		"walk_down_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 4.0,
+				"row": 2.0
+			}
+		],
+		"walk_left_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 6.0,
+				"row": 2.0
+			}
+		],
+		"walk_left_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 7.0,
+				"row": 2.0
+			}
+		],
+		"walk_right_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 9.0,
+				"row": 2.0
+			}
+		],
+		"walk_right_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 10.0,
+				"row": 2.0
+			}
+		],
+		"walk_up_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 0.0,
+				"row": 2.0
+			}
+		],
+		"walk_up_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 1.0,
+				"row": 2.0
+			}
+		]
+	},
+	"base_stats": {
+		"cha": 10,
+		"dex": 10,
+		"int": 18,
+		"str": 7,
+		"vit": 8,
+		"wis": 15
+	},
+	"character_name": "Mage",
+	"combat_role": "Caster",
+	"created_date": "2025-11-13T06:40:51",
+	"derived_stats": {
+		"mag_def": 15,
+		"mag_dmg": 52.0,
+		"max_ep": 60,
+		"max_hp": 154,
+		"max_mp": 170,
+		"phys_def": 5,
+		"phys_dmg": 19
+	},
+	"element": "None",
+	"flavor_text": {
+		"backstory": "",
+		"description": "Master of arcane arts, wielding devastating magical spells from afar."
+	},
+	"level": 1,
+	"manual_stats": {
+		"ep": -1,
+		"hp": -1,
+		"mp": -1
+	},
+	"type": "class",
+	"xp": 0
+}

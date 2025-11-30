@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="ContentIndex" load_steps=2 format=3 uid="uid://dbh5capirnmfs"]
+
+[ext_resource type="Script" uid="uid://0wmtcxri41vp" path="res://source/common/registry/content_index.gd" id="1_gemjq"]
+
+[resource]
+script = ExtResource("1_gemjq")
+content_name = &"items"
+version = 1757607667
+next_id = 1
+entries = Array[Dictionary]([])
+scan_path = ""
+filters = PackedStringArray()

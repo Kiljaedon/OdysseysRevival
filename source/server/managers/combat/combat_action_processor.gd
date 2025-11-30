@@ -113,6 +113,9 @@ func battle_player_attack(combat_id: int, target_index: int):
 	# SECURITY: Calculate damage using server-authoritative formula
 	var damage = server_battle_manager.calculate_damage(player_character, target_enemy, 0, target_index, false)
 
+	# HEROIC BIAS: Players deal +20% damage to feel powerful
+	damage = int(damage * 1.2)
+
 	# Apply damage
 	target_enemy.hp -= damage
 	target_enemy.hp = max(0, target_enemy.hp)
@@ -284,52 +287,84 @@ func client_ready_for_next_turn(combat_id: int):
 # ========== ENEMY AI TURN ==========
 
 func process_enemy_ai_turn(combat_id: int):
-	## Process enemy turn - enemies attack back
+	## Process enemy turn - ALL enemies act based on AI
 	if not combat_manager.has_combat_instance(combat_id):
 		return
 
 	var combat = combat_manager.get_combat_instance(combat_id)
-	var player_character = combat.get("player_character", {})
 	var enemy_squad = combat.get("enemy_squad", [])
+	var ally_squad = combat.get("ally_squad", [])
 	var peer_id = combat.get("peer_id")
 
 	if not peer_id or enemy_squad.is_empty():
 		return
 
-	# Simple AI: First alive enemy attacks player
-	for enemy in enemy_squad:
-		if enemy.hp > 0:
-			# SECURITY: Calculate enemy damage using server-authoritative formula
-			var damage = server_battle_manager.calculate_damage(enemy, player_character, 0, 0, true)
+	print("[COMBAT] Processing AI turn for %d enemies..." % enemy_squad.size())
 
-			# Apply defense if player is defending
-			if combat.get("player_defending", false):
-				damage = int(damage * 0.5)  # 50% reduction
-				combat.player_defending = false  # Reset defending after this turn
-
-			# Apply damage to player
-			player_character.hp -= damage
-			player_character.hp = max(0, player_character.hp)
-
-			print("[COMBAT] Combat %d - %s attacks player for %d damage (HP: %d/%d)" % [
-				combat_id,
-				enemy.get("character_name", "Enemy"),
-				damage,
-				player_character.hp,
-				player_character.get("max_hp", 100)
-			])
-
-			# Send updated player state to client
-			if network_handler:
-				var state_packet = PacketEncoder.build_combat_state_packet(
-					0,  # Player is entity 0
-					player_character.hp,
-					player_character.get("max_hp", 100),
-					0  # Effects bitmask
-				)
-				network_handler.send_binary_packet(peer_id, state_packet)
-			break  # Only first alive enemy attacks per turn
+	# Loop through ALL enemies
+	for i in range(enemy_squad.size()):
+		var enemy = enemy_squad[i]
+		
+		# Skip dead enemies
+		if enemy.get("hp", 0) <= 0:
+			continue
+			
+		# Consult AI Controller
+		var decision = NPC_AI_Controller.process_turn(combat, enemy, server_battle_manager)
+		var action = decision.get("action", "defend")
+		var target_idx = decision.get("target_index", 0)
+		
+		# Execute Decision
+		if action == "attack":
+			if target_idx >= 0 and target_idx < ally_squad.size():
+				var target = ally_squad[target_idx]
+				if target.get("hp", 0) > 0:
+					# Calculate Damage
+					var damage = server_battle_manager.calculate_damage(enemy, target, i, target_idx, true)
+					
+					# NPC NERF: Enemies deal -10% damage to make combat manageable
+					damage = int(damage * 0.9)
+					
+					# Apply Defense
+					if combat.get("player_defending", false) and target.get("is_player", false):
+						damage = int(damage * 0.5)
+					
+					# Apply Damage
+					target.hp -= damage
+					target.hp = max(0, target.hp)
+					
+					print("[COMBAT] AI %s (Index %d) ATTACKS %s for %d damage!" % [
+						enemy.get("character_name", "Enemy"), 
+						i,
+						target.get("character_name", "Player"),
+						damage
+					])
+					
+					# Send update
+					if network_handler:
+						var state_packet = PacketEncoder.build_combat_state_packet(
+							target_idx, # Target Entity ID (0 = Player)
+							target.hp,
+							target.get("max_hp", 100),
+							0
+						)
+						network_handler.send_binary_packet(peer_id, state_packet)
+				else:
+					print("[COMBAT] AI tried to attack dead target")
+		elif action == "defend":
+			print("[COMBAT] AI %s DEFENDS" % enemy.get("character_name", "Enemy"))
+			# TODO: Add defense flag to enemy for next turn
+			
+		# Small delay between actions so they don't all hit instantly (optional, logic is instant)
+	
+	# Reset Player Defense
+	if combat.has("player_defending"):
+		combat.player_defending = false
 
 	# Set is_player_turn back to true so player can act again
 	combat.is_player_turn = true
+	
+	# Notify client round is done (or just let them act)
+	if network_handler:
+		network_handler.start_action_selection.rpc_id(peer_id, combat.get("round_number", 1))
 

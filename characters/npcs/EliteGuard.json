@@ -1,0 +1,131 @@
+{
+	"ai_archetype": "AGGRESSIVE",
+	"animations": {
+		"attack_down": [
+			{
+				"atlas_index": 0.0,
+				"col": 5.0,
+				"row": 6.0
+			}
+		],
+		"attack_left": [
+			{
+				"atlas_index": 0.0,
+				"col": 8.0,
+				"row": 6.0
+			}
+		],
+		"attack_right": [
+			{
+				"atlas_index": 0.0,
+				"col": 11.0,
+				"row": 6.0
+			}
+		],
+		"attack_up": [
+			{
+				"atlas_index": 0.0,
+				"col": 2.0,
+				"row": 6.0
+			}
+		],
+		"walk_down_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 3.0,
+				"row": 6.0
+			}
+		],
+		"walk_down_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 4.0,
+				"row": 6.0
+			}
+		],
+		"walk_left_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 6.0,
+				"row": 6.0
+			}
+		],
+		"walk_left_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 7.0,
+				"row": 6.0
+			}
+		],
+		"walk_right_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 9.0,
+				"row": 6.0
+			}
+		],
+		"walk_right_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 10.0,
+				"row": 6.0
+			}
+		],
+		"walk_up_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 0.0,
+				"row": 6.0
+			}
+		],
+		"walk_up_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 1.0,
+				"row": 6.0
+			}
+		]
+	},
+	"base_stats": {
+		"cha": 12.0,
+		"dex": 13.0,
+		"int": 10.0,
+		"str": 14.0,
+		"vit": 14.0,
+		"wis": 9.0
+	},
+	"character_name": "EliteGuard",
+	"combat_role": "Melee",
+	"created_date": "2025-10-04T10:48:48",
+	"derived_stats": {
+		"mag_def": 9.0,
+		"mag_dmg": 29.0,
+		"max_ep": 69.0,
+		"max_hp": 99.0,
+		"max_mp": 118.0,
+		"phys_def": 9.0,
+		"phys_dmg": 34.0
+	},
+	"element": "None",
+	"flavor_text": {
+		"backstory": "",
+		"description": "Well-trained soldier with balanced stats. Dangerous in groups."
+	},
+	"level": 1.0,
+	"level_range": {
+		"max": 1,
+		"min": 1
+	},
+	"loot_table": {
+		"gold_reward": 10,
+		"items": [],
+		"xp_reward": 50
+	},
+	"manual_stats": {
+		"ep": -1.0,
+		"hp": -1.0,
+		"mp": -1.0
+	},
+	"type": "npc",
+	"xp": 0.0
+}

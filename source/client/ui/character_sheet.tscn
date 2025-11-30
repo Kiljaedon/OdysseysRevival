@@ -1,0 +1,178 @@
+[gd_scene load_steps=3 format=3 uid="uid://character_sheet_scene"]
+
+[ext_resource type="Script" path="res://source/client/ui/character_sheet.gd" id="1_script"]
+[ext_resource type="Texture2D" uid="uid://panel_inset" path="res://assets/ui/kenney/rpg-expansion/panelInset_beige.png" id="3_inset"]
+
+[node name="CharacterSheet" type="Panel"]
+offset_left = 100.0
+offset_top = 100.0
+offset_right = 900.0
+offset_bottom = 500.0
+script = ExtResource("1_script")
+panel_title = "CHARACTER SHEET"
+
+[node name="Content" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 40
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 20
+
+[node name="Columns" type="HBoxContainer" parent="Content"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="ProfileCol" type="VBoxContainer" parent="Content/Columns"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 15
+
+[node name="PortraitFrame" type="NinePatchRect" parent="Content/Columns/ProfileCol"]
+custom_minimum_size = Vector2(0, 200)
+layout_mode = 2
+texture = ExtResource("3_inset")
+patch_margin_left = 10
+patch_margin_top = 10
+patch_margin_right = 10
+patch_margin_bottom = 10
+
+[node name="Portrait" type="TextureRect" parent="Content/Columns/ProfileCol/PortraitFrame"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="InfoBox" type="VBoxContainer" parent="Content/Columns/ProfileCol"]
+layout_mode = 2
+
+[node name="NameLabel" type="Label" parent="Content/Columns/ProfileCol/InfoBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 20
+text = "Character Name"
+horizontal_alignment = 1
+
+[node name="ClassLabel" type="Label" parent="Content/Columns/ProfileCol/InfoBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.4, 0.4, 1)
+text = "Level 1 Warrior"
+horizontal_alignment = 1
+
+[node name="ElementLabel" type="Label" parent="Content/Columns/ProfileCol/InfoBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.2, 0.2, 1)
+text = "Element: Fire"
+horizontal_alignment = 1
+
+[node name="GearCol" type="VBoxContainer" parent="Content/Columns"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Title" type="Label" parent="Content/Columns/GearCol"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.3, 0.3, 1)
+text = "EQUIPMENT"
+horizontal_alignment = 1
+
+[node name="Grid" type="GridContainer" parent="Content/Columns/GearCol"]
+layout_mode = 2
+size_flags_vertical = 3
+columns = 2
+theme_override_constants/h_separation = 10
+theme_override_constants/v_separation = 10
+
+[node name="StatsCol" type="VBoxContainer" parent="Content/Columns"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 20
+
+[node name="Title" type="Label" parent="Content/Columns/StatsCol"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.3, 0.3, 1)
+text = "STATS"
+horizontal_alignment = 1
+
+[node name="VitalsBox" type="VBoxContainer" parent="Content/Columns/StatsCol"]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="HPLabel" type="Label" parent="Content/Columns/StatsCol/VitalsBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+text = "HP: 100 / 100"
+
+[node name="HPBar" type="ProgressBar" parent="Content/Columns/StatsCol/VitalsBox"]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+value = 100.0
+show_percentage = false
+
+[node name="MPLabel" type="Label" parent="Content/Columns/StatsCol/VitalsBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+text = "MP: 50 / 50"
+
+[node name="MPBar" type="ProgressBar" parent="Content/Columns/StatsCol/VitalsBox"]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+value = 100.0
+show_percentage = false
+
+[node name="XPLabel" type="Label" parent="Content/Columns/StatsCol/VitalsBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+text = "XP: 0 / 100"
+
+[node name="XPBar" type="ProgressBar" parent="Content/Columns/StatsCol/VitalsBox"]
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+value = 0.0
+show_percentage = false
+
+[node name="AttributesBox" type="GridContainer" parent="Content/Columns/StatsCol"]
+layout_mode = 2
+columns = 2
+theme_override_constants/h_separation = 20
+
+[node name="StrLabel" type="Label" parent="Content/Columns/StatsCol/AttributesBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+text = "STR: 10"
+
+[node name="DexLabel" type="Label" parent="Content/Columns/StatsCol/AttributesBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+text = "DEX: 10"
+
+[node name="IntLabel" type="Label" parent="Content/Columns/StatsCol/AttributesBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+text = "INT: 10"
+
+[node name="VitLabel" type="Label" parent="Content/Columns/StatsCol/AttributesBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+text = "VIT: 10"
+
+[node name="WisLabel" type="Label" parent="Content/Columns/StatsCol/AttributesBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+text = "WIS: 10"
+
+[node name="ChaLabel" type="Label" parent="Content/Columns/StatsCol/AttributesBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+text = "CHA: 10"

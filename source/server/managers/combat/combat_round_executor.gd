@@ -406,9 +406,7 @@ func start_selection_phase(combat: Dictionary):
 func finalize_battle(combat: Dictionary) -> Dictionary:
 	## Finalize battle and calculate rewards
 	var victor = check_battle_end(combat).victor
-	var victory = (victor == "allies")
-	
-
+	var victory = (victor == "player") # check_battle_end returns "player" or "enemy", not "allies"
 	
 	var rewards = {}
 	
@@ -417,9 +415,9 @@ func finalize_battle(combat: Dictionary) -> Dictionary:
 		var player_character = combat.get("player_character", {})
 		var player_level = player_character.get("level", 1)
 		
-		# Calculate rewards using battle_manager
-		if server_battle_manager and server_battle_manager.has_method("calculate_battle_rewards"):
-			rewards = server_battle_manager.calculate_battle_rewards(enemy_squad, player_level)
+		# Calculate rewards using combat_manager (FIX: was incorrectly using calculator)
+		if combat_manager and combat_manager.has_method("calculate_rewards"):
+			rewards = combat_manager.calculate_rewards(combat)
 		else:
 			# Fallback simple calculation
 			var total_xp = 0
@@ -427,9 +425,20 @@ func finalize_battle(combat: Dictionary) -> Dictionary:
 			for enemy in enemy_squad:
 				total_xp += enemy.get("level", 1) * 10
 				total_gold += enemy.get("level", 1) * 5
-			rewards = {"xp": total_xp, "gold": total_gold}
+			rewards = {"xp_gained": total_xp, "gold_gained": total_gold}
 		
-		print("[COMBAT-SECURITY] Rewards calculated: %d XP, %d gold" % [rewards.get("xp", 0), rewards.get("gold", 0)])
+		print("[COMBAT-SECURITY] Rewards calculated: %d XP, %d gold" % [rewards.get("xp_gained", 0), rewards.get("gold_gained", 0)])
+		
+		# GRANT REWARDS TO PLAYER DB (Closing the loop)
+		var peer_id = combat.get("peer_id", -1)
+		if combat_manager.player_manager:
+			# Convert to format expected by grant_rewards
+			var grant_data = {
+				"xp": rewards.get("xp_gained", 0), 
+				"gold": rewards.get("gold_gained", 0)
+			}
+			combat_manager.player_manager.grant_rewards(peer_id, grant_data)
+			print("[COMBAT] Rewards granted to peer %d" % peer_id)
 	
 	return {
 		"victory": victory,

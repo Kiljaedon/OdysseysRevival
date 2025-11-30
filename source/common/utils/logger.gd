@@ -1,4 +1,4 @@
-class_name Logger
+class_name GameLogger
 extends RefCounted
 ## Logger - Centralized logging with toggleable levels
 ## Use this instead of print() for production-ready logging

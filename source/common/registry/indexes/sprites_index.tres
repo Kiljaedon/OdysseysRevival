@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="ContentIndex" load_steps=2 format=3 uid="uid://cmlrxlrwn0h6t"]
+
+[ext_resource type="Script" uid="uid://0wmtcxri41vp" path="res://source/common/registry/content_index.gd" id="1_ccyyb"]
+
+[resource]
+script = ExtResource("1_ccyyb")
+content_name = &"sprites"
+version = 1757682500
+next_id = 1
+entries = Array[Dictionary]([])

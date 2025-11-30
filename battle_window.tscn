@@ -1,9 +1,12 @@
-[gd_scene load_steps=5 format=3 uid="uid://battle_window_001"]
+[gd_scene load_steps=7 format=3 uid="uid://battle_window_001"]
 
-[ext_resource type="Script" path="res://battle_window.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/battle/battle_window_v2.gd" id="1"]
 [ext_resource type="Script" path="res://battle_panel.gd" id="2"]
 [ext_resource type="Material" path="res://shaders/smooth_material.tres" id="3"]
 [ext_resource type="Texture2D" path="res://assets/battle_backgrounds/grassy_field.png" id="4"]
+[ext_resource type="Texture2D" path="res://assets/node_icons/blue/icon_save.png" id="5"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_target"]
 
 [node name="BattleWindow" type="Control"]
 layout_mode = 3
@@ -27,6 +30,20 @@ texture = ExtResource("4")
 expand_mode = 1
 stretch_mode = 1
 
+[node name="SaveUIButton" type="TextureButton" parent="."]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -128.0
+offset_top = 8.0
+offset_right = -72.0
+offset_bottom = 64.0
+grow_horizontal = 0
+texture_normal = ExtResource("5")
+ignore_texture_size = true
+stretch_mode = 5
+
 [node name="BattleContainer" type="VBoxContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
@@ -44,6 +61,7 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 32
 text = "BATTLE"
 horizontal_alignment = 1
+visible = false
 
 [node name="CombatArea" type="HBoxContainer" parent="BattleContainer"]
 layout_mode = 2
@@ -77,6 +95,7 @@ anchor_bottom = 1.0
 offset_top = 55.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 theme_override_constants/separation = 5
 
 [node name="EnemySprite1" type="TextureRect" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel1/EnemyUnit1"]
@@ -100,11 +119,13 @@ layout_mode = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
+visible = false
 
 [node name="EnemyHPLabel1" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel1/EnemyUnit1"]
 layout_mode = 2
 text = "HP: 100 / 100"
 horizontal_alignment = 1
+visible = false
 
 [node name="EnemyMPBar1" type="ProgressBar" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel1/EnemyUnit1"]
 custom_minimum_size = Vector2(160, 20)
@@ -112,11 +133,13 @@ layout_mode = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
+visible = false
 
 [node name="EnemyMPLabel1" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel1/EnemyUnit1"]
 layout_mode = 2
 text = "MP: 50 / 50"
 horizontal_alignment = 1
+visible = false
 
 [node name="EnemyEnergyBar1" type="ProgressBar" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel1/EnemyUnit1"]
 custom_minimum_size = Vector2(160, 20)
@@ -124,11 +147,13 @@ layout_mode = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
+visible = false
 
 [node name="EnemyEnergyLabel1" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel1/EnemyUnit1"]
 layout_mode = 2
 text = "Energy: 100 / 100"
 horizontal_alignment = 1
+visible = false
 
 [node name="EnemyPanel2" type="Panel" parent="BattleContainer/CombatArea/EnemyArea"]
 layout_mode = 0
@@ -148,6 +173,7 @@ anchor_bottom = 1.0
 offset_top = 55.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 theme_override_constants/separation = 5
 
 [node name="EnemySprite2" type="TextureRect" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel2/EnemyUnit2"]
@@ -171,11 +197,13 @@ layout_mode = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
+visible = false
 
 [node name="EnemyHPLabel2" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel2/EnemyUnit2"]
 layout_mode = 2
 text = "HP: 100 / 100"
 horizontal_alignment = 1
+visible = false
 
 [node name="EnemyMPBar2" type="ProgressBar" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel2/EnemyUnit2"]
 custom_minimum_size = Vector2(160, 20)
@@ -183,11 +211,13 @@ layout_mode = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
+visible = false
 
 [node name="EnemyMPLabel2" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel2/EnemyUnit2"]
 layout_mode = 2
 text = "MP: 50 / 50"
 horizontal_alignment = 1
+visible = false
 
 [node name="EnemyEnergyBar2" type="ProgressBar" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel2/EnemyUnit2"]
 custom_minimum_size = Vector2(160, 20)
@@ -195,11 +225,13 @@ layout_mode = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
+visible = false
 
 [node name="EnemyEnergyLabel2" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel2/EnemyUnit2"]
 layout_mode = 2
 text = "Energy: 100 / 100"
 horizontal_alignment = 1
+visible = false
 
 [node name="EnemyPanel3" type="Panel" parent="BattleContainer/CombatArea/EnemyArea"]
 layout_mode = 0
@@ -219,6 +251,7 @@ anchor_bottom = 1.0
 offset_top = 55.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 theme_override_constants/separation = 5
 
 [node name="EnemySprite3" type="TextureRect" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel3/EnemyUnit3"]
@@ -242,11 +275,13 @@ layout_mode = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
+visible = false
 
 [node name="EnemyHPLabel3" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel3/EnemyUnit3"]
 layout_mode = 2
 text = "HP: 100 / 100"
 horizontal_alignment = 1
+visible = false
 
 [node name="EnemyMPBar3" type="ProgressBar" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel3/EnemyUnit3"]
 custom_minimum_size = Vector2(160, 20)
@@ -254,11 +289,13 @@ layout_mode = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
+visible = false
 
 [node name="EnemyMPLabel3" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel3/EnemyUnit3"]
 layout_mode = 2
 text = "MP: 50 / 50"
 horizontal_alignment = 1
+visible = false
 
 [node name="EnemyEnergyBar3" type="ProgressBar" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel3/EnemyUnit3"]
 custom_minimum_size = Vector2(160, 20)
@@ -266,11 +303,13 @@ layout_mode = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
+visible = false
 
 [node name="EnemyEnergyLabel3" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel3/EnemyUnit3"]
 layout_mode = 2
 text = "Energy: 100 / 100"
 horizontal_alignment = 1
+visible = false
 
 [node name="EnemyPanel4" type="Panel" parent="BattleContainer/CombatArea/EnemyArea"]
 layout_mode = 0
@@ -290,6 +329,7 @@ anchor_bottom = 1.0
 offset_top = 55.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 theme_override_constants/separation = 5
 
 [node name="EnemySprite4" type="TextureRect" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel4/EnemyUnit4"]
@@ -313,11 +353,13 @@ layout_mode = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
+visible = false
 
 [node name="EnemyHPLabel4" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel4/EnemyUnit4"]
 layout_mode = 2
 text = "HP: 100 / 100"
 horizontal_alignment = 1
+visible = false
 
 [node name="EnemyMPBar4" type="ProgressBar" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel4/EnemyUnit4"]
 custom_minimum_size = Vector2(160, 20)
@@ -325,11 +367,13 @@ layout_mode = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
+visible = false
 
 [node name="EnemyMPLabel4" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel4/EnemyUnit4"]
 layout_mode = 2
 text = "MP: 50 / 50"
 horizontal_alignment = 1
+visible = false
 
 [node name="EnemyEnergyBar4" type="ProgressBar" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel4/EnemyUnit4"]
 custom_minimum_size = Vector2(160, 20)
@@ -337,11 +381,13 @@ layout_mode = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
+visible = false
 
 [node name="EnemyEnergyLabel4" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel4/EnemyUnit4"]
 layout_mode = 2
 text = "Energy: 100 / 100"
 horizontal_alignment = 1
+visible = false
 
 [node name="EnemyPanel5" type="Panel" parent="BattleContainer/CombatArea/EnemyArea"]
 layout_mode = 0
@@ -361,6 +407,7 @@ anchor_bottom = 1.0
 offset_top = 55.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 theme_override_constants/separation = 5
 
 [node name="EnemySprite5" type="TextureRect" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel5/EnemyUnit5"]
@@ -384,11 +431,13 @@ layout_mode = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
+visible = false
 
 [node name="EnemyHPLabel5" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel5/EnemyUnit5"]
 layout_mode = 2
 text = "HP: 100 / 100"
 horizontal_alignment = 1
+visible = false
 
 [node name="EnemyMPBar5" type="ProgressBar" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel5/EnemyUnit5"]
 custom_minimum_size = Vector2(160, 20)
@@ -396,11 +445,13 @@ layout_mode = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
+visible = false
 
 [node name="EnemyMPLabel5" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel5/EnemyUnit5"]
 layout_mode = 2
 text = "MP: 50 / 50"
 horizontal_alignment = 1
+visible = false
 
 [node name="EnemyEnergyBar5" type="ProgressBar" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel5/EnemyUnit5"]
 custom_minimum_size = Vector2(160, 20)
@@ -408,11 +459,13 @@ layout_mode = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
+visible = false
 
 [node name="EnemyEnergyLabel5" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel5/EnemyUnit5"]
 layout_mode = 2
 text = "Energy: 100 / 100"
 horizontal_alignment = 1
+visible = false
 
 [node name="EnemyPanel6" type="Panel" parent="BattleContainer/CombatArea/EnemyArea"]
 layout_mode = 0
@@ -432,6 +485,7 @@ anchor_bottom = 1.0
 offset_top = 55.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 theme_override_constants/separation = 5
 
 [node name="EnemySprite6" type="TextureRect" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel6/EnemyUnit6"]
@@ -455,11 +509,13 @@ layout_mode = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
+visible = false
 
 [node name="EnemyHPLabel6" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel6/EnemyUnit6"]
 layout_mode = 2
 text = "HP: 100 / 100"
 horizontal_alignment = 1
+visible = false
 
 [node name="EnemyMPBar6" type="ProgressBar" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel6/EnemyUnit6"]
 custom_minimum_size = Vector2(160, 20)
@@ -467,11 +523,13 @@ layout_mode = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
+visible = false
 
 [node name="EnemyMPLabel6" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel6/EnemyUnit6"]
 layout_mode = 2
 text = "MP: 50 / 50"
 horizontal_alignment = 1
+visible = false
 
 [node name="EnemyEnergyBar6" type="ProgressBar" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel6/EnemyUnit6"]
 custom_minimum_size = Vector2(160, 20)
@@ -479,11 +537,13 @@ layout_mode = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
+visible = false
 
 [node name="EnemyEnergyLabel6" type="Label" parent="BattleContainer/CombatArea/EnemyArea/EnemyPanel6/EnemyUnit6"]
 layout_mode = 2
 text = "Energy: 100 / 100"
 horizontal_alignment = 1
+visible = false
 
 [node name="MiddleSpacer" type="Control" parent="BattleContainer/CombatArea"]
 custom_minimum_size = Vector2(100, 0)
@@ -536,11 +596,13 @@ layout_mode = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
+visible = false
 
 [node name="Ally5HPLabel" type="Label" parent="BattleContainer/CombatArea/PlayerArea/Ally5Panel/Ally5Unit"]
 layout_mode = 2
 text = "HP: 100 / 100"
 horizontal_alignment = 1
+visible = false
 
 [node name="Ally5MPBar" type="ProgressBar" parent="BattleContainer/CombatArea/PlayerArea/Ally5Panel/Ally5Unit"]
 custom_minimum_size = Vector2(160, 20)
@@ -548,11 +610,13 @@ layout_mode = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
+visible = false
 
 [node name="Ally5MPLabel" type="Label" parent="BattleContainer/CombatArea/PlayerArea/Ally5Panel/Ally5Unit"]
 layout_mode = 2
 text = "MP: 50 / 50"
 horizontal_alignment = 1
+visible = false
 
 [node name="Ally1Panel" type="Panel" parent="BattleContainer/CombatArea/PlayerArea"]
 layout_mode = 0
@@ -595,11 +659,13 @@ layout_mode = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
+visible = false
 
 [node name="Ally1HPLabel" type="Label" parent="BattleContainer/CombatArea/PlayerArea/Ally1Panel/Ally1Unit"]
 layout_mode = 2
 text = "HP: 100 / 100"
 horizontal_alignment = 1
+visible = false
 
 [node name="Ally1MPBar" type="ProgressBar" parent="BattleContainer/CombatArea/PlayerArea/Ally1Panel/Ally1Unit"]
 custom_minimum_size = Vector2(160, 20)
@@ -607,11 +673,13 @@ layout_mode = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
+visible = false
 
 [node name="Ally1MPLabel" type="Label" parent="BattleContainer/CombatArea/PlayerArea/Ally1Panel/Ally1Unit"]
 layout_mode = 2
 text = "MP: 50 / 50"
 horizontal_alignment = 1
+visible = false
 
 [node name="Ally2Panel" type="Panel" parent="BattleContainer/CombatArea/PlayerArea"]
 layout_mode = 0
@@ -654,11 +722,13 @@ layout_mode = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
+visible = false
 
 [node name="Ally2HPLabel" type="Label" parent="BattleContainer/CombatArea/PlayerArea/Ally2Panel/Ally2Unit"]
 layout_mode = 2
 text = "HP: 100 / 100"
 horizontal_alignment = 1
+visible = false
 
 [node name="Ally2MPBar" type="ProgressBar" parent="BattleContainer/CombatArea/PlayerArea/Ally2Panel/Ally2Unit"]
 custom_minimum_size = Vector2(160, 20)
@@ -666,11 +736,13 @@ layout_mode = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
+visible = false
 
 [node name="Ally2MPLabel" type="Label" parent="BattleContainer/CombatArea/PlayerArea/Ally2Panel/Ally2Unit"]
 layout_mode = 2
 text = "MP: 50 / 50"
 horizontal_alignment = 1
+visible = false
 
 [node name="Ally3Panel" type="Panel" parent="BattleContainer/CombatArea/PlayerArea"]
 layout_mode = 0
@@ -713,11 +785,13 @@ layout_mode = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
+visible = false
 
 [node name="Ally3HPLabel" type="Label" parent="BattleContainer/CombatArea/PlayerArea/Ally3Panel/Ally3Unit"]
 layout_mode = 2
 text = "HP: 100 / 100"
 horizontal_alignment = 1
+visible = false
 
 [node name="Ally3MPBar" type="ProgressBar" parent="BattleContainer/CombatArea/PlayerArea/Ally3Panel/Ally3Unit"]
 custom_minimum_size = Vector2(160, 20)
@@ -725,11 +799,13 @@ layout_mode = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
+visible = false
 
 [node name="Ally3MPLabel" type="Label" parent="BattleContainer/CombatArea/PlayerArea/Ally3Panel/Ally3Unit"]
 layout_mode = 2
 text = "MP: 50 / 50"
 horizontal_alignment = 1
+visible = false
 
 [node name="Ally4Panel" type="Panel" parent="BattleContainer/CombatArea/PlayerArea"]
 layout_mode = 0
@@ -772,11 +848,13 @@ layout_mode = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
+visible = false
 
 [node name="Ally4HPLabel" type="Label" parent="BattleContainer/CombatArea/PlayerArea/Ally4Panel/Ally4Unit"]
 layout_mode = 2
 text = "HP: 100 / 100"
 horizontal_alignment = 1
+visible = false
 
 [node name="Ally4MPBar" type="ProgressBar" parent="BattleContainer/CombatArea/PlayerArea/Ally4Panel/Ally4Unit"]
 custom_minimum_size = Vector2(160, 20)
@@ -784,11 +862,13 @@ layout_mode = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
+visible = false
 
 [node name="Ally4MPLabel" type="Label" parent="BattleContainer/CombatArea/PlayerArea/Ally4Panel/Ally4Unit"]
 layout_mode = 2
 text = "MP: 50 / 50"
 horizontal_alignment = 1
+visible = false
 
 [node name="Ally6Panel" type="Panel" parent="BattleContainer/CombatArea/PlayerArea"]
 layout_mode = 0
@@ -831,11 +911,13 @@ layout_mode = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
+visible = false
 
 [node name="Ally6HPLabel" type="Label" parent="BattleContainer/CombatArea/PlayerArea/Ally6Panel/Ally6Unit"]
 layout_mode = 2
 text = "HP: 100 / 100"
 horizontal_alignment = 1
+visible = false
 
 [node name="Ally6MPBar" type="ProgressBar" parent="BattleContainer/CombatArea/PlayerArea/Ally6Panel/Ally6Unit"]
 custom_minimum_size = Vector2(160, 20)
@@ -843,11 +925,13 @@ layout_mode = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
+visible = false
 
 [node name="Ally6MPLabel" type="Label" parent="BattleContainer/CombatArea/PlayerArea/Ally6Panel/Ally6Unit"]
 layout_mode = 2
 text = "MP: 50 / 50"
 horizontal_alignment = 1
+visible = false
 
 [node name="RightSpacer" type="Control" parent="BattleContainer/CombatArea"]
 custom_minimum_size = Vector2(50, 0)
@@ -875,7 +959,8 @@ theme_override_constants/separation = 10
 
 [node name="TurnInfo" type="Label" parent="UIPanel/UIArea"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_colors/font_color = Color(1, 1, 0, 1)
+theme_override_font_sizes/font_size = 28
 text = "Waiting for turn..."
 horizontal_alignment = 1
 
@@ -1011,6 +1096,7 @@ offset_left = 0.0
 offset_top = 0.0
 offset_right = 100.0
 offset_bottom = 100.0
+theme_override_styles/panel = SubResource("StyleBoxEmpty_target")
 
 [node name="CursorBorder" type="ColorRect" parent="TargetCursor"]
 layout_mode = 1

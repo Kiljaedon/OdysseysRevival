@@ -1,0 +1,18 @@
+[gd_scene load_steps=3 format=3 uid="uid://cqv4j3w5g8jnk"]
+
+[ext_resource type="Script" path="res://source/client/ui/weapon/weapon_sheath_indicator.gd" id="1_weapon_indicator"]
+[ext_resource type="Texture2D" uid="uid://dccxekkrwrcxt" path="res://assets/ui/kenney/rpg-expansion/cursorSword_bronze.png" id="2_bronze_sword"]
+
+[node name="WeaponSheathIndicator" type="HBoxContainer"]
+custom_minimum_size = Vector2(32, 32)
+offset_right = 32.0
+offset_bottom = 32.0
+z_index = 100
+script = ExtResource("1_weapon_indicator")
+
+[node name="WeaponIcon" type="TextureRect" parent="."]
+custom_minimum_size = Vector2(24, 24)
+layout_mode = 2
+texture = ExtResource("2_bronze_sword")
+expand_mode = 1
+stretch_mode = 5

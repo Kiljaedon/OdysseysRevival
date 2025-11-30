@@ -1,0 +1,280 @@
+[gd_scene load_steps=11 format=3 uid="uid://dev_client_scene"]
+
+[ext_resource type="Script" path="res://dev_client_controller.gd" id="1_controller"]
+[ext_resource type="TileSet" uid="uid://dplk5f3w4xqyv" path="res://addons/gs_mmo_tools/resources/main_tileset.tres" id="2_tileset"]
+[ext_resource type="TileSet" uid="uid://collision_tileset" path="res://addons/gs_mmo_tools/resources/collision_tileset.tres" id="3_collision"]
+[ext_resource type="PackedScene" uid="uid://cqv4j3w5g8jnk" path="res://source/client/ui/weapon/weapon_sheath_indicator.tscn" id="5_weapon_indicator"]
+[ext_resource type="Script" path="res://source/common/gameplay/combat/weapon_state.gd" id="6_weapon_state"]
+[ext_resource type="Script" path="res://source/client/weapon/weapon_input_handler.gd" id="7_weapon_input"]
+[ext_resource type="Script" path="res://source/client/ui/emotes/weapon_emote_display.gd" id="8_emote_display"]
+[ext_resource type="Script" path="res://source/client/weapon/weapon_system_connector.gd" id="9_weapon_connector"]
+[ext_resource type="Script" path="res://source/client/weapon/weapon_attack_validator.gd" id="10_attack_validator"]
+[ext_resource type="PackedScene" uid="uid://character_sheet_scene" path="res://source/client/ui/character_sheet.tscn" id="11_char_sheet"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
+size = Vector2(50, 85)
+
+[sub_resource type="RectangleShape2D" id="AttackHitbox"]
+size = Vector2(60, 60)
+
+[node name="DevClient" type="Node2D"]
+script = ExtResource("1_controller")
+
+[node name="WeaponSystemConnector" type="Node" parent="."]
+script = ExtResource("9_weapon_connector")
+
+[node name="BlackBackground" type="CanvasLayer" parent="."]
+layer = -100
+
+[node name="ColorRect" type="ColorRect" parent="BlackBackground"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_right = 0.0
+offset_bottom = 0.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.85, 0.75, 0.6, 1)
+metadata/_edit_use_anchors_ = true
+
+[node name="GameWorld" type="Node2D" parent="."]
+y_sort_enabled = true
+
+[node name="BottomLayer" type="TileMapLayer" parent="GameWorld"]
+z_index = 0
+y_sort_enabled = false
+texture_filter = 0
+collision_enabled = false
+collision_layer = 1
+collision_mask = 0
+scale = Vector2(4, 4)
+tile_set = ExtResource("2_tileset")
+
+[node name="MiddleLayer" type="TileMapLayer" parent="GameWorld"]
+z_index = 0
+y_sort_enabled = true
+texture_filter = 0
+collision_enabled = false
+collision_layer = 1
+collision_mask = 0
+scale = Vector2(4, 4)
+tile_set = ExtResource("2_tileset")
+
+[node name="TopLayer" type="TileMapLayer" parent="GameWorld"]
+z_index = 1
+y_sort_enabled = false
+texture_filter = 0
+collision_enabled = false
+collision_layer = 1
+collision_mask = 0
+scale = Vector2(4, 4)
+tile_set = ExtResource("2_tileset")
+
+[node name="TestCharacter" type="CharacterBody2D" parent="GameWorld"]
+z_index = 0
+z_as_relative = false
+y_sort_enabled = true
+collision_layer = 2
+collision_mask = 3
+position = Vector2(320, 240)
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="GameWorld/TestCharacter"]
+texture_filter = 0
+centered = true
+scale = Vector2(3.0, 3.0)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="GameWorld/TestCharacter"]
+shape = SubResource("RectangleShape2D_1")
+
+[node name="AttackHitbox" type="Area2D" parent="GameWorld/TestCharacter"]
+collision_layer = 4
+collision_mask = 8
+monitorable = false
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="GameWorld/TestCharacter/AttackHitbox"]
+shape = SubResource("AttackHitbox")
+disabled = true
+
+[node name="Camera2D" type="Camera2D" parent="GameWorld/TestCharacter"]
+enabled = true
+zoom = Vector2(2, 2)
+
+[node name="WeaponSheathIndicator" parent="GameWorld/TestCharacter" instance=ExtResource("5_weapon_indicator")]
+offset_left = -16.0
+offset_top = -60.0
+offset_right = 16.0
+offset_bottom = -28.0
+
+[node name="WeaponState" type="Node" parent="GameWorld/TestCharacter"]
+script = ExtResource("6_weapon_state")
+start_sheathed = true
+
+[node name="DevUI" type="CanvasLayer" parent="."]
+
+[node name="CharacterSheet" parent="DevUI" instance=ExtResource("11_char_sheet")]
+visible = false
+
+[node name="WeaponEmoteDisplay" type="Control" parent="DevUI"]
+layout_mode = 3
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("8_emote_display")
+
+[node name="MapSelector" type="Panel" parent="DevUI"]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -200.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = 150.0
+
+[node name="VBox" type="VBoxContainer" parent="DevUI/MapSelector"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 5.0
+offset_top = 5.0
+offset_right = -5.0
+offset_bottom = -5.0
+
+[node name="Title" type="Label" parent="DevUI/MapSelector/VBox"]
+layout_mode = 2
+text = "MAP SELECTOR"
+horizontal_alignment = 1
+
+[node name="MapDropdown" type="OptionButton" parent="DevUI/MapSelector/VBox"]
+layout_mode = 2
+
+[node name="LoadButton" type="Button" parent="DevUI/MapSelector/VBox"]
+layout_mode = 2
+text = "Load Map"
+
+[node name="MapInfo" type="Label" parent="DevUI/MapSelector/VBox"]
+layout_mode = 2
+text = "No map loaded"
+autowrap_mode = 3
+
+[node name="CharacterTester" type="Panel" parent="DevUI"]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -200.0
+offset_top = 160.0
+offset_right = -10.0
+offset_bottom = 350.0
+
+[node name="VBox" type="VBoxContainer" parent="DevUI/CharacterTester"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 5.0
+offset_top = 5.0
+offset_right = -5.0
+offset_bottom = -5.0
+
+[node name="Title" type="Label" parent="DevUI/CharacterTester/VBox"]
+layout_mode = 2
+text = "CHARACTER TESTER"
+horizontal_alignment = 1
+
+[node name="ClassDropdown" type="OptionButton" parent="DevUI/CharacterTester/VBox"]
+layout_mode = 2
+
+[node name="AnimationDropdown" type="OptionButton" parent="DevUI/CharacterTester/VBox"]
+layout_mode = 2
+
+[node name="DirectionDropdown" type="OptionButton" parent="DevUI/CharacterTester/VBox"]
+layout_mode = 2
+
+[node name="AnimControls" type="HBoxContainer" parent="DevUI/CharacterTester/VBox"]
+layout_mode = 2
+
+[node name="PlayButton" type="Button" parent="DevUI/CharacterTester/VBox/AnimControls"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Play"
+
+[node name="PauseButton" type="Button" parent="DevUI/CharacterTester/VBox/AnimControls"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Pause"
+
+[node name="StopButton" type="Button" parent="DevUI/CharacterTester/VBox/AnimControls"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Stop"
+
+[node name="FrameInfo" type="Label" parent="DevUI/CharacterTester/VBox"]
+layout_mode = 2
+text = "Frame: 0/0"
+
+[node name="DevTools" type="Panel" parent="DevUI"]
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -250.0
+offset_top = -60.0
+offset_right = 250.0
+offset_bottom = -10.0
+
+[node name="HBox" type="HBoxContainer" parent="DevUI/DevTools"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 5.0
+offset_top = 5.0
+offset_right = -5.0
+offset_bottom = -5.0
+
+[node name="SpriteCreator" type="Button" parent="DevUI/DevTools/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Sprite Creator"
+
+[node name="MapEditor" type="Button" parent="DevUI/DevTools/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Map Editor"
+
+[node name="ArtStudio" type="Button" parent="DevUI/DevTools/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Art Studio"
+
+[node name="Instructions" type="Label" parent="DevUI"]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = -80.0
+offset_right = 300.0
+offset_bottom = -10.0
+text = "WASD: Move Character
+SPACE: Test Attack Animation
+- / =: Zoom Out / In
+Mouse Wheel: Zoom In/Out
+C: Toggle Collision Layer
+ESC: Return to Main Menu"
+vertical_alignment = 1
+
+[connection signal="pressed" from="DevUI/MapSelector/VBox/LoadButton" to="." method="_on_load_map_pressed"]
+[connection signal="item_selected" from="DevUI/CharacterTester/VBox/ClassDropdown" to="." method="_on_class_selected"]
+[connection signal="item_selected" from="DevUI/CharacterTester/VBox/AnimationDropdown" to="." method="_on_animation_selected"]
+[connection signal="item_selected" from="DevUI/CharacterTester/VBox/DirectionDropdown" to="." method="_on_direction_selected"]
+[connection signal="pressed" from="DevUI/CharacterTester/VBox/AnimControls/PlayButton" to="." method="_on_play_pressed"]
+[connection signal="pressed" from="DevUI/CharacterTester/VBox/AnimControls/PauseButton" to="." method="_on_pause_pressed"]
+[connection signal="pressed" from="DevUI/CharacterTester/VBox/AnimControls/StopButton" to="." method="_on_stop_pressed"]
+[connection signal="pressed" from="DevUI/DevTools/HBox/SpriteCreator" to="." method="_on_sprite_creator_pressed"]
+[connection signal="pressed" from="DevUI/DevTools/HBox/MapEditor" to="." method="_on_map_editor_pressed"]
+[connection signal="pressed" from="DevUI/DevTools/HBox/ArtStudio" to="." method="_on_art_studio_pressed"]

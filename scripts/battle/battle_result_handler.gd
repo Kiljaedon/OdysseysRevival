@@ -34,7 +34,7 @@ func set_enemy_squad(squad: Array):
 	enemy_squad = squad
 
 
-func show_result(victory: bool):
+func show_result(victory: bool, rewards: Dictionary = {}):
 	"""Show battle result popup"""
 	# Disable all action buttons
 	for button in action_buttons:
@@ -42,27 +42,31 @@ func show_result(victory: bool):
 			button.disabled = true
 
 	if victory:
-		_show_victory()
+		_show_victory(rewards)
 	else:
 		_show_defeat()
 
 
-func _show_victory():
+func _show_victory(server_rewards: Dictionary = {}):
 	"""Display victory screen with rewards"""
 	if ui_manager:
 		ui_manager.update_turn_info("VICTORY! You defeated all enemies!")
 
-	# Calculate rewards
-	var rewards = calculate_rewards()
+	# Use server rewards if available, otherwise calculate locally
+	var rewards = server_rewards if not server_rewards.is_empty() else calculate_rewards()
+	
+	# Map server keys (xp_gained) to UI keys (xp) if needed
+	if rewards.has("xp_gained"): rewards["xp"] = rewards.get("xp_gained")
+	if rewards.has("gold_gained"): rewards["gold"] = rewards.get("gold_gained")
 
 	# Update popup text
 	if result_title:
 		result_title.text = "VICTORY!"
 		result_title.modulate = Color(0.2, 1.0, 0.2)  # Green
 	if xp_label:
-		xp_label.text = "XP Gained: " + str(rewards.xp)
+		xp_label.text = "XP Gained: " + str(rewards.get("xp", 0))
 	if gold_label:
-		gold_label.text = "Gold Earned: " + str(rewards.gold)
+		gold_label.text = "Gold Earned: " + str(rewards.get("gold", 0))
 
 	# Show popup
 	if result_popup:

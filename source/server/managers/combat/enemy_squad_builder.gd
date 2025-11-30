@@ -9,45 +9,46 @@ const NPC_TYPES = ["Rogue", "Goblin", "OrcWarrior", "DarkMage", "EliteGuard", "R
 
 
 static func build_enemy_squad(npc_type: String, npc_id: int) -> Array:
-	## Build complete enemy squad: 1 boss + 5 random enemies
-	## Returns array of enemy data dictionaries
+	## Build enemy squad: 1 boss + 0-2 adds (same type)
 	var enemy_squad = []
 
 	# Load the attacked NPC as the boss (index 0)
-	var boss_data = load_and_setup_npc(npc_type, npc_type + " 1", [1, 5])
-	if not boss_data.is_empty():
-		enemy_squad.append(boss_data)
-		print("[COMBAT] Boss enemy: %s (Lv%d, DEX:%d, ATK:%d, DEF:%d)" % [
-			boss_data.get("character_name"),
-			boss_data.get("level", 1),
-			boss_data.get("base_stats", {}).get("dex", 10),
-			boss_data.get("attack", 10),
-			boss_data.get("defense", 10)
-		])
+	# Note: We pass [-1, -1] to indicate "Use JSON Range"
+	var boss_data = load_and_setup_npc(npc_type, npc_type + " A", [-1, -1])
+	
+	if boss_data.is_empty():
+		return [] # Failed to load boss
+		
+	enemy_squad.append(boss_data)
+	var boss_level = boss_data.get("level", 1)
+	
+	print("[COMBAT] Boss: %s (Lv%d)" % [boss_data.get("character_name"), boss_level])
 
-	# Load 5 random different NPCs for the rest of the squad
-	var shuffled_types = NPC_TYPES.duplicate()
-	shuffled_types.shuffle()  # Randomize order
-
-	for i in range(5):
-		var random_type = shuffled_types[i % shuffled_types.size()]
-		var enemy_data = load_and_setup_npc(random_type, random_type + " " + str(i + 2), [1, 5])
-
-		if not enemy_data.is_empty():
-			enemy_squad.append(enemy_data)
-			print("[COMBAT] Enemy %d: %s (Lv%d, DEX:%d, ATK:%d, DEF:%d)" % [
-				i + 2,
-				enemy_data.get("character_name"),
-				enemy_data.get("level", 1),
-				enemy_data.get("base_stats", {}).get("dex", 10),
-				enemy_data.get("attack", 10),
-				enemy_data.get("defense", 10)
-			])
+	# Determine adds (0-2)
+	var roll = randf()
+	var adds_count = 0
+	
+	if roll < 0.5: 
+		adds_count = 0 # 50% chance for solo
+	elif roll < 0.8:
+		adds_count = 1 # 30% chance for +1
+	else:
+		adds_count = 2 # 20% chance for +2
+		
+	# Spawn adds
+	for i in range(adds_count):
+		var add_name = npc_type + " " + String.chr(66 + i) # B, C
+		var min_lvl = max(1, boss_level - 1)
+		var max_lvl = min(50, boss_level + 1)
+		
+		var add_data = load_and_setup_npc(npc_type, add_name, [min_lvl, max_lvl])
+		if not add_data.is_empty():
+			enemy_squad.append(add_data)
 
 	return enemy_squad
 
 
-static func load_and_setup_npc(npc_type: String, display_name: String, level_range: Array) -> Dictionary:
+static func load_and_setup_npc(npc_type: String, display_name: String, level_range_override: Array) -> Dictionary:
 	## Load single NPC and setup its stats
 	## Returns enemy data dictionary with all stats initialized
 	var file_path = "res://characters/npcs/" + npc_type + ".json"
@@ -56,15 +57,32 @@ static func load_and_setup_npc(npc_type: String, display_name: String, level_ran
 	if npc_data.is_empty():
 		return {}
 
-	# Setup display name and level
+	# Setup display name
 	npc_data["character_name"] = display_name
 	npc_data["name"] = display_name
-	npc_data["level"] = randi_range(level_range[0], level_range[1])
+	
+	# Determine Level
+	var min_lvl = 1
+	var max_lvl = 1
+	
+	# Use override if valid
+	if level_range_override.size() == 2 and level_range_override[0] > 0:
+		min_lvl = level_range_override[0]
+		max_lvl = level_range_override[1]
+	# Use JSON range if available
+	elif npc_data.has("level_range"):
+		min_lvl = int(npc_data.level_range.get("min", 1))
+		max_lvl = int(npc_data.level_range.get("max", 1))
+		
+	npc_data["level"] = randi_range(min_lvl, max_lvl)
+	
+	# SCALE STATS (Critical for balance)
+	_scale_npc_stats(npc_data, npc_data["level"])
 
-	# Use actual stats from derived_stats if available
+	# Initialize Derived Stats (HP/MP)
 	if npc_data.has("derived_stats"):
 		npc_data["max_hp"] = npc_data.derived_stats.get("max_hp", 100)
-		npc_data["hp"] = npc_data["max_hp"]  # Start at full HP
+		npc_data["hp"] = npc_data["max_hp"]
 		npc_data["max_mp"] = npc_data.derived_stats.get("max_mp", 50)
 		npc_data["mp"] = npc_data["max_mp"]
 		npc_data["max_energy"] = npc_data.derived_stats.get("max_ep", 100)
@@ -72,7 +90,7 @@ static func load_and_setup_npc(npc_type: String, display_name: String, level_ran
 		npc_data["attack"] = npc_data.derived_stats.get("phys_dmg", 10)
 		npc_data["defense"] = npc_data.derived_stats.get("phys_def", 10)
 	else:
-		# Fallback defaults if no derived_stats
+		# Fallback
 		npc_data["max_hp"] = 100
 		npc_data["hp"] = 100
 		npc_data["max_mp"] = 50
@@ -83,6 +101,25 @@ static func load_and_setup_npc(npc_type: String, display_name: String, level_ran
 		npc_data["defense"] = 10
 
 	return npc_data
+
+static func _scale_npc_stats(npc_data: Dictionary, level: int) -> void:
+	# Duplicate of NPCManager logic to ensure squads are scaled too
+	if level <= 1: return
+	var stat_growth = 0.05
+	var hp_growth = 0.10
+	var multiplier_stats = 1.0 + ((level-1) * stat_growth)
+	var multiplier_hp = 1.0 + ((level-1) * hp_growth)
+	
+	if npc_data.has("derived_stats"):
+		for key in npc_data.derived_stats:
+			if key == "max_hp":
+				npc_data.derived_stats[key] = int(npc_data.derived_stats[key] * multiplier_hp)
+			else:
+				npc_data.derived_stats[key] = int(npc_data.derived_stats[key] * multiplier_stats)
+				
+	if npc_data.has("base_stats"):
+		for key in npc_data.base_stats:
+			npc_data.base_stats[key] = int(npc_data.base_stats[key] * multiplier_stats)
 
 
 static func _load_npc_character_file(file_path: String) -> Dictionary:

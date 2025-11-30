@@ -1,0 +1,121 @@
+{
+	"animations": {
+		"attack_down": [
+			{
+				"atlas_index": 0.0,
+				"col": 5.0,
+				"row": 4.0
+			}
+		],
+		"attack_left": [
+			{
+				"atlas_index": 0.0,
+				"col": 8.0,
+				"row": 4.0
+			}
+		],
+		"attack_right": [
+			{
+				"atlas_index": 0.0,
+				"col": 11.0,
+				"row": 4.0
+			}
+		],
+		"attack_up": [
+			{
+				"atlas_index": 0.0,
+				"col": 2.0,
+				"row": 4.0
+			}
+		],
+		"walk_down_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 3.0,
+				"row": 4.0
+			}
+		],
+		"walk_down_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 4.0,
+				"row": 4.0
+			}
+		],
+		"walk_left_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 6.0,
+				"row": 4.0
+			}
+		],
+		"walk_left_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 7.0,
+				"row": 4.0
+			}
+		],
+		"walk_right_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 9.0,
+				"row": 4.0
+			}
+		],
+		"walk_right_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 10.0,
+				"row": 4.0
+			}
+		],
+		"walk_up_1": [
+			{
+				"atlas_index": 0.0,
+				"col": 0.0,
+				"row": 4.0
+			}
+		],
+		"walk_up_2": [
+			{
+				"atlas_index": 0.0,
+				"col": 1.0,
+				"row": 4.0
+			}
+		]
+	},
+	"base_stats": {
+		"cha": 12,
+		"dex": 18,
+		"int": 10,
+		"str": 13,
+		"vit": 10,
+		"wis": 8
+	},
+	"character_name": "Rogue",
+	"combat_role": "Melee",
+	"created_date": "2025-11-13T06:41:14",
+	"derived_stats": {
+		"mag_def": 8,
+		"mag_dmg": 29.0,
+		"max_ep": 84,
+		"max_hp": 176,
+		"max_mp": 116,
+		"phys_def": 7,
+		"phys_dmg": 35
+	},
+	"element": "None",
+	"flavor_text": {
+		"backstory": "",
+		"description": "Swift and deadly, striking from shadows with precision and speed."
+	},
+	"level": 1,
+	"manual_stats": {
+		"ep": -1,
+		"hp": -1,
+		"mp": -1
+	},
+	"type": "class",
+	"xp": 0
+}

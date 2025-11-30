@@ -205,6 +205,8 @@ static func _create_account_json(username: String, password: String = "") -> Dic
 		"username": username,
 		"password_hash": password_hash,
 		"created_at": Time.get_datetime_string_from_system(),
+		"last_login": "",
+		"admin_level": 0,
 		"characters": []
 	}
 
@@ -239,11 +241,16 @@ static func _get_account_json(username: String) -> Dictionary:
 
 		var json = JSON.new()
 		if json.parse(json_text) == OK:
+			var account_data = json.data
+			# Add fallback fields for old accounts without these fields
+			account_data["admin_level"] = account_data.get("admin_level", 0)
+			account_data["last_login"] = account_data.get("last_login", "")
+
 			account_cache[cache_key] = {
-				"data": json.data,
+				"data": account_data,
 				"timestamp": now
 			}
-			return {"success": true, "account": json.data}
+			return {"success": true, "account": account_data}
 
 	return {"success": false, "error": "Failed to load account"}
 
@@ -435,7 +442,7 @@ static func _create_account_sqlite(username: String, password: String = "") -> D
 	var timestamp = Time.get_datetime_string_from_system()
 
 	# Build INSERT query
-	var query = "INSERT INTO accounts (username, password_hash, created_at, is_active) VALUES ('%s', '%s', '%s', 1);" % [
+	var query = "INSERT INTO accounts (username, password_hash, created_at, last_login, admin_level, is_active) VALUES ('%s', '%s', '%s', '', 0, 1);" % [
 		_sql_escape(username),
 		_sql_escape(password_hash),
 		timestamp
@@ -450,6 +457,8 @@ static func _create_account_sqlite(username: String, password: String = "") -> D
 			"username": username,
 			"password_hash": password_hash,
 			"created_at": timestamp,
+			"last_login": "",
+			"admin_level": 0,
 			"characters": []
 		}
 		return {"success": true, "account": account_data}
@@ -473,7 +482,7 @@ static func _get_account_sqlite(username: String) -> Dictionary:
 			return {"success": true, "account": cached.data.duplicate()}
 
 	# Query SQLite
-	var query = "SELECT username, password_hash, created_at, last_login FROM accounts WHERE username='%s' LIMIT 1;" % _sql_escape(username)
+	var query = "SELECT username, password_hash, created_at, last_login, admin_level FROM accounts WHERE username='%s' LIMIT 1;" % _sql_escape(username)
 
 	var output = []
 	var result = OS.execute("sqlite3", [db_path_absolute, "-json", query], output, true, false)
@@ -505,7 +514,8 @@ static func _get_account_sqlite(username: String) -> Dictionary:
 						"username": row.get("username", username),
 						"password_hash": row.get("password_hash", ""),
 						"created_at": row.get("created_at", ""),
-						"last_login": row.get("last_login", null),
+						"last_login": row.get("last_login", ""),
+						"admin_level": row.get("admin_level", 0),
 						"characters": character_ids
 					}
 
