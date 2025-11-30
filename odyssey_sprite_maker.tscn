@@ -1,0 +1,281 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://odyssey_sprite_maker.gd" id="1_maker"]
+[ext_resource type="Script" path="res://draggable_panel.gd" id="2_draggable"]
+
+[node name="OdysseySpriteMaker" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_maker")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.1, 0.1, 0.1, 1)
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="TitleBar" type="Panel" parent="UI"]
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 40.0
+grow_horizontal = 2
+
+[node name="HBoxContainer" type="HBoxContainer" parent="UI/TitleBar"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 5.0
+offset_right = -10.0
+offset_bottom = -5.0
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="UI/TitleBar/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "ODYSSEY SPRITE MAKER"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="BackButton" type="Button" parent="UI/TitleBar/HBoxContainer"]
+layout_mode = 2
+text = "Back to Main Menu"
+
+[node name="SpriteGridPanel" type="Panel" parent="UI"]
+offset_left = 10.0
+offset_top = 50.0
+offset_right = 510.0
+offset_bottom = 650.0
+script = ExtResource("2_draggable")
+panel_title = "Sprite Browser"
+
+[node name="Content" type="VBoxContainer" parent="UI/SpriteGridPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 5.0
+offset_top = 40.0
+offset_right = -5.0
+offset_bottom = -5.0
+theme_override_constants/separation = 5
+
+[node name="SpriteGrid" type="ScrollContainer" parent="UI/SpriteGridPanel/Content"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="GridContainer" type="GridContainer" parent="UI/SpriteGridPanel/Content/SpriteGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+columns = 6
+
+[node name="PageNavigation" type="HBoxContainer" parent="UI/SpriteGridPanel/Content"]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="PrevPageButton" type="Button" parent="UI/SpriteGridPanel/Content/PageNavigation"]
+layout_mode = 2
+text = "< Previous Page"
+
+[node name="PageLabel" type="Label" parent="UI/SpriteGridPanel/Content/PageNavigation"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Page 1/1"
+horizontal_alignment = 1
+
+[node name="NextPageButton" type="Button" parent="UI/SpriteGridPanel/Content/PageNavigation"]
+layout_mode = 2
+text = "Next Page >"
+
+[node name="CharacterPanel" type="Panel" parent="UI"]
+offset_left = 520.0
+offset_top = 50.0
+offset_right = 920.0
+offset_bottom = 650.0
+script = ExtResource("2_draggable")
+panel_title = "Character Management"
+
+[node name="Content" type="VBoxContainer" parent="UI/CharacterPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+offset_top = 40.0
+offset_right = -8.0
+offset_bottom = -8.0
+theme_override_constants/separation = 8
+
+[node name="PreviewRow" type="HBoxContainer" parent="UI/CharacterPanel/Content"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PreviewSection" type="VBoxContainer" parent="UI/CharacterPanel/Content/PreviewRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(96, 0)
+theme_override_constants/separation = 4
+
+[node name="PreviewLabel" type="Label" parent="UI/CharacterPanel/Content/PreviewRow/PreviewSection"]
+layout_mode = 2
+text = "Preview"
+horizontal_alignment = 1
+
+[node name="PreviewBackground" type="Panel" parent="UI/CharacterPanel/Content/PreviewRow/PreviewSection"]
+layout_mode = 2
+custom_minimum_size = Vector2(96, 96)
+size_flags_horizontal = 4
+
+[node name="AnimationPreview" type="TextureRect" parent="UI/CharacterPanel/Content/PreviewRow/PreviewSection/PreviewBackground"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+stretch_mode = 5
+expand_mode = 1
+
+[node name="CurrentFrames" type="Label" parent="UI/CharacterPanel/Content/PreviewRow/PreviewSection"]
+layout_mode = 2
+text = "No Selection"
+horizontal_alignment = 1
+
+[node name="NameSection" type="VBoxContainer" parent="UI/CharacterPanel/Content/PreviewRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="CharacterName" type="LineEdit" parent="UI/CharacterPanel/Content/PreviewRow/NameSection"]
+layout_mode = 2
+placeholder_text = "Character Name"
+
+[node name="TypeButtons" type="HBoxContainer" parent="UI/CharacterPanel/Content/PreviewRow/NameSection"]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="SetClassTypeButton" type="Button" parent="UI/CharacterPanel/Content/PreviewRow/NameSection/TypeButtons"]
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "CLASS"
+
+[node name="SetNPCTypeButton" type="Button" parent="UI/CharacterPanel/Content/PreviewRow/NameSection/TypeButtons"]
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "NPC"
+
+[node name="SaveCharacterButton" type="Button" parent="UI/CharacterPanel/Content/PreviewRow/NameSection"]
+layout_mode = 2
+text = "Save Character"
+
+[node name="ClassListLabel" type="Label" parent="UI/CharacterPanel/Content"]
+layout_mode = 2
+text = "Classes:"
+
+[node name="ClassList" type="OptionButton" parent="UI/CharacterPanel/Content"]
+layout_mode = 2
+
+[node name="DeleteClassButton" type="Button" parent="UI/CharacterPanel/Content"]
+layout_mode = 2
+text = "Delete Class"
+
+[node name="NPCListLabel" type="Label" parent="UI/CharacterPanel/Content"]
+layout_mode = 2
+text = "NPCs:"
+
+[node name="NPCList" type="OptionButton" parent="UI/CharacterPanel/Content"]
+layout_mode = 2
+
+[node name="DeleteNPCButton" type="Button" parent="UI/CharacterPanel/Content"]
+layout_mode = 2
+text = "Delete NPC"
+
+[node name="CombatRolePanel" type="Panel" parent="UI"]
+offset_left = 520.0
+offset_top = 300.0
+offset_right = 920.0
+offset_bottom = 550.0
+script = ExtResource("2_draggable")
+panel_title = "Combat Configuration"
+
+[node name="Content" type="VBoxContainer" parent="UI/CombatRolePanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+offset_top = 40.0
+offset_right = -8.0
+offset_bottom = -8.0
+theme_override_constants/separation = 8
+
+[node name="CurrentRoleLabel" type="Label" parent="UI/CombatRolePanel/Content"]
+layout_mode = 2
+text = "Current Role: None"
+horizontal_alignment = 1
+
+[node name="Separator1" type="HSeparator" parent="UI/CombatRolePanel/Content"]
+layout_mode = 2
+
+[node name="RoleSelectLabel" type="Label" parent="UI/CombatRolePanel/Content"]
+layout_mode = 2
+text = "Select Combat Role:"
+
+[node name="RoleDropdown" type="OptionButton" parent="UI/CombatRolePanel/Content"]
+layout_mode = 2
+
+[node name="RoleDescription" type="Label" parent="UI/CombatRolePanel/Content"]
+layout_mode = 2
+text = "Select a role to see description"
+autowrap_mode = 3
+
+[node name="AddRoleButton" type="Button" parent="UI/CombatRolePanel/Content"]
+layout_mode = 2
+text = "Add Selected Role"
+
+[node name="StatsPanel" type="Panel" parent="UI"]
+offset_left = 930.0
+offset_top = 50.0
+offset_right = 1270.0
+offset_bottom = 650.0
+script = ExtResource("2_draggable")
+panel_title = "Character Stats"
+
+[node name="Content" type="VBoxContainer" parent="UI/StatsPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+offset_top = 40.0
+offset_right = -8.0
+offset_bottom = -8.0
+theme_override_constants/separation = 6
+
+[node name="StatusLabel" type="Label" parent="UI"]
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -30.0
+grow_horizontal = 2
+grow_vertical = 0
+text = "Ready. Click sprites to add to current animation."
+horizontal_alignment = 1
+
+[connection signal="pressed" from="UI/TitleBar/HBoxContainer/BackButton" to="." method="_on_back_button_pressed"]
+[connection signal="pressed" from="UI/SpriteGridPanel/Content/PageNavigation/PrevPageButton" to="." method="_on_prev_page_pressed"]
+[connection signal="pressed" from="UI/SpriteGridPanel/Content/PageNavigation/NextPageButton" to="." method="_on_next_page_pressed"]
+[connection signal="pressed" from="UI/CharacterPanel/Content/PreviewRow/NameSection/TypeButtons/SetClassTypeButton" to="." method="_on_set_class_type_pressed"]
+[connection signal="pressed" from="UI/CharacterPanel/Content/PreviewRow/NameSection/TypeButtons/SetNPCTypeButton" to="." method="_on_set_npc_type_pressed"]
+[connection signal="pressed" from="UI/CharacterPanel/Content/PreviewRow/NameSection/SaveCharacterButton" to="." method="_on_save_character_pressed"]
+[connection signal="item_selected" from="UI/CharacterPanel/Content/ClassList" to="." method="_on_class_list_selected"]
+[connection signal="pressed" from="UI/CharacterPanel/Content/DeleteClassButton" to="." method="_on_delete_class_pressed"]
+[connection signal="item_selected" from="UI/CharacterPanel/Content/NPCList" to="." method="_on_npc_list_selected"]
+[connection signal="pressed" from="UI/CharacterPanel/Content/DeleteNPCButton" to="." method="_on_delete_npc_pressed"]

@@ -257,6 +257,23 @@ func create_ui():
 	bottom_spacer.custom_minimum_size = Vector2(0, 10)
 	panel_vbox.add_child(bottom_spacer)
 
+	# Local Server button (small, bottom right corner)
+	var server_button = Button.new()
+	server_button.text = "Start Local Server"
+	server_button.custom_minimum_size = Vector2(160, 35)
+	server_button.add_theme_font_size_override("font_size", 12)
+	server_button.pressed.connect(_on_local_server_pressed)
+
+	# Position in bottom-right corner
+	var server_container = Control.new()
+	server_container.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	server_container.offset_left = -180
+	server_container.offset_top = -55
+	server_container.offset_right = -20
+	server_container.offset_bottom = -20
+	server_container.add_child(server_button)
+	add_child(server_container)
+
 	# Setup keyboard navigation
 	setup_focus_navigation()
 
@@ -569,6 +586,72 @@ func show_success(message: String):
 func show_status(message: String, color: Color):
 	status_label.text = message
 	status_label.modulate = color
+
+
+func _on_local_server_pressed():
+	"""Launch local development server"""
+	Log.info("Launching Local Development Server...", "Server")
+
+	# Get project root path
+	var project_path = ProjectSettings.globalize_path("res://")
+
+	# Switch client to LOCAL server environment so it connects to 127.0.0.1
+	ConfigManager.set_server_environment(ConfigManager.ServerEnvironment.LOCAL)
+	Log.info("Client configured to connect to LOCAL server (127.0.0.1)", "Network")
+
+	# Update the dropdown to reflect the change
+	if server_env_dropdown:
+		server_env_dropdown.select(ConfigManager.ServerEnvironment.LOCAL)
+
+	# Create batch script to launch server
+	var batch_content = """@echo off
+:: Kill any existing Godot server processes silently
+taskkill /F /IM Godot_v4.5.1-stable_win64.exe 2>nul
+taskkill /F /IM godot.exe 2>nul
+timeout /t 1 /nobreak >nul
+
+:: Launch Godot with START to hide this console window
+
+if exist "C:\\Program Files\\Godot\\Godot_v4.5.1-stable_win64.exe" (
+    start "" "C:\\Program Files\\Godot\\Godot_v4.5.1-stable_win64.exe" --path "%s" source/server/server_world.tscn
+    exit
+)
+
+if exist "C:\\Godot\\Godot_v4.5.1-stable_win64.exe" (
+    start "" "C:\\Godot\\Godot_v4.5.1-stable_win64.exe" --path "%s" source/server/server_world.tscn
+    exit
+)
+
+:: Try the running Godot executable
+if exist "%s" (
+    start "" "%s" --path "%s" source/server/server_world.tscn
+    exit
+)
+
+echo ERROR: Godot executable not found!
+pause
+""" % [project_path, project_path, OS.get_executable_path(), OS.get_executable_path(), project_path]
+
+	# Write batch file
+	var batch_path = project_path + "run_local_server.bat"
+	var file = FileAccess.open(batch_path, FileAccess.WRITE)
+	if file:
+		file.store_string(batch_content)
+		file.close()
+
+		# Launch the server
+		var err = OS.shell_open(batch_path)
+		if err != OK:
+			Log.error("Failed to launch server, error: %d" % err, "Server")
+		else:
+			Log.info("Local server launching...", "Server")
+			show_status("Local server starting... Reconnecting...", Color.YELLOW)
+
+			# Give server time to start, then reconnect
+			await get_tree().create_timer(2.0).timeout
+			_on_server_env_changed(ConfigManager.ServerEnvironment.LOCAL)
+	else:
+		Log.error("Failed to create server launch script", "Server")
 
 
 func create_styled_button(text: String) -> Button:
