@@ -19,7 +19,7 @@ var hp: int = 100
 var max_hp: int = 100
 var facing: String = "down"
 var unit_state: String = "idle"
-var is_defending: bool = false
+var is_dodge_rolling: bool = false
 var is_player_controlled: bool = false
 
 ## Server position for interpolation
@@ -59,73 +59,80 @@ func _ready():
 func _create_visuals():
 	var scaled_size = BASE_SPRITE_SIZE * SPRITE_SCALE  # 128px
 
-	# Sprite for character (scaled to match overworld)
+	# Sprite for character
 	sprite = TextureRect.new()
 	sprite.name = "Sprite"
 	sprite.size = Vector2(scaled_size, scaled_size)
-	sprite.position = Vector2(-scaled_size / 2, -scaled_size)  # Centered, bottom at origin
+	sprite.position = Vector2(-scaled_size / 2, -scaled_size)
 	sprite.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	sprite.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	add_child(sprite)
 
-	# Stats container ABOVE the sprite head - rendered on top with high z_index
+	# --- NEW CLEAN STATS CONTAINER (VBox) ---
 	var bar_width = 50.0
-	stats_container = Control.new()
-	stats_container.name = "StatsContainer"
-	stats_container.position = Vector2(-bar_width / 2, -scaled_size - 28)  # Higher above sprite
-	stats_container.size = Vector2(bar_width, 24)
-	stats_container.z_index = 100  # Render on top of everything
-	stats_container.z_as_relative = false  # Use absolute z_index
+	
+	# Use VBoxContainer for automatic, perfect stacking
+	var vbox = VBoxContainer.new()
+	vbox.name = "StatsContainer"
+	vbox.custom_minimum_size = Vector2(bar_width, 0) # Height auto-calculated
+	vbox.size = Vector2(bar_width, 0)
+	# Position: Centered X, Lower Y (-36px above sprite) - Closer but not touching
+	vbox.position = Vector2(-bar_width / 2, -scaled_size - 36)
+	vbox.add_theme_constant_override("separation", 1) # 1px gap between bars
+	vbox.z_index = 100
+	vbox.z_as_relative = false
+	stats_container = vbox # Keep reference
 	add_child(stats_container)
 
-	# Health bar (red) - HP
+	# 1. Name Label (Top)
+	name_label = Label.new()
+	name_label.text = unit_name
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_label.add_theme_font_size_override("font_size", 8)
+	name_label.add_theme_color_override("font_shadow_color", Color.BLACK)
+	name_label.add_theme_constant_override("shadow_offset_x", 1)
+	name_label.add_theme_constant_override("shadow_offset_y", 1)
+	name_label.add_theme_constant_override("line_spacing", 0)
+	stats_container.add_child(name_label)
+
+	# 2. Health Bar (Red)
 	health_bar = ProgressBar.new()
-	health_bar.size = Vector2(bar_width, 4)
-	health_bar.position = Vector2(0, 0)
+	health_bar.custom_minimum_size = Vector2(bar_width, 4) # 4px tall
 	health_bar.max_value = max_hp
 	health_bar.value = hp
 	health_bar.show_percentage = false
-	_style_bar(health_bar, Color(0.9, 0.15, 0.15, 1.0), Color(0.15, 0.15, 0.15, 0.9))
+	_style_bar(health_bar, Color(0.9, 0.2, 0.2, 1.0))
 	stats_container.add_child(health_bar)
 
-	# Mana bar (blue) - MP
+	# 3. Mana Bar (Blue)
 	mana_bar = ProgressBar.new()
-	mana_bar.size = Vector2(bar_width, 3)
-	mana_bar.position = Vector2(0, 5)
+	mana_bar.custom_minimum_size = Vector2(bar_width, 3) # 3px tall
 	mana_bar.max_value = max_mp
 	mana_bar.value = mp
 	mana_bar.show_percentage = false
-	_style_bar(mana_bar, Color(0.15, 0.25, 0.9, 1.0), Color(0.15, 0.15, 0.15, 0.9))
+	_style_bar(mana_bar, Color(0.2, 0.4, 1.0, 1.0))
 	stats_container.add_child(mana_bar)
 
-	# Energy bar (yellow)
+	# 4. Energy Bar (Yellow)
 	energy_bar = ProgressBar.new()
-	energy_bar.size = Vector2(bar_width, 3)
-	energy_bar.position = Vector2(0, 9)
+	energy_bar.custom_minimum_size = Vector2(bar_width, 3) # 3px tall
 	energy_bar.max_value = max_energy
 	energy_bar.value = energy
 	energy_bar.show_percentage = false
-	_style_bar(energy_bar, Color(0.9, 0.75, 0.1, 1.0), Color(0.15, 0.15, 0.15, 0.9))
+	_style_bar(energy_bar, Color(1.0, 0.8, 0.1, 1.0))
 	stats_container.add_child(energy_bar)
 
-	# Name label - above the bars
-	name_label = Label.new()
-	name_label.text = unit_name
-	name_label.position = Vector2(0, -14)
-	name_label.size = Vector2(bar_width, 12)
-	name_label.add_theme_font_size_override("font_size", 10)
-	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	stats_container.add_child(name_label)
-
-	# Damage label (hidden by default)
+	# Damage label (floating text)
 	damage_label = Label.new()
 	damage_label.visible = false
 	damage_label.position = Vector2(-15, -scaled_size / 2)
 	damage_label.add_theme_font_size_override("font_size", 14)
 	damage_label.add_theme_color_override("font_color", Color.RED)
+	damage_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	damage_label.add_theme_constant_override("outline_size", 2)
 	add_child(damage_label)
 
-	# Target indicator - simple circle under unit (hidden by default)
+	# Target indicator
 	target_indicator = Node2D.new()
 	target_indicator.name = "TargetIndicator"
 	target_indicator.visible = false
@@ -146,21 +153,74 @@ func _create_target_indicator() -> void:
 	ring.points = points
 	target_indicator.add_child(ring)
 
-func _style_bar(bar: ProgressBar, fill_color: Color, bg_color: Color) -> void:
-	"""Apply minimal style to progress bar"""
+func _create_slim_bar(x: float, y: float, width: float, height: float, fill_color: Color) -> ProgressBar:
+	"""Create a slim progress bar for overhead stats - no labels, no background panel"""
+	var bar = ProgressBar.new()
+	bar.position = Vector2(x, y)
+	bar.custom_minimum_size = Vector2(width, height)
+	bar.size = Vector2(width, height)
+	bar.max_value = 100
+	bar.value = 100
+	bar.show_percentage = false
+	bar.clip_contents = true
+	bar.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+
+	# Dark background, colored fill
 	var bg_style = StyleBoxFlat.new()
-	bg_style.bg_color = bg_color
-	bg_style.corner_radius_top_left = 1
-	bg_style.corner_radius_top_right = 1
-	bg_style.corner_radius_bottom_left = 1
-	bg_style.corner_radius_bottom_right = 1
+	bg_style.bg_color = Color(0.1, 0.1, 0.1, 0.7)
+	bg_style.set_corner_radius_all(1)
+	bg_style.set_content_margin_all(0)
+	bg_style.set_expand_margin_all(0)
 
 	var fill_style = StyleBoxFlat.new()
 	fill_style.bg_color = fill_color
-	fill_style.corner_radius_top_left = 1
-	fill_style.corner_radius_top_right = 1
-	fill_style.corner_radius_bottom_left = 1
-	fill_style.corner_radius_bottom_right = 1
+	fill_style.set_corner_radius_all(1)
+	fill_style.set_content_margin_all(0)
+	fill_style.set_expand_margin_all(0)
+
+	bar.add_theme_stylebox_override("background", bg_style)
+	bar.add_theme_stylebox_override("fill", fill_style)
+	stats_container.add_child(bar)
+
+	return bar
+
+func _style_bar(bar: ProgressBar, fill_color: Color) -> void:
+	"""Apply minimalist style to progress bar"""
+	var corner_radius = 1
+	
+	# Background Style (Dark semi-transparent)
+	var bg_style = StyleBoxFlat.new()
+	bg_style.bg_color = Color(0, 0, 0, 0.4)
+	bg_style.set_corner_radius_all(corner_radius)
+	bg_style.set_content_margin_all(0)
+	bg_style.set_expand_margin_all(0)
+	bg_style.anti_aliasing = false
+
+	# Fill Style (Value)
+	var fill_style = StyleBoxFlat.new()
+	fill_style.bg_color = fill_color
+	fill_style.set_corner_radius_all(corner_radius)
+	fill_style.set_content_margin_all(0)
+	fill_style.set_expand_margin_all(0)
+	fill_style.anti_aliasing = false
+
+	bar.add_theme_stylebox_override("background", bg_style)
+	bar.add_theme_stylebox_override("fill", fill_style)
+func _style_thin_bar(bar: ProgressBar, fill_color: Color, bg_color: Color) -> void:
+	"""Style for thin bars - TRANSPARENT background, colored fill only"""
+	# Background - nearly invisible dark tint
+	var bg_style = StyleBoxFlat.new()
+	bg_style.bg_color = Color(0, 0, 0, 0.3)  # Dark transparent
+	bg_style.set_corner_radius_all(0)
+	bg_style.set_content_margin_all(0)
+	bg_style.set_border_width_all(0)
+
+	# Fill (the actual colored bar)
+	var fill_style = StyleBoxFlat.new()
+	fill_style.bg_color = fill_color
+	fill_style.set_corner_radius_all(0)
+	fill_style.set_content_margin_all(0)
+	fill_style.set_border_width_all(0)
 
 	bar.add_theme_stylebox_override("background", bg_style)
 	bar.add_theme_stylebox_override("fill", fill_style)
@@ -224,15 +284,25 @@ func initialize(data: Dictionary) -> void:
 	unit_name = data.get("name", "Unit")
 	class_name_id = data.get("class_name", "")
 	team = data.get("team", "enemy")
-	hp = data.get("hp", 100)
-	max_hp = data.get("max_hp", 100)
-	mp = data.get("mp", 50)
-	max_mp = data.get("max_mp", 50)
-	energy = data.get("energy", 100)
-	max_energy = data.get("max_energy", 100)
+	
+	# Robust stat initialization - check direct keys first, then source_data
+	var source = data.get("source_data", {})
+	var derived = source.get("derived_stats", {})
+	var base = source.get("base_stats", {})
+	
+	# Max Stats (Hierarchy: direct > derived > base > default)
+	max_hp = data.get("max_hp", derived.get("max_hp", base.get("hp", 100)))
+	max_mp = data.get("max_mp", derived.get("max_mp", base.get("mp", 50)))
+	max_energy = data.get("max_energy", derived.get("max_ep", base.get("energy", 100)))
+	
+	# Current Stats
+	hp = data.get("hp", max_hp)
+	mp = data.get("mp", max_mp)
+	energy = data.get("energy", max_energy)
+
 	facing = data.get("facing", "down")
 	unit_state = data.get("state", "idle")
-	is_defending = data.get("is_defending", false)
+	is_dodge_rolling = data.get("is_dodge_rolling", false)
 	is_player_controlled = data.get("is_player_controlled", false)
 
 	server_position = data.get("position", Vector2.ZERO)
@@ -240,6 +310,7 @@ func initialize(data: Dictionary) -> void:
 
 	var npc_type = data.get("npc_type", "")
 	print("[RT_UNIT] Init data: class=%s, npc_type=%s, team=%s, name=%s" % [class_name_id, npc_type, team, unit_name])
+	print("[RT_UNIT] Stats: HP %d/%d, MP %d/%d, EP %d/%d" % [hp, max_hp, mp, max_mp, energy, max_energy])
 
 	# Load sprite data from class_name or animations
 	if data.has("animations") and not data.animations.is_empty():
@@ -272,6 +343,13 @@ func initialize(data: Dictionary) -> void:
 		energy_bar.value = energy
 	if name_label:
 		name_label.text = unit_name
+
+	# Player character renders on top of enemies
+	if is_player_controlled:
+		z_index = 10  # Player always on top
+		# Keep overhead stats visible for player too (same as NPCs)
+	else:
+		z_index = 5   # Enemies below player
 
 	# Set initial sprite
 	_update_sprite_frame()
@@ -433,13 +511,25 @@ func apply_server_state(state: Dictionary) -> void:
 
 	facing = state.get("facing", facing)
 	unit_state = state.get("state", unit_state)
-	is_defending = state.get("is_defending", false)
+	is_dodge_rolling = state.get("is_dodge_rolling", false)
 
 	var new_hp = state.get("hp", hp)
 	if new_hp != hp:
 		hp = new_hp
 		if health_bar:
 			health_bar.value = hp
+
+	var new_mp = state.get("mp", mp)
+	if new_mp != mp:
+		mp = new_mp
+		if mana_bar:
+			mana_bar.value = mp
+
+	var new_energy = state.get("energy", energy)
+	if new_energy != energy:
+		energy = new_energy
+		if energy_bar:
+			energy_bar.value = energy
 
 	# Update facing from server velocity if moving
 	if server_velocity.length() > 10:
@@ -492,14 +582,16 @@ func show_damage(damage: int, flank_type: String) -> void:
 		tween.parallel().tween_property(damage_label, "modulate:a", 0.0, 0.8)
 		tween.tween_callback(func(): damage_label.visible = false; damage_label.modulate.a = 1.0)
 
-func show_defend() -> void:
-	"""Show defend activation effect"""
-	# Flash cyan
+func play_dodge_roll(direction: Vector2) -> void:
+	"""Play dodge roll visual effect - quick flash and semi-transparent during roll"""
+	is_dodge_rolling = true
+
+	# Flash white briefly at start, then semi-transparent during roll
 	var tween = create_tween()
-	tween.tween_property(self, "modulate", Color.CYAN, 0.1)
-	tween.tween_property(self, "modulate", Color.WHITE, 0.1)
-	tween.tween_property(self, "modulate", Color.CYAN, 0.1)
-	tween.tween_property(self, "modulate", Color.WHITE, 0.1)
+	tween.tween_property(self, "modulate", Color(1.5, 1.5, 1.5, 0.7), 0.05)  # Bright and transparent
+	tween.tween_property(self, "modulate", Color(1, 1, 1, 0.5), 0.25)  # Stay semi-transparent during roll
+	tween.tween_property(self, "modulate", Color.WHITE, 0.05)  # Return to normal
+	tween.tween_callback(func(): is_dodge_rolling = false)
 
 func play_death() -> void:
 	"""Play death animation"""
@@ -507,3 +599,24 @@ func play_death() -> void:
 	var tween = create_tween()
 	tween.tween_property(self, "modulate:a", 0.3, 0.5)
 	tween.tween_property(self, "scale", Vector2(1.0, 0.5), 0.3)
+
+## ========== STAMINA/ENERGY ==========
+
+func drain_energy(amount: int) -> bool:
+	"""Drain energy locally. Returns true if had enough energy."""
+	if energy >= amount:
+		energy -= amount
+		if energy_bar:
+			energy_bar.value = energy
+		return true
+	return false
+
+func has_energy(amount: int) -> bool:
+	"""Check if unit has enough energy"""
+	return energy >= amount
+
+func regen_energy(amount: int) -> void:
+	"""Regenerate energy locally"""
+	energy = mini(energy + amount, max_energy)
+	if energy_bar:
+		energy_bar.value = energy

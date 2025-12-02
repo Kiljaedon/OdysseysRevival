@@ -1,4 +1,4 @@
-extends "res://draggable_panel.gd"
+extends "res://source/client/ui/common/draggable_panel.gd"
 
 @onready var name_label = $Content/Columns/ProfileCol/InfoBox/NameLabel
 @onready var class_label = $Content/Columns/ProfileCol/InfoBox/ClassLabel

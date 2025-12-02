@@ -67,60 +67,15 @@ func initialize(bottom: TileMapLayer, middle: TileMapLayer, top: TileMapLayer,
 	print("[MapManager] ✓ Client-side MapManager initialized")
 
 ## Load selected map by name
-## Handles "default_test" as special case, otherwise loads TMX file
 func load_selected_map(map_name: String):
 	print("[MapManager] Loading map: ", map_name)
-
-	if map_name == "default_test":
-		create_default_test_map()
-	else:
-		load_tmx_map(map_name)
-
-## Create default 41x41 test map with checkerboard pattern
-## Used as fallback when no TMX maps are available
-func create_default_test_map():
-	print("[MapManager] Creating default test map...")
-
-	# Clear all layers
-	bottom_layer.clear()
-	middle_layer.clear()
-	top_layer.clear()
-
-	# Create a larger, more visible test map on bottom layer
-	for x in range(-20, 21):
-		for y in range(-20, 21):
-			# Create a checkerboard pattern for visibility
-			var tile_x = 0
-			var tile_y = 0
-
-			if (x + y) % 2 == 0:
-				tile_x = 0  # First tile
-				tile_y = 0
-			else:
-				tile_x = 1  # Second tile
-				tile_y = 0
-
-			bottom_layer.set_cell(Vector2i(x, y), 0, Vector2i(tile_x, tile_y))
-
-	# Position character at center
-	if test_character:
-		test_character.position = Vector2(0, 0)
-
-	# Store map dimensions
-	current_map_width = 41
-	current_map_height = 41
-
-	# Create boundaries for test map
-	create_test_map_boundaries()
-
-	if map_info:
-		map_info.text = "Default Test Map\nSize: 41x41 tiles\nCheckerboard pattern with borders"
-
-	print("[MapManager] Default test map created: 41x41 tiles")
+	load_tmx_map(map_name)
 
 ## Load TMX map file from disk
 ## Opens and reads the TMX XML file, passes to parse_and_load_tmx()
+## map_name can be "map_name" or "Subdir/map_name" for maps in subdirectories
 func load_tmx_map(map_name: String):
+	# map_name can include subdirectory (e.g., "World Maps/sample_map")
 	var tmx_path = "res://maps/" + map_name + ".tmx"
 	print("=== LOADING TMX MAP ===")
 	print("Map name: ", map_name)
@@ -241,24 +196,32 @@ func parse_and_load_tmx(tmx_content: String, map_name: String):
 				map_name, map_width, map_height, layers_loaded, tile_width, tile_height
 			]
 
-		# Position character - use pre-battle position if returning from battle
-		# Otherwise, DON'T override position here - let the server's spawn position be used
+		# Position character at center of map (or restore from pre-battle position)
 		var game_state = get_node_or_null("/root/GameState")
+		var spawn_pos = Vector2.ZERO
 
 		if game_state and "pre_battle_position" in game_state and game_state.pre_battle_position != Vector2.ZERO:
 			# Returning from battle - restore previous position
-			var spawn_pos = game_state.pre_battle_position
+			spawn_pos = game_state.pre_battle_position
 			game_state.pre_battle_position = Vector2.ZERO  # Clear it
 			print("  ✓ Restored player position from battle: ", spawn_pos)
-			if test_character:
-				test_character.position = spawn_pos
 		else:
-			# First spawn - server will send the correct position via spawn_accepted
-			# Don't override here, the multiplayer_manager will set position from server data
-			print("  ✓ Waiting for server spawn position")
+			# First spawn - use map center
+			var center_x = (map_width * tile_width) / 2
+			var center_y = (map_height * tile_height) / 2
+			spawn_pos = Vector2(center_x, center_y)
+			print("  ✓ Spawning player at map center: ", spawn_pos)
+
+		if test_character:
+			test_character.position = spawn_pos
 
 		# Create map boundaries
 		create_map_boundaries(map_width, map_height, tile_width, tile_height)
+
+		# NOTE: Middle layer collision DISABLED - use Collision objectgroup in TMX instead
+		# The auto-collision was making ALL middle layer tiles solid (including decorations)
+		# To add collision: In Tiled, add rectangles to the "Collision" object layer
+		# generate_middle_layer_collision(map_width, map_height)
 
 		print("TMX map loaded successfully: ", map_name)
 		print("  Map size: ", map_width, "x", map_height, " tiles")
@@ -333,10 +296,6 @@ func load_tiles_from_csv(csv_data: String, map_width: int, map_height: int, targ
 	print("Placed ", tiles_placed, " actual tiles")
 	print("=== TILE LOADING COMPLETE ===")
 
-	# Auto-generate collision for Middle layer tiles
-	if target_layer == middle_layer:
-		generate_middle_layer_collision(map_width, map_height)
-
 ## ============================================================================
 ## MIDDLE LAYER AUTO-COLLISION
 ## ============================================================================
@@ -390,48 +349,6 @@ func generate_middle_layer_collision(map_width: int, map_height: int):
 ## ============================================================================
 ## MAP BOUNDARY CREATION
 ## ============================================================================
-
-func create_test_map_boundaries():
-	"""Create boundaries for centered test map (coordinates -20 to 20)."""
-	print("[MapManager] Creating test map boundaries...")
-
-	# Clear existing boundaries
-	for boundary in map_boundaries:
-		boundary.queue_free()
-	map_boundaries.clear()
-
-	# Test map uses tile coordinates -20 to 20, scaled 4x with 32x32 tiles
-	var scaled_tile_size = 32 * 4  # 128 pixels per tile
-	var half_map_size = 20.5 * scaled_tile_size  # Just past the edge tile
-	var wall_thickness = 256.0  # Make walls very thick to ensure collision
-
-	# Create 4 boundary walls at the edges (extended for full coverage)
-	var boundaries_data = [
-		{"name": "TopWall", "pos": Vector2(0, -half_map_size - wall_thickness / 2), "size": Vector2(half_map_size * 2 + wall_thickness * 4, wall_thickness)},
-		{"name": "BottomWall", "pos": Vector2(0, half_map_size + wall_thickness / 2), "size": Vector2(half_map_size * 2 + wall_thickness * 4, wall_thickness)},
-		{"name": "LeftWall", "pos": Vector2(-half_map_size - wall_thickness / 2, 0), "size": Vector2(wall_thickness, half_map_size * 2 + wall_thickness * 2)},
-		{"name": "RightWall", "pos": Vector2(half_map_size + wall_thickness / 2, 0), "size": Vector2(wall_thickness, half_map_size * 2 + wall_thickness * 2)}
-	]
-
-	for boundary_data in boundaries_data:
-		var boundary = StaticBody2D.new()
-		boundary.name = boundary_data.name
-		boundary.collision_layer = 1  # Same as middle layer
-		boundary.collision_mask = 0
-		boundary.position = boundary_data.pos
-
-		var collision_shape = CollisionShape2D.new()
-		var rect_shape = RectangleShape2D.new()
-		rect_shape.size = boundary_data.size
-		collision_shape.shape = rect_shape
-
-		boundary.add_child(collision_shape)
-		game_world.add_child(boundary)
-		map_boundaries.append(boundary)
-
-	print("[MapManager] Created ", map_boundaries.size(), " test map boundary walls")
-	print("  Wall thickness: ", wall_thickness, "px")
-	print("  Map edge at: +/-", half_map_size, "px")
 
 func create_map_boundaries(map_width: int, map_height: int, tile_width: int, tile_height: int):
 	"""Create collision boundaries around the map edges."""

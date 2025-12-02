@@ -3,7 +3,7 @@
         "height": 4300,
         "width": 2
     },
-    "activeFile": "C:/Users/dougd/GoldenSunMMO/GoldenSunMMO-Dev/maps/sample_map.tmx",
+    "activeFile": "C:/Users/dougd/GoldenSunMMO/GoldenSunMMO-Dev/maps/World Maps/sample_map.tmx",
     "automapping.whileDrawing": false,
     "expandedProjectPaths": [
         "."
@@ -26,16 +26,33 @@
                 "y": 250.13850415512462
             }
         },
+        "C:/Users/dougd/GoldenSunMMO/GoldenSunMMO-Dev/maps/World Maps/sample_map.tmx": {
+            "scale": 0.31468749999999995,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 1231.3803376365443,
+                "y": 408.34160873882826
+            }
+        },
         "C:/Users/dougd/GoldenSunMMO/GoldenSunMMO-Dev/maps/sample_map.tmx": {
             "scale": 2,
             "selectedLayer": 1,
             "viewCenter": {
-                "x": 331.75,
-                "y": 221.5
+                "x": 284.25,
+                "y": 328.25
             }
+        },
+        "C:/Users/dougd/GoldenSunMMO/GoldenSunMMO-Dev/maps/tiled_projects/collision_tileset.tsx": {
+            "scaleInDock": 1
         },
         "C:/Users/dougd/GoldenSunMMO/GoldenSunMMO-Dev/maps/tiled_projects/odyssey_tileset.tsx": {
             "dynamicWrapping": true,
+            "scaleInDock": 1
+        },
+        "C:/Users/dougd/GoldenSunMMO/GoldenSunMMO-Dev/maps/tiled_projects/odyssey_tileset_part1.tsx": {
+            "scaleInDock": 1
+        },
+        "C:/Users/dougd/GoldenSunMMO/GoldenSunMMO-Dev/maps/tiled_projects/odyssey_tileset_part2.tsx": {
             "scaleInDock": 1
         },
         "collision_tileset.tsx": {
@@ -72,10 +89,11 @@
     "last.externalTilesetPath": "C:/Users/dougd/GoldenSunMMO/GoldenSunMMO-Dev/maps",
     "map.lastUsedFormat": "tmx",
     "openFiles": [
-        "C:/Users/dougd/GoldenSunMMO/GoldenSunMMO-Dev/maps/sample_map.tmx"
+        "C:/Users/dougd/GoldenSunMMO/GoldenSunMMO-Dev/maps/World Maps/sample_map.tmx"
     ],
     "project": "GoldenSunMMO.tiled-project",
     "recentFiles": [
+        "C:/Users/dougd/GoldenSunMMO/GoldenSunMMO-Dev/maps/World Maps/sample_map.tmx",
         "C:/Users/dougd/GoldenSunMMO/GoldenSunMMO-Dev/maps/sample_map.tmx",
         "C:/Users/dougd/GoldenSunMMO/GoldenSunMMO-Dev/maps/Battle Maps/Forest.tmx",
         "C:/Users/dougd/GoldenSunMMO/GoldenSunMMO-Dev/maps/Battle Maps/grassland_battle.tmx",

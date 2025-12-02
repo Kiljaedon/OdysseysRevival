@@ -11,16 +11,24 @@ signal unit_damaged(unit_id: String, damage: int, flank_type: String)
 signal unit_died(unit_id: String)
 
 ## ========== CONSTANTS ==========
-## Arena size - matches the SubViewport (900-8 = 892 width, 700-40 = 660 height)
-const ARENA_WIDTH: int = 892  # Match viewport width
-const ARENA_HEIGHT: int = 660  # Match viewport height
 const ARENA_PADDING: int = 60  # Keep units away from edges
+
+## ========== MAP DATA ==========
+var arena_width: int = 2560   # Default: 20 tiles * 128px scaled (overwritten by battle_data)
+var arena_height: int = 1920  # Default: 15 tiles * 128px scaled (overwritten by battle_data)
+var battle_map_name: String = "sample_map"
 
 ## ========== CHILD NODES ==========
 var arena_renderer: Node2D
 var units_container: Node2D
 var ui_layer: CanvasLayer
 var camera: Camera2D
+
+## Player corner HUD elements
+var player_hp_bar: ProgressBar
+var player_mp_bar: ProgressBar
+var player_ep_bar: ProgressBar
+var player_name_label: Label
 
 ## ========== STATE ==========
 var battle_id: int = -1
@@ -35,7 +43,7 @@ var world_offset: Vector2 = Vector2.ZERO  # Offset to center battle area in aren
 
 func get_arena_pixel_size() -> Vector2:
 	"""Get arena size in pixels"""
-	return Vector2(ARENA_WIDTH, ARENA_HEIGHT)
+	return Vector2(arena_width, arena_height)
 
 func world_to_arena_pos(world_pos: Vector2) -> Vector2:
 	"""Convert world position to arena position"""
@@ -69,19 +77,24 @@ func _create_scene_structure():
 	camera.position_smoothing_enabled = true
 	camera.position_smoothing_speed = 8.0
 	# Center camera on arena (no scrolling needed for fullscreen)
-	camera.position = Vector2(ARENA_WIDTH / 2.0, ARENA_HEIGHT / 2.0)
+	camera.position = Vector2(arena_width / 2.0, arena_height / 2.0)
 	add_child(camera)
 
-	# UI layer for health bars, damage numbers
+	# UI layer for battle effects (if needed later)
 	ui_layer = CanvasLayer.new()
 	ui_layer.name = "BattleUI"
 	ui_layer.layer = 10
 	add_child(ui_layer)
 
+	# Bottom-left corner HUD removed - using overhead bars only
+
 func _process(_delta: float):
 	if not battle_active:
 		return
-	# Camera stays centered on arena (fullscreen view)
+	# Camera follows the player unit
+	var player = get_player_unit()
+	if player:
+		camera.global_position = player.position
 
 ## ========== BATTLE LIFECYCLE ==========
 
@@ -89,52 +102,36 @@ func start_battle(battle_data: Dictionary) -> void:
 	"""Initialize battle from server data"""
 	battle_id = battle_data.get("id", -1)
 	player_unit_id = battle_data.get("player_unit_id", "")
+	battle_map_name = battle_data.get("battle_map_name", "sample_map")
 
-	# Calculate coordinate mapping from world to arena
-	# Battle center is where the player was when battle started
-	var battle_center = battle_data.get("battle_center", Vector2(1280, 960))
-	var spawn_distance = 12 * 128  # 12 tiles * 128px per tile = 1536px
+	# Get arena size from server (full map size)
+	var arena_pixels = battle_data.get("arena_pixels", Vector2(2560, 1920))
+	arena_width = int(arena_pixels.x)
+	arena_height = int(arena_pixels.y)
 
-	# The battle area in world coords spans from (center - spawn_distance) to (center + some margin)
-	# We want to map this to fit in the arena (892x660)
-	# Player at bottom of arena, enemies at top
-	var world_battle_height = spawn_distance + 256  # Extra space above and below
-	var world_battle_width = 800  # Width of battle area
+	# Direct coordinate mapping (1:1, server sends positions in battle map coords)
+	world_to_arena_scale = 1.0
+	world_offset = Vector2.ZERO
 
-	# Calculate scale to fit world battle area into arena
-	world_to_arena_scale = min(
-		(ARENA_WIDTH - ARENA_PADDING * 2) / world_battle_width,
-		(ARENA_HEIGHT - ARENA_PADDING * 2) / world_battle_height
-	)
+	print("[RT_BATTLE_SCENE] Battle map: %s (%dx%d)" % [battle_map_name, arena_width, arena_height])
 
-	# Offset so battle center maps to arena center
-	# Player is at battle_center, enemies are at battle_center.y - spawn_distance
-	# We want player at bottom of arena (75% down), enemies at top (25% down)
-	var arena_center_y = ARENA_HEIGHT * 0.5
-	world_offset = Vector2(
-		battle_center.x - (ARENA_WIDTH / 2.0) / world_to_arena_scale,
-		battle_center.y - spawn_distance / 2.0 - (ARENA_HEIGHT / 2.0) / world_to_arena_scale
-	)
-
-	print("[RT_BATTLE_SCENE] Coordinate mapping: scale=%.3f, offset=%s" % [world_to_arena_scale, world_offset])
-
-	# Render arena using current map as background
+	# Render arena using battle map
 	_render_arena_from_map(battle_data)
 
-	# Spawn units (positions will be converted from world to arena coords)
+	# Spawn units (positions are already in arena coords from server)
 	_spawn_units(battle_data.get("units", {}))
 
-	# Center camera on arena
-	camera.global_position = Vector2(ARENA_WIDTH / 2.0, ARENA_HEIGHT / 2.0)
-	camera.position_smoothing_enabled = false
-	camera.reset_smoothing()
-
-	# Activate camera
+	# Camera follows player (set to player position)
+	var player_pos = battle_data.get("player_position", Vector2(arena_width / 2, arena_height - 256))
+	camera.global_position = player_pos
+	camera.position_smoothing_enabled = true
+	camera.position_smoothing_speed = 8.0
 	camera.make_current()
 
 	battle_active = true
 	battle_started.emit(battle_data)
-	print("[RT_BATTLE_SCENE] Battle %d started (arena: %dx%d, using current map)" % [battle_id, ARENA_WIDTH, ARENA_HEIGHT])
+
+	print("[RT_BATTLE_SCENE] Battle %d started on %s" % [battle_id, battle_map_name])
 
 func end_battle(result: String, rewards: Dictionary) -> void:
 	"""Clean up battle"""
@@ -156,19 +153,68 @@ func end_battle(result: String, rewards: Dictionary) -> void:
 
 ## ========== ARENA RENDERING ==========
 
-func _render_arena_from_map(battle_data: Dictionary) -> void:
-	"""Render battle arena using the current map as background"""
-	print("[RT_BATTLE_SCENE] Rendering arena from current map")
-
-	# Try to capture the current map viewport
+func _render_arena_from_map(_battle_data: Dictionary) -> void:
+	"""Render battle arena by cloning the current map's TileMapLayers"""
+	# Primary method: Clone the actual map the player is standing on
 	var captured = _capture_map_viewport()
+	if captured:
+		print("[RT_BATTLE_SCENE] Cloned current map for battle arena")
+		return
 
-	if not captured:
-		# Fallback: render simple grass background
-		print("[RT_BATTLE_SCENE] Could not capture map, using fallback grass arena")
-		_render_fallback_arena()
+	# Fallback: simple grass arena
+	print("[RT_BATTLE_SCENE] WARNING: Using fallback grass arena (could not clone map)")
+	_render_fallback_arena()
 
-	_add_arena_border()
+func _load_battle_map_tmx(map_path: String) -> bool:
+	"""Load battle map from TMX file using TMXLoader"""
+	var tileset = load("res://addons/gs_mmo_tools/resources/main_tileset.tres") as TileSet
+	if not tileset:
+		print("[RT_BATTLE_SCENE] Could not load tileset")
+		return false
+
+	# Parse TMX and create layers
+	var tmx_data = TMXLoader.parse_tmx_file(map_path)
+	if tmx_data.is_empty():
+		print("[RT_BATTLE_SCENE] Failed to parse TMX: %s" % map_path)
+		return false
+
+	# Create TileMapLayers for each layer in the TMX
+	var tile_scale = 4  # 32px tiles scaled 4x = 128px
+	for i in range(tmx_data.layers.size()):
+		var layer_data = tmx_data.layers[i]
+		var tile_layer = TileMapLayer.new()
+		tile_layer.name = "Battle_" + layer_data.name
+		tile_layer.tile_set = tileset
+		tile_layer.scale = Vector2(tile_scale, tile_scale)
+		tile_layer.z_index = i - 5  # Bottom at -5, Middle at -4, Top at -3
+
+		# Place tiles from CSV data
+		# Uses dual tileset sources like map_manager:
+		# - tiles_part1: firstgid=1, tiles 1-3584 (source_id=0)
+		# - tiles_part2: firstgid=3585, tiles 3585+ (source_id=1)
+		var data_index = 0
+		for y in range(tmx_data.height):
+			for x in range(tmx_data.width):
+				if data_index < layer_data.data.size():
+					var tile_id = layer_data.data[data_index]
+					if tile_id > 0:
+						var source_id = 0
+						var adjusted_tile_id = tile_id - 1  # Convert to 0-based
+
+						if tile_id >= 3585:
+							# tiles_part2 (trees and other higher tiles)
+							source_id = 1
+							adjusted_tile_id = tile_id - 3585
+
+						# Convert to atlas coords (7 columns per row in tileset)
+						var atlas_x = adjusted_tile_id % 7
+						var atlas_y = adjusted_tile_id / 7
+						tile_layer.set_cell(Vector2i(x, y), source_id, Vector2i(atlas_x, atlas_y))
+				data_index += 1
+
+		arena_renderer.add_child(tile_layer)
+
+	return true
 
 func _capture_map_viewport() -> bool:
 	"""Capture the current game viewport as the arena background"""
@@ -177,29 +223,63 @@ func _capture_map_viewport() -> bool:
 		print("[RT_BATTLE_SCENE] No parent_node found")
 		return false
 
-	# Find the GameWorld node which contains the map layers
-	var game_world = parent_node.get_node_or_null("GameWorld")
-	if not game_world:
-		print("[RT_BATTLE_SCENE] No GameWorld found")
-		return false
+	# Try multiple approaches to find the tile map layers
+	var bottom_layer: TileMapLayer = null
+	var middle_layer: TileMapLayer = null
+	var top_layer: TileMapLayer = null
 
-	# Get the tile map layers
-	var bottom_layer = game_world.get_node_or_null("BottomLayer")
-	var middle_layer = game_world.get_node_or_null("MiddleLayer")
-	var top_layer = game_world.get_node_or_null("TopLayer")
+	# Approach 1: Look for GameWorld child (old structure)
+	var game_world = parent_node.get_node_or_null("GameWorld")
+	if game_world:
+		bottom_layer = game_world.get_node_or_null("BottomLayer")
+		middle_layer = game_world.get_node_or_null("MiddleLayer")
+		top_layer = game_world.get_node_or_null("TopLayer")
+		print("[RT_BATTLE_SCENE] Found layers via GameWorld child")
+
+	# Approach 2: Direct children of parent (current structure)
+	if not bottom_layer:
+		bottom_layer = parent_node.get_node_or_null("BottomLayer")
+		middle_layer = parent_node.get_node_or_null("MiddleLayer")
+		top_layer = parent_node.get_node_or_null("TopLayer")
+		if bottom_layer:
+			print("[RT_BATTLE_SCENE] Found layers as direct children of parent")
+
+	# Approach 3: Search entire tree for TileMapLayers
+	if not bottom_layer:
+		print("[RT_BATTLE_SCENE] Searching tree for TileMapLayers...")
+		for child in parent_node.get_children():
+			if child is TileMapLayer:
+				var child_name = child.name.to_lower()
+				if "bottom" in child_name:
+					bottom_layer = child
+				elif "middle" in child_name:
+					middle_layer = child
+				elif "top" in child_name:
+					top_layer = child
+			# Also check grandchildren
+			for grandchild in child.get_children():
+				if grandchild is TileMapLayer:
+					var gc_name = grandchild.name.to_lower()
+					if "bottom" in gc_name:
+						bottom_layer = grandchild
+					elif "middle" in gc_name:
+						middle_layer = grandchild
+					elif "top" in gc_name:
+						top_layer = grandchild
 
 	if not bottom_layer:
-		print("[RT_BATTLE_SCENE] No BottomLayer found")
+		print("[RT_BATTLE_SCENE] No BottomLayer found in any location")
 		return false
 
 	# Clone the map layers into the arena
+	print("[RT_BATTLE_SCENE] Cloning layers to arena...")
 	_clone_map_layer(bottom_layer, -10)
 	if middle_layer:
 		_clone_map_layer(middle_layer, -5)
 	if top_layer:
 		_clone_map_layer(top_layer, 0)
 
-	print("[RT_BATTLE_SCENE] Map layers cloned to arena")
+	print("[RT_BATTLE_SCENE] Map layers cloned to arena successfully")
 	return true
 
 func _clone_map_layer(source_layer: TileMapLayer, z_index_value: int) -> void:
@@ -215,7 +295,7 @@ func _clone_map_layer(source_layer: TileMapLayer, z_index_value: int) -> void:
 	# Original map: 20x15 tiles * 32px * 4 scale = 2560x1920 pixels
 	# Arena: 892x660 pixels
 	# Scale factor: arena / original = ~0.35
-	var scale_factor = min(ARENA_WIDTH / 2560.0, ARENA_HEIGHT / 1920.0) * 1.2  # Slight upscale for better coverage
+	var scale_factor = min(arena_width / 2560.0, arena_height / 1920.0) * 1.2  # Slight upscale for better coverage
 	cloned_layer.scale = Vector2(scale_factor * 4, scale_factor * 4)  # Include original 4x scale
 
 	# Copy all cells from source
@@ -228,8 +308,8 @@ func _clone_map_layer(source_layer: TileMapLayer, z_index_value: int) -> void:
 
 	# Center the map in the arena
 	cloned_layer.position = Vector2(
-		(ARENA_WIDTH - 2560 * scale_factor) / 2.0,
-		(ARENA_HEIGHT - 1920 * scale_factor) / 2.0
+		(arena_width - 2560 * scale_factor) / 2.0,
+		(arena_height - 1920 * scale_factor) / 2.0
 	)
 
 	arena_renderer.add_child(cloned_layer)
@@ -242,9 +322,9 @@ func _render_fallback_arena() -> void:
 	bg.color = Color(0.28, 0.48, 0.25)  # Grass green
 	bg.polygon = PackedVector2Array([
 		Vector2(0, 0),
-		Vector2(ARENA_WIDTH, 0),
-		Vector2(ARENA_WIDTH, ARENA_HEIGHT),
-		Vector2(0, ARENA_HEIGHT)
+		Vector2(arena_width, 0),
+		Vector2(arena_width, arena_height),
+		Vector2(0, arena_height)
 	])
 	bg.z_index = -10
 	arena_renderer.add_child(bg)
@@ -255,8 +335,8 @@ func _render_fallback_arena() -> void:
 	for i in range(20):
 		var patch = Polygon2D.new()
 		patch.name = "GrassPatch%d" % i
-		var px = rng.randf_range(50, ARENA_WIDTH - 50)
-		var py = rng.randf_range(50, ARENA_HEIGHT - 50)
+		var px = rng.randf_range(50, arena_width - 50)
+		var py = rng.randf_range(50, arena_height - 50)
 		var size = rng.randf_range(40, 100)
 		patch.color = Color(0.32, 0.52, 0.28, 0.4)  # Lighter grass
 		patch.polygon = PackedVector2Array([
@@ -277,9 +357,9 @@ func _add_arena_border() -> void:
 	border.width = 12.0
 	border.points = PackedVector2Array([
 		Vector2(0, 0),
-		Vector2(ARENA_WIDTH, 0),
-		Vector2(ARENA_WIDTH, ARENA_HEIGHT),
-		Vector2(0, ARENA_HEIGHT),
+		Vector2(arena_width, 0),
+		Vector2(arena_width, arena_height),
+		Vector2(0, arena_height),
 		Vector2(0, 0)
 	])
 	border.z_index = 5
@@ -293,9 +373,9 @@ func _add_arena_border() -> void:
 	var margin = 16.0
 	inner_border.points = PackedVector2Array([
 		Vector2(margin, margin),
-		Vector2(ARENA_WIDTH - margin, margin),
-		Vector2(ARENA_WIDTH - margin, ARENA_HEIGHT - margin),
-		Vector2(margin, ARENA_HEIGHT - margin),
+		Vector2(arena_width - margin, margin),
+		Vector2(arena_width - margin, arena_height - margin),
+		Vector2(margin, arena_height - margin),
 		Vector2(margin, margin)
 	])
 	inner_border.z_index = 5
@@ -303,9 +383,9 @@ func _add_arena_border() -> void:
 
 	# Add corner decorations
 	_add_corner_decoration(Vector2(32, 32))
-	_add_corner_decoration(Vector2(ARENA_WIDTH - 32, 32))
-	_add_corner_decoration(Vector2(32, ARENA_HEIGHT - 32))
-	_add_corner_decoration(Vector2(ARENA_WIDTH - 32, ARENA_HEIGHT - 32))
+	_add_corner_decoration(Vector2(arena_width - 32, 32))
+	_add_corner_decoration(Vector2(32, arena_height - 32))
+	_add_corner_decoration(Vector2(arena_width - 32, arena_height - 32))
 
 func _add_corner_decoration(pos: Vector2) -> void:
 	"""Add a corner decoration element"""
@@ -367,6 +447,16 @@ func on_state_update(units_state: Array) -> void:
 				state["position"] = world_to_arena_pos(world_pos)
 			units[unit_id].apply_server_state(state)
 
+			# Update player corner HUD if this is the player unit
+			if unit_id == player_unit_id:
+				var unit = units[unit_id]
+				update_player_hud(
+					unit.hp, unit.max_hp,
+					unit.mp, unit.max_mp,
+					unit.energy, unit.max_energy,
+					unit.unit_name
+				)
+
 func on_damage_event(attacker_id: String, target_id: String, damage: int, flank_type: String) -> void:
 	"""Handle damage event from server"""
 	# Play attack animation on attacker
@@ -384,7 +474,111 @@ func on_unit_death(unit_id: String) -> void:
 		units[unit_id].play_death()
 	unit_died.emit(unit_id)
 
-func on_defend_event(unit_id: String) -> void:
-	"""Handle defend activation from server"""
+func on_dodge_roll_event(unit_id: String, direction: Vector2) -> void:
+	"""Handle dodge roll from server"""
 	if unit_id in units:
-		units[unit_id].show_defend()
+		units[unit_id].play_dodge_roll(direction)
+
+
+## ========== PLAYER CORNER HUD ==========
+
+func _create_player_corner_hud() -> void:
+	"""Create compact player stats HUD in bottom-left corner"""
+	var hud_container = Control.new()
+	hud_container.name = "PlayerHUD"
+	hud_container.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	hud_container.position = Vector2(8, -60)  # 8px from left, 60px from bottom
+	hud_container.size = Vector2(120, 52)
+	hud_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui_layer.add_child(hud_container)
+
+	# Semi-transparent background panel
+	var bg = Panel.new()
+	bg.name = "HUDBg"
+	bg.size = Vector2(120, 52)
+	bg.position = Vector2.ZERO
+	var bg_style = StyleBoxFlat.new()
+	bg_style.bg_color = Color(0.05, 0.05, 0.1, 0.7)
+	bg_style.set_corner_radius_all(4)
+	bg_style.set_border_width_all(1)
+	bg_style.border_color = Color(0.3, 0.3, 0.4, 0.8)
+	bg.add_theme_stylebox_override("panel", bg_style)
+	hud_container.add_child(bg)
+
+	# Player name label
+	player_name_label = Label.new()
+	player_name_label.text = "Player"
+	player_name_label.position = Vector2(6, 2)
+	player_name_label.size = Vector2(108, 12)
+	player_name_label.add_theme_font_size_override("font_size", 10)
+	player_name_label.add_theme_color_override("font_color", Color(0.9, 0.85, 0.7))
+	hud_container.add_child(player_name_label)
+
+	# Stat bars - compact horizontal layout
+	var bar_width = 100
+	var bar_height = 10
+	var bar_x = 6
+	var bar_y = 16
+
+	# HP bar (red)
+	player_hp_bar = _create_hud_bar(hud_container, "HP", bar_x, bar_y, bar_width, bar_height,
+		Color(0.85, 0.2, 0.2), Color(0.3, 0.1, 0.1, 0.8))
+	bar_y += bar_height + 2
+
+	# MP bar (blue)
+	player_mp_bar = _create_hud_bar(hud_container, "MP", bar_x, bar_y, bar_width, bar_height,
+		Color(0.2, 0.4, 0.9), Color(0.1, 0.1, 0.3, 0.8))
+	bar_y += bar_height + 2
+
+	# EP bar (green/yellow)
+	player_ep_bar = _create_hud_bar(hud_container, "EP", bar_x, bar_y, bar_width, bar_height,
+		Color(0.3, 0.8, 0.3), Color(0.1, 0.25, 0.1, 0.8))
+
+func _create_hud_bar(parent: Control, label_text: String, x: float, y: float,
+		width: float, height: float, fill_color: Color, bg_color: Color) -> ProgressBar:
+	"""Create a labeled progress bar for the HUD"""
+	var bar = ProgressBar.new()
+	bar.position = Vector2(x, y)
+	bar.size = Vector2(width, height)
+	bar.max_value = 100
+	bar.value = 100
+	bar.show_percentage = false
+
+	# Style the bar
+	var bg_style = StyleBoxFlat.new()
+	bg_style.bg_color = bg_color
+	bg_style.set_corner_radius_all(2)
+
+	var fill_style = StyleBoxFlat.new()
+	fill_style.bg_color = fill_color
+	fill_style.set_corner_radius_all(2)
+
+	bar.add_theme_stylebox_override("background", bg_style)
+	bar.add_theme_stylebox_override("fill", fill_style)
+	parent.add_child(bar)
+
+	# Label inside bar
+	var label = Label.new()
+	label.text = label_text
+	label.position = Vector2(4, 0)
+	label.size = Vector2(width - 8, height)
+	label.add_theme_font_size_override("font_size", 8)
+	label.add_theme_color_override("font_color", Color.WHITE)
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	bar.add_child(label)
+
+	return bar
+
+func update_player_hud(hp: int, max_hp: int, mp: int, max_mp: int, ep: int, max_ep: int, name: String = "") -> void:
+	"""Update player corner HUD with current stats"""
+	if player_hp_bar:
+		player_hp_bar.max_value = max_hp
+		player_hp_bar.value = hp
+	if player_mp_bar:
+		player_mp_bar.max_value = max_mp
+		player_mp_bar.value = mp
+	if player_ep_bar:
+		player_ep_bar.max_value = max_ep
+		player_ep_bar.value = ep
+	if player_name_label and not name.is_empty():
+		player_name_label.text = name

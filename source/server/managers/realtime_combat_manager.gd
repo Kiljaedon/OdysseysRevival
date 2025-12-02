@@ -27,8 +27,8 @@ const TILE_SIZE_SCALED: int = 128  # 32 * 4 scale
 const BATTLE_SPAWN_DISTANCE: int = BATTLE_TILE_SPACING * TILE_SIZE_SCALED  # Pixels between player/enemy
 
 ## Map boundaries (updated per battle from server map data)
-var map_width: int = 2560   # Default sample_map: 20 * 128
-var map_height: int = 1920  # Default sample_map: 15 * 128
+var map_width: int = 2560   # Default sample_map: 20 tiles * 128px (scaled)
+var map_height: int = 1920  # Default sample_map: 15 tiles * 128px (scaled)
 
 ## Grace period before NPCs can attack (seconds)
 const BATTLE_GRACE_PERIOD: float = 2.0
@@ -37,7 +37,7 @@ const BATTLE_GRACE_PERIOD: float = 2.0
 const UNIT_COLLISION_RADIUS: float = 40.0  # Collision radius for each unit
 const MAP_EDGE_PADDING: float = 128.0  # Keep units away from map edges (1 tile)
 
-## Default grass tile from test map
+## Default grass tile (tile ID 568 = basic grass terrain from world maps)
 const DEFAULT_GRASS_TILE: int = 568
 
 ## Flanking multipliers
@@ -45,10 +45,7 @@ const FLANK_FRONT: float = 1.0
 const FLANK_SIDE: float = 1.15
 const FLANK_BACK: float = 1.30
 
-## Defend mode
-const DEFEND_DAMAGE_REDUCTION: float = 0.1  # Takes 10% damage (90% reduction)
-const DEFEND_DURATION: float = 5.0
-const DEFEND_COOLDOWN: float = 20.0
+## Dodge roll constants are in CombatRules
 
 ## ========== DEPENDENCIES ==========
 var server_world = null
@@ -61,10 +58,19 @@ var active_battles: Dictionary = {}  # battle_id -> battle data
 var next_battle_id: int = 1
 var state_update_timer: float = 0.0
 
+## AI callback references (passed to RealtimeCombatAI)
+var _ai_callbacks: Dictionary = {}
+
 ## ========== LIFECYCLE ==========
 
 func _ready():
 	print("[RT_COMBAT] RealtimeCombatManager ready")
+	# Setup AI callbacks
+	_ai_callbacks = {
+		"update_facing_from_velocity": _update_facing_from_velocity,
+		"face_target": _face_target,
+		"execute_attack": _execute_attack
+	}
 
 func initialize(p_server_world, p_player_manager, p_npc_manager) -> void:
 	server_world = p_server_world
@@ -92,7 +98,7 @@ func _physics_process(delta: float) -> void:
 
 ## ========== BATTLE INSTANCE MANAGEMENT ==========
 
-func create_battle(peer_id: int, npc_id: int, player_data: Dictionary, squad_data: Array, enemy_data: Array) -> int:
+func create_battle(peer_id: int, npc_id: int, player_data: Dictionary, squad_data: Array, enemy_data: Array, battle_map_name: String = "sample_map") -> int:
 	"""Create a new battle instance. Returns battle_id."""
 	var battle_id = next_battle_id
 	next_battle_id += 1
@@ -116,6 +122,7 @@ func create_battle(peer_id: int, npc_id: int, player_data: Dictionary, squad_dat
 		"arena_pixels": battle_area,  # Full map bounds
 		"map_width": map_width,
 		"map_height": map_height,
+		"battle_map_name": battle_map_name,  # Map to load for this battle
 		"units": {},
 		"player_unit_id": "",
 		"captain_id": "",
@@ -273,24 +280,31 @@ func _spawn_enemy_units(battle: Dictionary, enemy_data: Array, player_world_pos:
 func _create_unit_data(unit_id: String, source_data: Dictionary, team: String) -> Dictionary:
 	"""Create standardized unit data structure"""
 	var base_stats = source_data.get("base_stats", {})
-	var hp = base_stats.get("hp", source_data.get("hp", 100))
-	var max_hp = base_stats.get("max_hp", source_data.get("max_hp", hp))
-	var mp = base_stats.get("mp", source_data.get("mp", 50))
-	var max_mp = base_stats.get("max_mp", source_data.get("max_mp", mp))
-	var energy = base_stats.get("energy", source_data.get("energy", 100))
-	var max_energy = base_stats.get("max_energy", source_data.get("max_energy", energy))
+	var derived_stats = source_data.get("derived_stats", {})
+
+	# HP: derived_stats.max_hp > base_stats.hp > source.hp > 100
+	var max_hp = derived_stats.get("max_hp", base_stats.get("max_hp", source_data.get("max_hp", source_data.get("hp", 100))))
+	var hp = source_data.get("hp", max_hp)
+
+	# MP: derived_stats.max_mp > base_stats.mp > source.mp > 50
+	var max_mp = derived_stats.get("max_mp", base_stats.get("max_mp", source_data.get("max_mp", source_data.get("mp", 50))))
+	var mp = source_data.get("mp", max_mp)
+
+	# Energy/Stamina: derived_stats.max_ep > energy > 100
+	var max_energy = derived_stats.get("max_ep", source_data.get("max_energy", source_data.get("energy", 100)))
+	var energy = source_data.get("energy", max_energy)
+
 	var dex = base_stats.get("dex", 10)
 
-	# Fixed base move speed (no DEX modification for now)
-	var base_move_speed = 300.0  # Base walk speed for all units
+	# Use CombatRules for movement speed (players faster than enemies)
 	var base_attack_speed = source_data.get("base_as", 1.0)  # Attacks per second
 
-	# Use fixed speeds for now (DEX will be added later)
-	var move_speed = base_move_speed
+	# Speed will be set based on team after unit is created
+	var move_speed = CombatRules.BASE_PLAYER_SPEED  # Default, will be adjusted
 	# Minimum 1 second cooldown between attacks
 	var attack_cooldown = max(1.0, 1.0 / base_attack_speed)
 
-	return {
+	var unit = {
 		"id": unit_id,
 		"name": source_data.get("character_name", source_data.get("name", "Unit")),
 		"team": team,
@@ -314,9 +328,6 @@ func _create_unit_data(unit_id: String, source_data: Dictionary, team: String) -
 		"target_id": "",
 		"is_player_controlled": false,
 		"is_captain": false,
-		"is_defending": false,
-		"defend_timer": 0.0,
-		"defend_cooldown_timer": 0.0,
 		"archetype": "AGGRESSIVE",
 		"peer_id": -1,
 		"base_stats": base_stats,
@@ -324,6 +335,14 @@ func _create_unit_data(unit_id: String, source_data: Dictionary, team: String) -
 		"damage_type": source_data.get("damage_type", "physical"),
 		"source_data": source_data
 	}
+
+	# Initialize combat rules fields (attack state system)
+	CombatRules.init_combat_fields(unit)
+
+	# Set movement speed based on team (players faster than enemies)
+	unit.move_speed = CombatRules.get_unit_speed(unit)
+
+	return unit
 
 func _get_attack_range(combat_role: String) -> float:
 	match combat_role:
@@ -350,32 +369,60 @@ func _process_battle(battle: Dictionary, delta: float) -> void:
 
 		# Update timers
 		unit.cooldown_timer = max(0, unit.cooldown_timer - delta)
-		unit.defend_timer = max(0, unit.defend_timer - delta)
-		unit.defend_cooldown_timer = max(0, unit.defend_cooldown_timer - delta)
 
-		# Check if defend expired
-		if unit.is_defending and unit.defend_timer <= 0:
-			unit.is_defending = false
+		# Process invincibility timer
+		CombatRules.process_invincibility(unit, delta)
+
+		# Process resource regeneration (energy + mana)
+		CombatRules.process_resource_regen(unit, delta)
+
+		# Process dodge roll cooldown
+		CombatRules.process_dodge_cooldown(unit, delta)
+
+		# Process dodge roll movement (overrides normal movement)
+		var roll_velocity = CombatRules.process_dodge_roll(unit, delta)
+		if roll_velocity.length() > 0:
+			unit.position += roll_velocity * delta
+			_clamp_unit_to_arena(unit, battle.arena_pixels)
+
+		# Process knockback movement
+		if CombatRules.process_knockback(unit, delta):
+			# Apply knockback velocity (overrides normal movement)
+			var kb_vel = unit.get("knockback_velocity", Vector2.ZERO)
+			unit.position += kb_vel * delta
+			_clamp_unit_to_arena(unit, battle.arena_pixels)
+
+		# Process attack state machine (wind-up -> attack -> recovery)
+		var attack_event = CombatRules.process_attack_state(unit, delta)
+		if attack_event == "execute_attack":
+			# Wind-up complete - execute the actual attack
+			var target = battle.units.get(unit.get("attack_target_id", ""))
+			if target and target.state != "dead":
+				_execute_attack(battle, unit, target)
+			else:
+				# Target died or invalid, cancel attack
+				CombatRules.cancel_attack(unit)
 
 		# Process AI for non-player units (only after grace period)
 		if not unit.is_player_controlled:
 			if battle.grace_timer <= 0:
-				_process_unit_ai(battle, unit, delta)
+				RealtimeCombatAI.process_unit_ai(battle, unit, delta, _ai_callbacks)
 			else:
 				# During grace period, NPCs stand still
 				unit.velocity = Vector2.ZERO
 				unit.state = "idle"
 
 		# Apply movement (normalize velocity to prevent speed exploits)
-		if unit.velocity.length() > 0 and not unit.is_defending:
+		# Use CombatRules.can_move() to block movement during attack sequence
+		if unit.velocity.length() > 0 and CombatRules.can_move(unit):
 			var normalized_velocity = unit.velocity.normalized() * min(unit.velocity.length(), unit.move_speed)
 			var new_position = unit.position + normalized_velocity * delta
 
-			# Check collision with other units before applying movement
-			var collision = _check_unit_collision(battle, unit, new_position)
-			if collision.collided:
-				# Slide along collision - try to move perpendicular
-				new_position = _resolve_collision(unit.position, new_position, collision)
+			# Unit collision DISABLED - will be used as spell/ability later
+			# For now, all units can pass through each other freely
+			# var collision = _check_unit_collision(battle, unit, new_position)
+			# if collision.collided:
+			# 	new_position = _resolve_collision(unit.position, new_position, collision)
 
 			unit.position = new_position
 			_clamp_unit_to_arena(unit, battle.arena_pixels)
@@ -422,251 +469,20 @@ func _clamp_unit_to_arena(unit: Dictionary, arena_pixels: Vector2) -> void:
 	unit.position.x = clamp(unit.position.x, MAP_EDGE_PADDING, arena_pixels.x - MAP_EDGE_PADDING)
 	unit.position.y = clamp(unit.position.y, MAP_EDGE_PADDING, arena_pixels.y - MAP_EDGE_PADDING)
 
-## ========== AI PROCESSING ==========
-
-func _process_unit_ai(battle: Dictionary, unit: Dictionary, delta: float) -> void:
-	"""Simple AI state machine"""
-	match unit.state:
-		"idle":
-			_ai_find_target(battle, unit)
-		"moving":
-			_ai_chase_target(battle, unit)
-		"attacking":
-			_ai_attack(battle, unit)
-
-func _ai_find_target(battle: Dictionary, unit: Dictionary) -> void:
-	"""Find a target based on archetype"""
-	var enemies = _get_enemy_units(battle, unit.team)
-	if enemies.is_empty():
-		return
-
-	var target = _select_target_by_archetype(unit, enemies)
-	if target:
-		unit.target_id = target.id
-		unit.state = "moving"
-
-func _ai_chase_target(battle: Dictionary, unit: Dictionary) -> void:
-	"""Move toward target, positioning for cardinal direction attack"""
-	if unit.target_id.is_empty():
-		unit.state = "idle"
-		return
-
-	var target = battle.units.get(unit.target_id)
-	if not target or target.state == "dead":
-		unit.target_id = ""
-		unit.state = "idle"
-		return
-
-	var to_target = target.position - unit.position
-	var distance = to_target.length()
-
-	# Check if we're in a valid attack position (cardinal direction aligned)
-	var attack_position = _get_cardinal_attack_position(unit, target)
-
-	if attack_position.aligned and distance <= unit.attack_range:
-		# Properly aligned and in range - attack!
-		unit.velocity = Vector2.ZERO
-		unit.state = "attacking"
-		return
-
-	# Need to reposition for attack
-	# Move toward the best cardinal attack position
-	var target_pos = _calculate_attack_approach_position(unit, target, battle)
-	var move_dir = (target_pos - unit.position).normalized()
-
-	# Apply archetype behavior for approach style
-	match unit.archetype:
-		"AGGRESSIVE":
-			# Move directly to attack position
-			unit.velocity = move_dir * unit.move_speed
-		"DEFENSIVE":
-			# Slower approach, more cautious
-			if distance < unit.attack_range * 2:
-				unit.velocity = move_dir * unit.move_speed * 0.7
-			else:
-				unit.velocity = move_dir * unit.move_speed
-		"TACTICAL":
-			# Try to approach from behind
-			unit.velocity = move_dir * unit.move_speed
-		_:
-			unit.velocity = move_dir * unit.move_speed
-
-	# Avoid bunching with allies
-	unit.velocity = _apply_separation(battle, unit, unit.velocity)
-
-	_update_facing_from_velocity(unit)
-
-func _get_cardinal_attack_position(attacker: Dictionary, target: Dictionary) -> Dictionary:
-	"""Check if attacker is aligned on a cardinal direction from target (chess-board style)
-	Must be DIRECTLY above/below/left/right - no diagonal attacks allowed"""
-	var to_target = target.position - attacker.position
-	var abs_x = abs(to_target.x)
-	var abs_y = abs(to_target.y)
-
-	# Strict alignment tolerance - must be nearly perfectly on cardinal axis
-	var alignment_tolerance = 50.0  # How far off-axis is allowed
-
-	var aligned = false
-	var cardinal_dir = ""
-
-	# Must be clearly on ONE axis, not diagonal
-	# If both X and Y distances are significant, it's diagonal = not allowed
-	if abs_x < alignment_tolerance and abs_y > alignment_tolerance:
-		# Vertically aligned (directly above or below)
-		aligned = true
-		cardinal_dir = "up" if to_target.y < 0 else "down"
-	elif abs_y < alignment_tolerance and abs_x > alignment_tolerance:
-		# Horizontally aligned (directly left or right)
-		aligned = true
-		cardinal_dir = "left" if to_target.x < 0 else "right"
-	# If both are small or both are large, not aligned for attack
-
-	return {"aligned": aligned, "direction": cardinal_dir}
-
-func _calculate_attack_approach_position(unit: Dictionary, target: Dictionary, battle: Dictionary) -> Vector2:
-	"""Calculate the best position to move to for attacking"""
-	var attack_range = unit.attack_range
-	var target_pos = target.position
-
-	# Calculate 4 cardinal attack positions around target
-	var positions = [
-		target_pos + Vector2(0, -attack_range * 0.8),   # Above
-		target_pos + Vector2(0, attack_range * 0.8),    # Below
-		target_pos + Vector2(-attack_range * 0.8, 0),   # Left
-		target_pos + Vector2(attack_range * 0.8, 0)     # Right
-	]
-
-	# Find the closest unoccupied position
-	var best_pos = positions[0]
-	var best_score = 999999.0
-
-	for pos in positions:
-		var dist_to_pos = unit.position.distance_to(pos)
-		var score = dist_to_pos
-
-		# Penalize positions occupied by other units
-		for other in battle.units.values():
-			if other.id != unit.id and other.state != "dead":
-				var other_dist = other.position.distance_to(pos)
-				if other_dist < 60:
-					score += 500  # Heavy penalty for occupied positions
-
-		# Penalize positions outside arena
-		if pos.x < 50 or pos.x > battle.arena_pixels.x - 50:
-			score += 300
-		if pos.y < 50 or pos.y > battle.arena_pixels.y - 50:
-			score += 300
-
-		if score < best_score:
-			best_score = score
-			best_pos = pos
-
-	return best_pos
-
-func _apply_separation(battle: Dictionary, unit: Dictionary, velocity: Vector2) -> Vector2:
-	"""Apply separation force to avoid bunching with ALL units (allies and enemies)"""
-	var separation_force = Vector2.ZERO
-	var separation_radius = UNIT_COLLISION_RADIUS * 2.5  # Keep some distance from all units
-
-	for other in battle.units.values():
-		if other.id == unit.id or other.state == "dead":
-			continue
-
-		var to_other = other.position - unit.position
-		var dist = to_other.length()
-
-		if dist < separation_radius and dist > 0:
-			# Push away from other unit (stronger push for closer units)
-			var push_strength = (separation_radius - dist) / separation_radius
-			var push = -to_other.normalized() * push_strength
-			separation_force += push
-
-	# Blend separation with original velocity
-	if separation_force.length() > 0:
-		velocity = (velocity.normalized() + separation_force * 0.5).normalized() * unit.move_speed
-
-	return velocity
-
-func _ai_attack(battle: Dictionary, unit: Dictionary) -> void:
-	"""Execute attack if off cooldown, aligned, and facing target"""
-	var target = battle.units.get(unit.target_id)
-	if not target or target.state == "dead":
-		unit.target_id = ""
-		unit.state = "idle"
-		return
-
-	var distance = unit.position.distance_to(target.position)
-	if distance > unit.attack_range:
-		unit.state = "moving"
-		return
-
-	# Check if properly aligned on cardinal direction
-	var attack_position = _get_cardinal_attack_position(unit, target)
-	if not attack_position.aligned:
-		# Not aligned, need to reposition
-		unit.state = "moving"
-		return
-
-	# Face target (should already be facing due to alignment)
-	_face_target(unit, target.position)
-
-	# Check cooldown (minimum 1 second enforced in unit creation)
-	if unit.cooldown_timer > 0:
-		return
-
-	# Execute attack
-	_execute_attack(battle, unit, target)
-	unit.cooldown_timer = unit.attack_cooldown
-
-	# Check if target died, find new target
-	if target.state == "dead":
-		unit.target_id = ""
-		unit.state = "idle"
-
-func _select_target_by_archetype(unit: Dictionary, enemies: Array) -> Dictionary:
-	"""Select target based on AI archetype"""
-	if enemies.is_empty():
-		return {}
-
-	match unit.archetype:
-		"AGGRESSIVE":
-			# Target lowest HP
-			enemies.sort_custom(func(a, b): return a.hp < b.hp)
-			return enemies[0]
-		"DEFENSIVE":
-			# Random target (retreat handled elsewhere)
-			return enemies.pick_random()
-		"TACTICAL":
-			# Prioritize casters/ranged
-			var priority = enemies.filter(func(e): return e.combat_role in ["caster", "ranged"])
-			if not priority.is_empty():
-				priority.sort_custom(func(a, b): return a.hp < b.hp)
-				return priority[0]
-			return enemies.pick_random()
-		"CHAOTIC":
-			return enemies.pick_random()
-
-	return enemies[0]
-
-func _get_enemy_units(battle: Dictionary, my_team: String) -> Array:
-	"""Get all alive enemy units"""
-	var enemies = []
-	for unit in battle.units.values():
-		if unit.team != my_team and unit.state != "dead" and unit.hp > 0:
-			enemies.append(unit)
-	return enemies
-
 ## ========== COMBAT LOGIC ==========
 
 func _execute_attack(battle: Dictionary, attacker: Dictionary, target: Dictionary) -> void:
-	"""Calculate and apply damage"""
+	"""Calculate and apply damage with balanced combat rules"""
 	# Base damage from SharedBattleCalculator
-	var damage = SharedBattleCalculator.calculate_damage(
+	var base_damage = SharedBattleCalculator.calculate_damage(
 		attacker.source_data,
 		target.source_data,
 		-1, -1,
 		attacker.team == "enemy"
 	)
+
+	# Apply hits-to-kill balance to make combat predictable
+	var damage = CombatRules.calculate_balanced_damage(base_damage, attacker, target)
 
 	# Apply flanking bonus
 	var flank_type = _get_flank_type(attacker, target)
@@ -677,15 +493,13 @@ func _execute_attack(battle: Dictionary, attacker: Dictionary, target: Dictionar
 	var weakness_mult = _get_weakness_multiplier(attacker.damage_type, target.weaknesses)
 	damage = int(damage * weakness_mult)
 
-	# Apply defend reduction
-	if target.is_defending:
-		damage = int(damage * DEFEND_DAMAGE_REDUCTION)
+	# Dodge roll grants invincibility - damage is handled by invincibility frames in CombatRules
 
-	# Apply damage
-	target.hp -= damage
+	# Apply damage with invincibility check (dodge roll gives iframes)
+	var actual_damage = CombatRules.apply_damage(target, damage)
 
-	# Notify clients
-	_broadcast_damage_event(battle, attacker.id, target.id, damage, flank_type)
+	# Notify clients (use actual_damage which may be 0 if invincible)
+	_broadcast_damage_event(battle, attacker.id, target.id, actual_damage, flank_type)
 
 	# Check death
 	if target.hp <= 0:
@@ -803,8 +617,9 @@ func handle_player_movement(peer_id: int, velocity: Vector2) -> void:
 	if not unit or unit.state == "dead":
 		return
 
-	# Can't move while defending
-	if unit.is_defending:
+	# Use combat rules to check if movement is allowed
+	# (blocks during attack wind-up, attack, recovery, and defending)
+	if not CombatRules.can_move(unit):
 		return
 
 	# Clamp velocity to max speed
@@ -831,9 +646,9 @@ func handle_player_attack(peer_id: int, target_id: String) -> void:
 		print("[RT_COMBAT] Attack rejected: no unit or dead")
 		return
 
-	# Can't attack while defending
-	if unit.is_defending:
-		print("[RT_COMBAT] Attack rejected: defending")
+	# Can't attack while dodge rolling
+	if CombatRules.is_dodge_rolling(unit):
+		print("[RT_COMBAT] Attack rejected: dodge rolling")
 		return
 
 	# Check cooldown (minimum 1 second enforced)
@@ -853,21 +668,26 @@ func handle_player_attack(peer_id: int, target_id: String) -> void:
 		return
 
 	# Check if aligned on cardinal direction to target
-	var attack_position = _get_cardinal_attack_position(unit, target)
+	var attack_position = RealtimeCombatAI.get_cardinal_attack_position(unit, target)
 	if not attack_position.aligned:
 		print("[RT_COMBAT] Attack rejected: not aligned (need cardinal direction)")
+		return
+
+	# Use combat rules to check if attack can start (includes max attackers check)
+	var can_attack = CombatRules.can_start_attack(unit, battle, target_id)
+	if not can_attack.allowed:
+		print("[RT_COMBAT] Attack rejected: %s" % can_attack.reason)
 		return
 
 	# Face target automatically when attacking
 	_face_target(unit, target.position)
 
-	# Execute attack
-	_execute_attack(battle, unit, target)
-	unit.cooldown_timer = unit.attack_cooldown
-	print("[RT_COMBAT] Attack executed: %s -> %s for damage" % [unit.id, target_id])
+	# Start attack with wind-up (doesn't execute immediately)
+	CombatRules.start_attack(unit, target_id)
+	print("[RT_COMBAT] Attack started (wind-up): %s -> %s" % [unit.id, target_id])
 
-func handle_player_defend(peer_id: int) -> void:
-	"""Process player defend input"""
+func handle_player_dodge_roll(peer_id: int, direction_x: float, direction_y: float) -> void:
+	"""Process player dodge roll input"""
 	var battle = get_battle_for_peer(peer_id)
 	if battle.is_empty():
 		return
@@ -876,18 +696,22 @@ func handle_player_defend(peer_id: int) -> void:
 	if not unit or unit.state == "dead":
 		return
 
-	# Check cooldown
-	if unit.defend_cooldown_timer > 0:
+	# Check if can dodge roll (pass battle for enemy proximity check)
+	var can_roll = CombatRules.can_dodge_roll(unit, battle)
+	if not can_roll.allowed:
+		print("[RT_COMBAT] Dodge roll rejected: %s" % can_roll.reason)
 		return
 
-	# Activate defend
-	unit.is_defending = true
-	unit.defend_timer = DEFEND_DURATION
-	unit.defend_cooldown_timer = DEFEND_COOLDOWN
-	unit.velocity = Vector2.ZERO  # Stop movement
+	# Start the dodge roll (rolls in facing direction)
+	var direction = Vector2(direction_x, direction_y)
+	CombatRules.start_dodge_roll(unit, direction)
+
+	# Get actual roll direction for broadcast (based on facing)
+	var actual_direction = unit.get("dodge_roll_direction", direction)
+	print("[RT_COMBAT] Dodge roll started: %s direction=%s" % [unit.id, actual_direction])
 
 	# Notify clients
-	_broadcast_defend_event(battle, unit.id)
+	_broadcast_dodge_roll_event(battle, unit.id, actual_direction)
 
 ## ========== NETWORK BROADCASTING ==========
 
@@ -908,8 +732,12 @@ func _broadcast_battle_state(battle: Dictionary) -> void:
 			"velocity": unit.velocity,
 			"facing": unit.facing,
 			"hp": unit.hp,
+			"mp": unit.get("mp", 0),
+			"energy": unit.get("energy", 0),
 			"state": unit.state,
-			"is_defending": unit.is_defending
+			"is_dodge_rolling": unit.get("is_dodge_rolling", false),
+			"attack_state": unit.get("attack_state", ""),  # winding_up, attacking, recovering
+			"attack_target_id": unit.get("attack_target_id", "")
 		})
 
 	for peer_id in battle.participants:
@@ -928,11 +756,11 @@ func _broadcast_unit_death(battle: Dictionary, unit_id: String) -> void:
 		if network_handler:
 			network_handler.rt_unit_death.rpc_id(peer_id, unit_id)
 
-func _broadcast_defend_event(battle: Dictionary, unit_id: String) -> void:
-	"""Notify clients of defend activation"""
+func _broadcast_dodge_roll_event(battle: Dictionary, unit_id: String, direction: Vector2) -> void:
+	"""Notify clients of dodge roll activation"""
 	for peer_id in battle.participants:
 		if network_handler:
-			network_handler.rt_defend_event.rpc_id(peer_id, unit_id)
+			network_handler.rt_dodge_roll_event.rpc_id(peer_id, unit_id, direction.x, direction.y)
 
 func _send_battle_start(peer_id: int, battle: Dictionary) -> void:
 	"""Send battle start to client"""
@@ -952,6 +780,8 @@ func _send_battle_start(peer_id: int, battle: Dictionary) -> void:
 		"arena_pixels": battle.arena_pixels,
 		"player_unit_id": battle.player_unit_id,
 		"player_position": player_position,  # For map tile capture on client
+		"battle_map_name": battle.get("battle_map_name", "sample_map"),  # Map to load on client
+		"player_move_speed": 300.0,  # Base move speed for player
 		"units": {}
 	}
 
@@ -972,7 +802,7 @@ func _send_battle_start(peer_id: int, battle: Dictionary) -> void:
 			"max_energy": unit.max_energy,
 			"state": unit.state,
 			"is_player_controlled": unit.is_player_controlled,
-			"is_defending": unit.is_defending,
+			"is_dodge_rolling": unit.get("is_dodge_rolling", false),
 			"class_name": unit.source_data.get("class_name", ""),
 			"npc_type": unit.source_data.get("npc_type", unit.source_data.get("name", ""))
 		}
@@ -988,4 +818,9 @@ func _send_battle_start(peer_id: int, battle: Dictionary) -> void:
 func _send_battle_end(peer_id: int, battle_id: int, result: String, rewards: Dictionary) -> void:
 	"""Send battle end notification"""
 	if network_handler:
-		network_handler.rt_battle_end.rpc_id(peer_id, battle_id, result, rewards)
+		# Check if peer is still connected before sending
+		var peers = multiplayer.get_peers()
+		if peer_id in peers:
+			network_handler.rt_battle_end.rpc_id(peer_id, battle_id, result, rewards)
+		else:
+			print("[RT_COMBAT] Skipping battle_end for disconnected peer: %d" % peer_id)

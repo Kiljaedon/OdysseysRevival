@@ -59,27 +59,23 @@ func handle_authentication_callback(peer_id: int, data: PackedByteArray):
 
 func handle_player_connected(peer_id: int):
 	"""Handle new player connection (authenticated but not logged in)"""
-	print("[DEBUG] _on_player_connected called for peer %d" % peer_id)
 	log_message("[CONNECT] Peer %d connected and authenticated - awaiting login" % peer_id)
 
 	# Register with anti-cheat system
 	if anti_cheat:
 		anti_cheat.register_player(peer_id)
 
+	# debug_console disabled - using ui_manager console instead
 	if debug_console:
-		print("[DEBUG] Updating debug console for connection")
 		debug_console.add_log("Peer %d ready for login" % peer_id, "green")
 		var player_count = player_manager.connected_players.size() if player_manager else 0
 		debug_console.update_stats("SERVER RUNNING - Port 9043 (DEV)", -1, player_count)
-	else:
-		print("[DEBUG] WARNING: debug_console is null!")
 
 
 # ========== PLAYER DISCONNECTED ==========
 
 func handle_player_disconnected(peer_id: int):
 	"""Handle player disconnection - critical path code for data persistence"""
-	print("[DEBUG] _on_player_disconnected called for peer %d" % peer_id)
 
 	# Get username from auth manager
 	var username = auth_manager.get_username(peer_id) if auth_manager else "Unknown"
@@ -115,15 +111,12 @@ func handle_player_disconnected(peer_id: int):
 
 	# Update debug console with correct player count (after removal)
 	if debug_console:
-		print("[DEBUG] Updating debug console for disconnection")
 		debug_console.add_log("DISCONNECT: Peer %d" % peer_id, "orange")
 		debug_console.add_log("  └─ Reason: %s" % disconnect_reason, "gray")
 		if was_authenticated:
 			debug_console.add_log("  └─ User: %s" % username, "gray")
 		var player_count = player_manager.connected_players.size() if player_manager else 0
 		debug_console.update_stats("SERVER RUNNING - Port 9043 (DEV)", -1, player_count)
-	else:
-		print("[DEBUG] WARNING: debug_console is null!")
 
 	# Broadcast player removal to all connected players
 	if network_handler and player_manager:

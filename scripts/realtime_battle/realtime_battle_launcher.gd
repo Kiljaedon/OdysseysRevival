@@ -114,12 +114,13 @@ func start_battle(battle_data: Dictionary) -> void:
 	active_battle_scene.set_meta("use_current_map", true)
 	active_battle_scene.set_meta("parent_node", parent_node)
 
-	# Create controller
+	# Create controller - add to canvas layer (NOT viewport) so it receives input when paused
+	# SubViewports don't propagate input events when the main tree is paused
 	active_controller = Node.new()
 	active_controller.set_script(RealtimeBattleControllerScript)
 	active_controller.name = "RealtimeBattleController"
 	active_controller.process_mode = Node.PROCESS_MODE_ALWAYS
-	battle_viewport.add_child(active_controller)
+	battle_canvas_layer.add_child(active_controller)
 
 	# Get network service
 	var server_conn = get_tree().root.get_node_or_null("ServerConnection")

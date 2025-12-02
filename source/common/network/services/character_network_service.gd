@@ -56,12 +56,42 @@ func on_character_deletion_response(success: bool, message: String):
 
 
 func on_spawn_accepted(player_data: Dictionary):
+	# Try direct routing first
+	var manager = get_parent().get_meta("multiplayer_manager", null)
+	if manager and manager.has_method("handle_spawn_accepted"):
+		# Need to pass the callback provided by dev_client...
+		# Wait, dev_client passes `Callable(self, "setup_character_sprite")`
+		# If we route directly, we lose this callback context?
+		# Actually, MultiplayerManager stores the callback? No, it takes it as arg.
+		
+		# ISSUE: handle_spawn_accepted requires `on_character_loaded` callback.
+		# We can't provide that easily from here without the controller.
+		# So for this SPECIFIC method, we might need to keep the controller routing
+		# OR refactor MultiplayerManager to trigger a signal instead of callback.
+		
+		# Let's look at dev_client_controller.gd:
+		# func handle_spawn_accepted(player_data: Dictionary):
+		#     if multiplayer_manager:
+		#         multiplayer_manager.handle_spawn_accepted(player_data, Callable(self, "setup_character_sprite"))
+		
+		# Since `setup_character_sprite` is on the controller, we still need the controller.
+		# UNLESS we move `setup_character_sprite` to CharacterSetupManager and MultiplayerManager uses that.
+		
+		pass
+
+	# Fallback/Current logic (Required for callback context)
 	var controller = get_parent()._find_node_with_script("dev_client_controller.gd")
 	if controller:
 		controller.handle_spawn_accepted(player_data)
 
 
 func on_spawn_rejected(reason: String):
+	# Try direct routing
+	var manager = get_parent().get_meta("multiplayer_manager", null)
+	if manager and manager.has_method("handle_spawn_rejected"):
+		manager.handle_spawn_rejected(reason)
+		return
+
 	var controller = get_parent()._find_node_with_script("dev_client_controller.gd")
 	if controller:
 		controller.handle_spawn_rejected(reason)

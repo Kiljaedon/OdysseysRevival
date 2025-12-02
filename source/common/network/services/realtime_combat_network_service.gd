@@ -25,11 +25,11 @@ func handle_rt_player_attack(target_id: String):
 	if multiplayer.is_server() and server_world:
 		server_world.handle_realtime_player_attack(peer_id, target_id)
 
-func handle_rt_player_defend():
-	"""Client activates defend mode"""
+func handle_rt_player_dodge_roll(direction_x: float, direction_y: float):
+	"""Client performs dodge roll"""
 	var peer_id = multiplayer.get_remote_sender_id()
 	if multiplayer.is_server() and server_world:
-		server_world.handle_realtime_player_defend(peer_id)
+		server_world.handle_realtime_player_dodge_roll(peer_id, direction_x, direction_y)
 
 ## ========== CLIENT-SIDE RESPONSE HANDLERS ==========
 
@@ -72,11 +72,11 @@ func on_rt_unit_death(unit_id: String):
 	if controller and controller.has_method("on_unit_death"):
 		controller.on_unit_death(unit_id)
 
-func on_rt_defend_event(unit_id: String):
-	"""Handle defend activation on client"""
+func on_rt_dodge_roll_event(unit_id: String, direction_x: float, direction_y: float):
+	"""Handle dodge roll on client"""
 	var controller = _find_realtime_battle_controller()
-	if controller and controller.has_method("on_defend_event"):
-		controller.on_defend_event(unit_id)
+	if controller and controller.has_method("on_dodge_roll_event"):
+		controller.on_dodge_roll_event(unit_id, Vector2(direction_x, direction_y))
 
 func on_rt_battle_end(battle_id: int, result: String, rewards: Dictionary):
 	"""Handle battle end on client"""

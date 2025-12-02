@@ -40,40 +40,59 @@ func setup_tileset_tiles() -> void:
 	print("[TilesetManager] Tileset found: %s" % tileset)
 	print("[TilesetManager] Source count: %d" % tileset.get_source_count())
 
-	# Check source 0 (tiles_part1)
+	# Setup source 0 (tiles_part1)
 	var source0 = tileset.get_source(0) as TileSetAtlasSource
 	if source0:
 		print("[TilesetManager] Source 0 texture: %s" % source0.texture)
 		if source0.texture:
-			print("[TilesetManager] Source 0 texture size: %s" % source0.texture.get_size())
+			var tex_size = source0.texture.get_size()
+			print("[TilesetManager] Source 0 texture size: %s" % tex_size)
+
+			# Calculate grid size from texture
+			var tile_size = source0.texture_region_size
+			var cols = int(tex_size.x / tile_size.x)
+			var rows = int(tex_size.y / tile_size.y)
+			print("[TilesetManager] Source 0 grid: %d cols x %d rows" % [cols, rows])
+
+			# Create tiles if needed
+			if source0.get_tiles_count() == 0:
+				print("[TilesetManager] Creating tiles for source 0...")
+				for y in range(rows):
+					for x in range(cols):
+						# Check if this position is within texture bounds
+						var atlas_coords = Vector2i(x, y)
+						if not source0.has_tile(atlas_coords):
+							source0.create_tile(atlas_coords)
+				print("[TilesetManager] Created %d tiles for source 0" % source0.get_tiles_count())
+			else:
+				print("[TilesetManager] Source 0 already has %d tiles" % source0.get_tiles_count())
 		else:
 			print("[TilesetManager] ERROR: Source 0 texture is NULL!")
-		print("[TilesetManager] Source 0 tiles count before: %d" % source0.get_tiles_count())
-		if source0.get_tiles_count() == 0:
-			print("[TilesetManager] Setting up tiles_part1 (source 0)...")
-			for y in range(512):  # 512 rows
-				for x in range(7):  # 7 columns
-					source0.create_tile(Vector2i(x, y))
-			print("[TilesetManager] Created tiles for source 0: ", source0.get_tiles_count())
-		else:
-			print("[TilesetManager] Source 0 already has %d tiles" % source0.get_tiles_count())
 	else:
 		print("[TilesetManager] ERROR: Source 0 not found!")
 
-	# Check source 1 (tiles_part2)
+	# Setup source 1 (tiles_part2)
 	if tileset.get_source_count() > 1:
 		var source1 = tileset.get_source(1) as TileSetAtlasSource
 		if source1:
 			print("[TilesetManager] Source 1 texture: %s" % source1.texture)
-			print("[TilesetManager] Source 1 tiles count before: %d" % source1.get_tiles_count())
-			if source1.get_tiles_count() == 0:
-				print("[TilesetManager] Setting up tiles_part2 (source 1)...")
-				for y in range(485):  # 485 rows
-					for x in range(7):  # 7 columns
-						source1.create_tile(Vector2i(x, y))
-				print("[TilesetManager] Created tiles for source 1: ", source1.get_tiles_count())
-			else:
-				print("[TilesetManager] Source 1 already has %d tiles" % source1.get_tiles_count())
+			if source1.texture:
+				var tex_size = source1.texture.get_size()
+				var tile_size = source1.texture_region_size
+				var cols = int(tex_size.x / tile_size.x)
+				var rows = int(tex_size.y / tile_size.y)
+				print("[TilesetManager] Source 1 grid: %d cols x %d rows" % [cols, rows])
+
+				if source1.get_tiles_count() == 0:
+					print("[TilesetManager] Creating tiles for source 1...")
+					for y in range(rows):
+						for x in range(cols):
+							var atlas_coords = Vector2i(x, y)
+							if not source1.has_tile(atlas_coords):
+								source1.create_tile(atlas_coords)
+					print("[TilesetManager] Created %d tiles for source 1" % source1.get_tiles_count())
+				else:
+					print("[TilesetManager] Source 1 already has %d tiles" % source1.get_tiles_count())
 
 	# Debug: Check layer visibility
 	print("[TilesetManager] BottomLayer visible: %s, modulate: %s" % [bottom_layer.visible, bottom_layer.modulate])

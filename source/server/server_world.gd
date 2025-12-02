@@ -79,14 +79,14 @@ const RateLimiter = preload("res://source/server/rate_limiter.gd")
 const AuthenticationManager = preload("res://source/server/managers/authentication_manager.gd")
 const PlayerManager = preload("res://source/server/managers/player_manager.gd")
 const ServerNPCManager = preload("res://source/server/managers/npc_manager.gd")
-const CombatManager = preload("res://source/server/managers/combat_manager.gd")
+# CombatManager removed - using RealtimeCombatManager only
 const StatsManager = preload("res://source/server/managers/stats_manager.gd")
 const ServerMapManager = preload("res://source/server/managers/map_manager.gd")
 const NetworkManager = preload("res://source/server/managers/network_manager.gd")
 const ChatManager = preload("res://source/server/managers/chat_manager.gd")
 const InputManager = preload("res://source/server/managers/input_manager.gd")
 const ConnectionManager = preload("res://source/server/managers/connection_manager.gd")
-const RealtimeCombatManager = preload("res://source/server/managers/realtime_combat_manager.gd")
+# RealtimeCombatManager, BattleMapLoader, BattleInstanceManager use class_name - no preload needed
 
 ################################################################################
 # SECTION 1: MANAGER REFERENCES
@@ -108,7 +108,7 @@ var ui_manager = null  # UI manager (extracted module)
 var auth_manager = null  # Authentication manager (extracted module)
 var player_manager = null  # Player manager (character creation/deletion/spawning)
 var npc_manager = null  # NPC manager (spawning, AI, movement)
-var combat_manager = null  # Combat manager (NPC combat, player actions, enemy AI)
+# combat_manager removed - using realtime_combat_manager only
 var stats_manager = null  # Stats manager (server statistics and admin tools)
 var map_manager = null  # Map manager (collision loading and management)
 var network_manager = null  # Network manager
@@ -116,6 +116,8 @@ var chat_manager = null  # Chat manager (message handling and broadcasting)
 var input_manager = null  # Input manager (player input processing and validation)
 var connection_manager = null  # Connection manager
 var realtime_combat_manager = null  # Realtime combat manager (new tactical combat system)
+var battle_map_loader = null  # Battle map loader (loads battle maps and spawn points)
+var battle_instance_manager = null  # Battle instance manager (isolated battle instances)
 
 ################################################################################
 # SECTION 2: CONVENIENCE ACCESSORS
@@ -181,25 +183,16 @@ func _ready():
 	else:
 		print("[SERVER] ERROR: ServerConnection autoload not found!")
 
-	# Add debug console only if NOT in headless mode (headless has no display/UI)
-	if DisplayServer.get_name() != "headless":
-		var console_script = load("res://source/common/debug/debug_console.gd")
-		if console_script:
-			debug_console = console_script.new()
-			debug_console.name = "DebugConsole"  # Name it for easy retrieval in cleanup
-			get_tree().root.add_child(debug_console)
-			print("[DEBUG] Debug console created and added to root")
-			debug_console.set_motd("Welcome to Odysseys Revival! Your adventure begins now!")
-			debug_console.add_log("Server Debug Console Active", "green")
-			debug_console.add_log("Waiting for connections on port 9043...", "white")
-			if debug_console.log_text:
-				debug_console.log_text.append_text(
-					"[DEBUG] If you see this, the debug console is rendering correctly.\n"
-				)
-		else:
-			print("[DEBUG] ERROR: Could not load debug console script!")
-	else:
-		print("[DEBUG] Running in headless mode - skipping debug console UI")
+	# Debug console disabled - server runs without UI overlay
+	# To re-enable, uncomment the block below
+	#if DisplayServer.get_name() != "headless":
+	#	var console_script = load("res://source/common/debug/debug_console.gd")
+	#	if console_script:
+	#		debug_console = console_script.new()
+	#		debug_console.name = "DebugConsole"
+	#		get_tree().root.add_child(debug_console)
+	#		debug_console.set_motd("Welcome to Odysseys Revival!")
+	pass
 	
 	# Initialize database
 	GameDatabase.init_database()
@@ -342,14 +335,18 @@ func _ready():
 	if npc_manager:
 		npc_manager.spawn_server_npcs()
 
-	# Initialize combat manager
-	combat_manager = CombatManager.new()
-	add_child(combat_manager)
-	# Pass references to managers that combat_manager depends on
-	combat_manager.initialize(self, player_manager, npc_manager)
-	log_message("[COMBAT] Combat manager initialized")
+	# Initialize battle map loader (loads battle maps and spawn points)
+	battle_map_loader = BattleMapLoader.new()
+	add_child(battle_map_loader)
+	log_message("[BATTLE_MAP] Battle map loader initialized")
 
-	# Initialize realtime combat manager (new tactical system)
+	# Initialize battle instance manager (isolated battle instances)
+	battle_instance_manager = BattleInstanceManager.new()
+	add_child(battle_instance_manager)
+	battle_instance_manager.initialize(battle_map_loader, player_manager, npc_manager)
+	log_message("[BATTLE_INSTANCE] Battle instance manager initialized")
+
+	# Initialize realtime combat manager (real-time Zelda-style combat)
 	realtime_combat_manager = RealtimeCombatManager.new()
 	add_child(realtime_combat_manager)
 	realtime_combat_manager.initialize(self, player_manager, npc_manager)
@@ -550,95 +547,10 @@ func send_chat_message(message: String):
 		chat_manager.handle_chat_message(message)
 
 
-## RPC Proxy: Handle NPC Attack Request
-## Forwards to CombatManager
-@rpc("any_peer")
-func handle_npc_attack_request(peer_id: int, npc_id: int):
-	print("============================================================")
-	print("[SERVER_WORLD] ========== HANDLE_NPC_ATTACK_REQUEST ==========")
-	print("[SERVER_WORLD] peer_id: %d, npc_id: %d" % [peer_id, npc_id])
-	print("[SERVER_WORLD] combat_manager exists: %s" % (combat_manager != null))
-	print("============================================================")
-
-	if combat_manager:
-		print("[SERVER_WORLD] Forwarding to combat_manager...")
-		combat_manager.handle_npc_attack_request(peer_id, npc_id)
-		print("[SERVER_WORLD] combat_manager.handle_npc_attack_request() returned")
-	else:
-		print("[SERVER_WORLD] ERROR: combat_manager is null!")
-
-
-## RPC Proxy: Handle Player Action (Primary Battle Action Handler)
-## Called by server_connection.gd (NOT directly via RPC)
-## CRITICAL: This is the main entry point for battle actions
-func handle_player_action(peer_id: int, combat_id: int, action: String, target_id: int):
-	print("[SERVER] handle_player_action called: peer_id=%d, combat_id=%d, action=%s, target_id=%d" % [peer_id, combat_id, action, target_id])
-	if combat_manager:
-		combat_manager.receive_player_battle_action(peer_id, combat_id, action, target_id)
-	else:
-		print("[SERVER] ERROR: combat_manager is null - cannot process action")
-
-
-## RPC Proxy: Receive Player Battle Action (Legacy/Backup)
-## Forwards to CombatManager
-## CRITICAL: This proxy is required for battle system to function
-@rpc("any_peer")
-func receive_player_battle_action(peer_id: int, combat_id: int, action_type: String, target_id: int):
-	if combat_manager:
-		combat_manager.receive_player_battle_action(peer_id, combat_id, action_type, target_id)
-
-
-## RPC Proxy: Handle Battle End
-## Called when client reports battle has ended
-func handle_battle_end(peer_id: int, combat_id: int, victory: bool):
-	print("[COMBAT] Battle end received from peer %d: combat_id=%d, victory=%s" % [peer_id, combat_id, victory])
-	if combat_manager:
-		# Forward to combat_manager if it has a handler
-		if combat_manager.has_method("handle_battle_end"):
-			combat_manager.handle_battle_end(peer_id, combat_id, victory)
-		else:
-			print("[COMBAT] WARNING: combat_manager doesn't have handle_battle_end method - battle cleanup may not occur")
-	else:
-		print("[COMBAT] ERROR: combat_manager not found - cannot process battle end")
-
-
-## RPC Proxy: Battle Player Attack
-## Forwards to CombatManager
-@rpc("any_peer")
-func battle_player_attack(combat_id: int, target_index: int):
-	if combat_manager:
-		combat_manager.battle_player_attack(combat_id, target_index)
-
-
-## RPC Proxy: Battle Player Defend
-## Forwards to CombatManager
-@rpc("any_peer")
-func battle_player_defend(combat_id: int):
-	if combat_manager:
-		combat_manager.battle_player_defend(combat_id)
-
-
-## RPC Proxy: Battle Player Use Skill
-## Forwards to CombatManager
-@rpc("any_peer")
-func battle_player_use_skill(combat_id: int, target_index: int, skill_name: String):
-	if combat_manager:
-		combat_manager.battle_player_use_skill(combat_id, target_index, skill_name)
-
-
-## RPC Proxy: Battle Player Use Item
-## Forwards to CombatManager
-@rpc("any_peer")
-func battle_player_use_item(combat_id: int, target_index: int, item_name: String):
-	if combat_manager:
-		combat_manager.battle_player_use_item(combat_id, target_index, item_name)
-
-
 ################################################################################
-# SECTION 10B: RPC PROXIES - REALTIME COMBAT (NEW TACTICAL SYSTEM)
+# SECTION 10B: RPC PROXIES - REALTIME COMBAT
 ################################################################################
-# These RPCs handle the new real-time tactical combat system.
-# Separate from turn-based combat for clean separation of concerns.
+# Real-time Zelda-style combat system. Turn-based combat was removed.
 
 ## RPC Proxy: Request Realtime Battle
 ## Called when player attacks NPC to start real-time battle
@@ -654,7 +566,21 @@ func handle_realtime_battle_request(peer_id: int, npc_id: int):
 			var npc_info = npc_manager.server_npcs[npc_id]
 			enemy_data = [npc_info]  # Single enemy for now
 
-		realtime_combat_manager.create_battle(peer_id, npc_id, player_data, squad_data, enemy_data)
+		# Get player's current map for instanced battle
+		var current_map = "sample_map"  # Default
+		if map_manager:
+			current_map = map_manager.get_player_map(peer_id)
+			if current_map.is_empty():
+				current_map = "sample_map"
+
+			# Create battle instance in map manager
+			var instance_id = map_manager.create_battle_instance(current_map, [peer_id], [npc_id])
+			if instance_id < 0:
+				log_message("[SERVER] Failed to create battle instance for peer %d" % peer_id)
+				return
+
+		# Pass map info to create_battle
+		realtime_combat_manager.create_battle(peer_id, npc_id, player_data, squad_data, enemy_data, current_map)
 
 ## RPC Proxy: Realtime Player Movement
 func handle_realtime_player_move(peer_id: int, velocity: Vector2):
@@ -670,6 +596,11 @@ func handle_realtime_player_attack(peer_id: int, target_id: String):
 func handle_realtime_player_defend(peer_id: int):
 	if realtime_combat_manager:
 		realtime_combat_manager.handle_player_defend(peer_id)
+
+## RPC Proxy: Realtime Player Dodge Roll
+func handle_realtime_player_dodge_roll(peer_id: int, direction_x: float, direction_y: float):
+	if realtime_combat_manager:
+		realtime_combat_manager.handle_player_dodge_roll(peer_id, direction_x, direction_y)
 
 
 ################################################################################

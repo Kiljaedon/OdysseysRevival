@@ -513,8 +513,9 @@ func handle_binary_combat_start(packet: PackedByteArray, server_npcs: Dictionary
 	else:
 		print("[COMBAT_CLIENT] ERROR: GameState not found!")
 
-	# Transition to battle scene
-	get_tree().change_scene_to_file("res://battle_window.tscn")
+	# NOTE: Battle scene loading is handled by RealtimeBattleLauncher via realtime_combat_network_service
+	# DO NOT use change_scene_to_file here - it destroys the current map and prevents map cloning
+	print("[COMBAT_CLIENT] Combat data stored - waiting for realtime battle system to launch")
 
 func handle_combat_round_results(combat_id: int, results: Dictionary) -> void:
 	"""Server sends combat round results - forward to battle_window if active"""

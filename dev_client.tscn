@@ -41,7 +41,7 @@ metadata/_edit_use_anchors_ = true
 y_sort_enabled = true
 
 [node name="BottomLayer" type="TileMapLayer" parent="GameWorld"]
-z_index = 0
+z_index = -1
 y_sort_enabled = false
 texture_filter = 0
 collision_enabled = false
@@ -54,7 +54,7 @@ tile_set = ExtResource("2_tileset")
 z_index = 0
 y_sort_enabled = true
 texture_filter = 0
-collision_enabled = false
+collision_enabled = true
 collision_layer = 1
 collision_mask = 0
 scale = Vector2(4, 4)

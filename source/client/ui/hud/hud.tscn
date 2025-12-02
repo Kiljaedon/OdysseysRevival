@@ -8,8 +8,6 @@
 [node name="HUD" type="CanvasLayer"]
 script = ExtResource("1_rchld")
 
-[node name="HealthBar" parent="." instance=ExtResource("2_klco5")]
-
 [node name="MenuButton" type="Button" parent="."]
 offset_left = 885.0
 offset_top = 17.0

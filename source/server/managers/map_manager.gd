@@ -15,8 +15,21 @@ var player_positions: Dictionary = {}  # player_id -> Vector2
 # Transition zones per map (loaded from TMX)
 var map_transitions: Dictionary = {}  # map_name -> Array[{rect, target_map, spawn_x, spawn_y, direction}]
 
-# Available maps
+# World maps (overworld exploration) - also used as battle arenas
+var world_maps: Array[String] = []
+var world_map_paths: Dictionary = {}  # map_name -> "World Maps/map_name.tmx"
+
+# Combined available maps (for backwards compatibility)
 var available_maps: Array[String] = []
+var map_paths: Dictionary = {}
+
+# Active battle instances
+# instance_id -> { map_name, players: [], npcs: [], created_at }
+var battle_instances: Dictionary = {}
+var next_instance_id: int = 1
+
+# Player to battle instance mapping
+var player_battle_instance: Dictionary = {}  # player_id -> instance_id
 
 # Collision tiles per map (middle layer tiles that block movement)
 # map_name -> Dictionary of blocked tile positions: { Vector2i: true }
@@ -44,19 +57,53 @@ func initialize(server_ref: Node, collision_world_ref: Node2D):
 
 
 func _scan_available_maps():
-	"""Scan the maps directory for available TMX files"""
+	"""Scan World Maps directory (world maps are also used as battle arenas)"""
+	world_maps.clear()
+	world_map_paths.clear()
 	available_maps.clear()
-	var maps_dir = "res://maps/"
-	var dir = DirAccess.open(maps_dir)
-	if dir:
-		dir.list_dir_begin()
-		var file_name = dir.get_next()
-		while file_name != "":
-			if file_name.ends_with(".tmx"):
-				available_maps.append(file_name.get_basename())
-			file_name = dir.get_next()
-		dir.list_dir_end()
-	print("[ServerMapManager] Found maps: ", available_maps)
+	map_paths.clear()
+
+	# Scan World Maps - these serve as both exploration maps AND battle arenas
+	_scan_map_folder("res://maps/World Maps/", world_maps, world_map_paths)
+
+	# Build combined lists for backwards compatibility
+	for map_name in world_maps:
+		available_maps.append(map_name)
+		map_paths[map_name] = world_map_paths[map_name]
+
+	print("[ServerMapManager] Available maps: ", world_maps)
+
+
+func _scan_map_folder(path: String, map_list: Array[String], path_dict: Dictionary):
+	"""Scan a specific map folder for TMX files"""
+	var dir = DirAccess.open(path)
+	if not dir:
+		print("[ServerMapManager] Could not open: %s" % path)
+		return
+
+	dir.list_dir_begin()
+	var file_name = dir.get_next()
+	while file_name != "":
+		if not dir.current_is_dir() and file_name.ends_with(".tmx"):
+			var map_name = file_name.get_basename()
+			var relative_path = path.replace("res://maps/", "") + file_name
+			map_list.append(map_name)
+			path_dict[map_name] = relative_path
+		file_name = dir.get_next()
+	dir.list_dir_end()
+
+
+func get_map_path(map_name: String) -> String:
+	"""Get the full path for a world map by name"""
+	if world_map_paths.has(map_name):
+		return "res://maps/" + world_map_paths[map_name]
+	# Fallback
+	return "res://maps/World Maps/" + map_name + ".tmx"
+
+
+func get_battle_map_path(map_name: String) -> String:
+	"""Get the full path for a battle map (same as world map - we use world maps as arenas)"""
+	return get_map_path(map_name)
 
 
 # ========== MAP COLLISION LOADING (Server-Side Validation) ==========
@@ -233,7 +280,7 @@ func is_position_blocked(map_name: String, position: Vector2) -> bool:
 
 func load_map_collision_tiles(map_name: String):
 	"""Load collision tiles for a specific map"""
-	var map_path = "res://maps/" + map_name + ".tmx"
+	var map_path = get_map_path(map_name)
 	var file = FileAccess.open(map_path, FileAccess.READ)
 	if not file:
 		map_collision_tiles[map_name] = {}
@@ -352,7 +399,7 @@ func get_player_position(player_id: int) -> Vector2:
 
 func load_map_transitions(map_name: String):
 	"""Load transition zones from a map's TMX file"""
-	var map_path = "res://maps/" + map_name + ".tmx"
+	var map_path = get_map_path(map_name)
 	var file = FileAccess.open(map_path, FileAccess.READ)
 	if not file:
 		print("[ServerMapManager] Could not load transitions from: %s" % map_path)
@@ -496,3 +543,118 @@ func process_map_transition(player_id: int, target_map: String, spawn_x: int, sp
 		"new_map_players": new_map_players,
 		"players_info": players_info
 	}
+
+
+# ========== BATTLE INSTANCE MANAGEMENT ==========
+
+func create_battle_instance(world_map_name: String, player_ids: Array, npc_ids: Array = []) -> int:
+	"""Create a new instanced battle for players attacking NPCs on a world map.
+	Returns the instance_id for this battle."""
+
+	# Verify world map exists (we use it as the template for battle instances)
+	if world_map_name not in world_maps:
+		print("[ServerMapManager] ERROR: No world map for '%s'" % world_map_name)
+		return -1
+
+	var instance_id = next_instance_id
+	next_instance_id += 1
+
+	battle_instances[instance_id] = {
+		"map_name": world_map_name,
+		"players": player_ids.duplicate(),
+		"npcs": npc_ids.duplicate(),
+		"created_at": Time.get_unix_time_from_system(),
+		"state": "active"  # active, ending, cleanup
+	}
+
+	# Track which players are in this instance
+	for player_id in player_ids:
+		player_battle_instance[player_id] = instance_id
+
+	print("[ServerMapManager] Created battle instance %d on '%s' with %d players, %d NPCs" % [
+		instance_id, world_map_name, player_ids.size(), npc_ids.size()
+	])
+
+	return instance_id
+
+
+func get_battle_instance(instance_id: int) -> Dictionary:
+	"""Get battle instance data"""
+	return battle_instances.get(instance_id, {})
+
+
+func get_player_battle_instance(player_id: int) -> int:
+	"""Get the battle instance a player is in, or -1 if not in battle"""
+	return player_battle_instance.get(player_id, -1)
+
+
+func is_player_in_battle(player_id: int) -> bool:
+	"""Check if a player is currently in a battle instance"""
+	return player_battle_instance.has(player_id)
+
+
+func add_player_to_battle(instance_id: int, player_id: int):
+	"""Add a player to an existing battle instance (e.g., squad member joins)"""
+	if not battle_instances.has(instance_id):
+		return
+
+	if player_id not in battle_instances[instance_id].players:
+		battle_instances[instance_id].players.append(player_id)
+		player_battle_instance[player_id] = instance_id
+
+
+func remove_player_from_battle(player_id: int):
+	"""Remove a player from their battle instance (flee, death, victory)"""
+	if not player_battle_instance.has(player_id):
+		return
+
+	var instance_id = player_battle_instance[player_id]
+	player_battle_instance.erase(player_id)
+
+	if battle_instances.has(instance_id):
+		battle_instances[instance_id].players.erase(player_id)
+
+		# If no players left, mark for cleanup
+		if battle_instances[instance_id].players.is_empty():
+			battle_instances[instance_id].state = "cleanup"
+			print("[ServerMapManager] Battle instance %d marked for cleanup (no players)" % instance_id)
+
+
+func end_battle_instance(instance_id: int, result: String = "victory"):
+	"""End a battle instance (victory, defeat, flee)"""
+	if not battle_instances.has(instance_id):
+		return
+
+	battle_instances[instance_id].state = "ending"
+	battle_instances[instance_id].result = result
+
+	# Remove all players from battle tracking
+	for player_id in battle_instances[instance_id].players:
+		player_battle_instance.erase(player_id)
+
+	print("[ServerMapManager] Battle instance %d ended with result: %s" % [instance_id, result])
+
+
+func cleanup_battle_instance(instance_id: int):
+	"""Fully remove a battle instance after it's ended"""
+	if battle_instances.has(instance_id):
+		battle_instances.erase(instance_id)
+		print("[ServerMapManager] Battle instance %d cleaned up" % instance_id)
+
+
+func get_players_in_battle_on_map(world_map_name: String) -> Array:
+	"""Get all players currently in battle instances for a specific world map"""
+	var players = []
+	for instance_id in battle_instances:
+		if battle_instances[instance_id].map_name == world_map_name:
+			players.append_array(battle_instances[instance_id].players)
+	return players
+
+
+func get_active_battle_count() -> int:
+	"""Get count of active battle instances"""
+	var count = 0
+	for instance_id in battle_instances:
+		if battle_instances[instance_id].state == "active":
+			count += 1
+	return count

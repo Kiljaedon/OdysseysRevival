@@ -4,17 +4,19 @@ extends EditorExportPlugin
 func _export_begin(features: PackedStringArray, is_debug: bool, path: String, flags: int) -> void:
 	if features.has("client"):
 		return
-		
-	
-	var config := ConfigFile.new()
-	var override_content: String = "[autoload]
-	Events=null"
+
+	# Server export - disable client-only autoloads
+	var override_content: String = """[autoload]
+WindowFix=null
+UIScaler=null
+MainMenuHandler=null"""
+
 	add_file(
 		"override.cfg",
 		override_content.to_utf8_buffer(),
 		true
 	)
-	print("Server export detected. Removing client autoload...")
+	print("Server export detected. Disabling client-only autoloads (WindowFix, UIScaler, MainMenuHandler)...")
 
 
 func _export_end() -> void:

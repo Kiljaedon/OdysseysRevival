@@ -6,14 +6,13 @@ extends Node
 ##   - AuthNetworkService: Account/login
 ##   - CharacterNetworkService: Character CRUD
 ##   - WorldNetworkService: Movement/presence
-##   - CombatNetworkService: Battle system
+##   - RealtimeCombatNetworkService: Real-time combat
 ##   - ChatNetworkService: Chat messages
 ##   - AdminNetworkService: Content uploads
 
 const AuthNetworkService = preload("res://source/common/network/services/auth_network_service.gd")
 const CharacterNetworkService = preload("res://source/common/network/services/character_network_service.gd")
 const WorldNetworkService = preload("res://source/common/network/services/world_network_service.gd")
-const CombatNetworkService = preload("res://source/common/network/services/combat_network_service.gd")
 const RealtimeCombatNetworkService = preload("res://source/common/network/services/realtime_combat_network_service.gd")
 const ChatNetworkService = preload("res://source/common/network/services/chat_network_service.gd")
 const AdminNetworkService = preload("res://source/common/network/services/admin_network_service.gd")
@@ -22,7 +21,6 @@ const AdminNetworkService = preload("res://source/common/network/services/admin_
 var auth_service: Node
 var character_service: Node
 var world_service: Node
-var combat_service: Node
 var rt_combat_service: Node
 var chat_service: Node
 var admin_service: Node
@@ -67,10 +65,6 @@ func _init_services():
 	world_service.name = "WorldService"
 	add_child(world_service)
 
-	combat_service = CombatNetworkService.new()
-	combat_service.name = "CombatService"
-	add_child(combat_service)
-
 	rt_combat_service = RealtimeCombatNetworkService.new()
 	rt_combat_service.name = "RealtimeCombatService"
 	add_child(rt_combat_service)
@@ -88,7 +82,6 @@ func _propagate_server_world():
 	auth_service.server_world = server_world
 	character_service.server_world = server_world
 	world_service.server_world = server_world
-	combat_service.server_world = server_world
 	rt_combat_service.server_world = server_world
 	chat_service.server_world = server_world
 	admin_service.server_world = server_world
@@ -192,49 +185,6 @@ func map_changed(map_name: String, spawn_x: float, spawn_y: float):
 	world_service.on_map_changed(map_name, spawn_x, spawn_y)
 
 
-# ==================== COMBAT RPCs ====================
-
-@rpc("any_peer")
-func request_npc_attack(npc_id: int):
-	combat_service.handle_npc_attack(npc_id)
-
-@rpc("any_peer")
-func send_player_battle_action(combat_id: int, action_type: String, target_id: int):
-	combat_service.handle_player_battle_action(combat_id, action_type, target_id)
-
-@rpc("any_peer")
-func handle_player_action(combat_id: int, action: String, target_id: int):
-	combat_service.handle_player_action(combat_id, action, target_id)
-
-@rpc("any_peer")
-func send_battle_end(combat_id: int, victory: bool):
-	combat_service.handle_battle_end(combat_id, victory)
-
-@rpc
-func binary_combat_start(packet: PackedByteArray):
-	combat_service.on_binary_combat_start(packet)
-
-@rpc
-func combat_round_results(combat_id: int, results: Dictionary):
-	combat_service.on_combat_round_results(combat_id, results)
-
-@rpc("any_peer")
-func receive_action_result(result: Dictionary):
-	combat_service.on_receive_action_result(result)
-
-@rpc("any_peer")
-func receive_battle_end(combat_id: int, result: Dictionary):
-	combat_service.on_receive_battle_end(combat_id, result)
-
-@rpc("any_peer")
-func start_action_selection(round_number: int):
-	combat_service.on_start_action_selection(round_number)
-
-@rpc("any_peer")
-func round_complete_request_ready(round_number: int):
-	combat_service.on_round_complete_request_ready(round_number)
-
-
 # ==================== REALTIME COMBAT RPCs ====================
 
 @rpc("any_peer")
@@ -250,8 +200,8 @@ func rt_player_attack(target_id: String):
 	rt_combat_service.handle_rt_player_attack(target_id)
 
 @rpc("any_peer")
-func rt_player_defend():
-	rt_combat_service.handle_rt_player_defend()
+func rt_player_dodge_roll(direction_x: float, direction_y: float):
+	rt_combat_service.handle_rt_player_dodge_roll(direction_x, direction_y)
 
 @rpc
 func rt_battle_start(battle_data: Dictionary):
@@ -270,8 +220,8 @@ func rt_unit_death(unit_id: String):
 	rt_combat_service.on_rt_unit_death(unit_id)
 
 @rpc
-func rt_defend_event(unit_id: String):
-	rt_combat_service.on_rt_defend_event(unit_id)
+func rt_dodge_roll_event(unit_id: String, direction_x: float, direction_y: float):
+	rt_combat_service.on_rt_dodge_roll_event(unit_id, direction_x, direction_y)
 
 @rpc
 func rt_battle_end(battle_id: int, result: String, rewards: Dictionary):
@@ -346,12 +296,6 @@ func send_npc_spawn(peer_id: int, npc_id: int, npc_data: Dictionary):
 
 func send_sync_npc_positions(peer_id: int, npc_positions: Dictionary):
 	world_service.send_sync_npc_positions(peer_id, npc_positions)
-
-func send_binary_combat_start(peer_id: int, packet: PackedByteArray):
-	combat_service.send_binary_combat_start(peer_id, packet)
-
-func send_combat_round_results(peer_id: int, combat_id: int, results: Dictionary):
-	combat_service.send_combat_round_results(peer_id, combat_id, results)
 
 func send_upload_response(peer_id: int, success: bool, message: String):
 	admin_service.send_upload_response(peer_id, success, message)

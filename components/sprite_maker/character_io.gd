@@ -111,6 +111,13 @@ func save_character(char_name: String, current_type: String, character_data: Dic
 		"animations": {}
 	}
 
+	# Add NPC-specific role data
+	if current_type == "npc" and stats.has("npc_role"):
+		save_data["npc_role"] = stats.npc_role
+		save_data["dialogue"] = stats.get("dialogue", "")
+		save_data["npc_role_data"] = stats.get("npc_role_data", {})
+		save_data["is_non_combatant"] = stats.get("is_non_combatant", false)
+
 	# Convert texture references to atlas coordinates for saving
 	for anim_name in character_data.get("animations", {}):
 		save_data.animations[anim_name] = []
@@ -221,6 +228,16 @@ func load_character(load_path: String, char_name: String) -> Dictionary:
 
 		if save_data.has("flavor_text"):
 			stats_to_load["description"] = save_data.flavor_text.get("description", "")
+
+		# Load NPC role data
+		if save_data.has("npc_role"):
+			stats_to_load["npc_role"] = save_data.npc_role
+		if save_data.has("dialogue"):
+			stats_to_load["dialogue"] = save_data.dialogue
+		if save_data.has("npc_role_data"):
+			stats_to_load["npc_role_data"] = save_data.npc_role_data
+		if save_data.has("is_non_combatant"):
+			stats_to_load["is_non_combatant"] = save_data.is_non_combatant
 
 		stats_panel.set_type(loaded_type)
 		stats_panel.set_stats(stats_to_load)
@@ -365,6 +382,13 @@ func _prepare_upload_data(char_name: String, current_type: String, character_dat
 		"created_date": Time.get_datetime_string_from_system(),
 		"animations": {}
 	}
+
+	# Add NPC-specific role data for upload
+	if current_type == "npc" and stats.has("npc_role"):
+		upload_data["npc_role"] = stats.npc_role
+		upload_data["dialogue"] = stats.get("dialogue", "")
+		upload_data["npc_role_data"] = stats.get("npc_role_data", {})
+		upload_data["is_non_combatant"] = stats.get("is_non_combatant", false)
 
 	# Convert animations to atlas coordinates
 	for anim_name in character_data.get("animations", {}):

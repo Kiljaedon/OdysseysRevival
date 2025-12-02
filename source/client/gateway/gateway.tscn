@@ -1,4 +1,4 @@
-[gd_scene load_steps=17 format=3 uid="uid://5wv1gfwppcnf"]
+[gd_scene load_steps=16 format=3 uid="uid://5wv1gfwppcnf"]
 
 [ext_resource type="Theme" uid="uid://cf1ayo3dckj67" path="res://source/client/gateway/ui/theme_navy.tres" id="1_sg1qr"]
 [ext_resource type="Script" path="res://source/client/gateway/gateway.gd" id="2_74q4y"]
@@ -7,7 +7,6 @@
 [ext_resource type="FontFile" uid="uid://cehc3gujked8x" path="res://assets/fonts/Cinzel/static/Cinzel-Bold.ttf" id="6_opc3y"]
 [ext_resource type="FontFile" uid="uid://cr1d4ugttxggp" path="res://assets/fonts/Atkinson_Hyperlegible/AtkinsonHyperlegible-Bold.ttf" id="7_tnybn"]
 [ext_resource type="StyleBox" uid="uid://bi8r7kxlh83no" path="res://source/client/gateway/ui/gradient_button.tres" id="8_waovh"]
-[ext_resource type="PackedScene" uid="uid://hy5zj1f0r3def" path="res://odyssey_character.tscn" id="9_character"]
 [ext_resource type="Script" uid="uid://q5rsjtg6nsto" path="res://source/client/gateway/ui/popup_panel.gd" id="10_4rdug"]
 [ext_resource type="Script" path="res://addons/scaling_canvas_layer/scaling_canvas_layer.gd" id="12_scaling"]
 

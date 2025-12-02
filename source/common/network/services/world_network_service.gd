@@ -42,24 +42,50 @@ func send_sync_npc_positions(peer_id: int, npc_positions: Dictionary):
 ## ========== CLIENT-SIDE RESPONSE HANDLERS ==========
 
 func on_player_spawned(spawned_peer_id: int, player_data: Dictionary):
+	# Try direct routing
+	var manager = get_parent().get_meta("multiplayer_manager", null)
+	if manager:
+		manager.handle_player_spawned(spawned_peer_id, player_data)
+		return
+
 	var controller = get_parent()._find_node_with_script("dev_client_controller.gd")
 	if controller:
 		controller.handle_player_spawned(spawned_peer_id, player_data)
 
 
 func on_player_despawned(despawned_peer_id: int):
+	# Try direct routing
+	var manager = get_parent().get_meta("multiplayer_manager", null)
+	if manager:
+		manager.handle_player_despawned(despawned_peer_id)
+		return
+
 	var controller = get_parent()._find_node_with_script("dev_client_controller.gd")
 	if controller:
 		controller.handle_player_despawned(despawned_peer_id)
 
 
 func on_sync_positions(positions: Dictionary):
+	# Try direct routing
+	var manager = get_parent().get_meta("multiplayer_manager", null)
+	if manager:
+		manager.sync_positions(positions)
+		return
+
 	var controller = get_parent()._find_node_with_script("dev_client_controller.gd")
 	if controller:
 		controller.handle_sync_positions(positions)
 
 
 func on_binary_positions(packet: PackedByteArray):
+	# Try direct routing (Requires both managers)
+	var mp_manager = get_parent().get_meta("multiplayer_manager", null)
+	var npc_manager = get_parent().get_meta("npc_manager", null)
+	
+	if mp_manager and npc_manager:
+		mp_manager.handle_binary_positions(packet, npc_manager.get_server_npcs())
+		return
+
 	var controller = get_parent()._find_node_with_script("dev_client_controller.gd")
 	if controller:
 		controller.handle_binary_positions(packet)
@@ -67,12 +93,25 @@ func on_binary_positions(packet: PackedByteArray):
 
 func on_npc_spawned(npc_id: int, npc_data: Dictionary):
 	print("[WorldService] NPC spawned received: %d" % npc_id)
+	
+	# Try direct routing
+	var manager = get_parent().get_meta("npc_manager", null)
+	if manager:
+		manager.handle_npc_spawned(npc_id, npc_data)
+		return
+
 	var controller = get_parent()._find_node_with_script("dev_client_controller.gd")
 	if controller:
 		controller.handle_npc_spawned(npc_id, npc_data)
 
 
 func on_sync_npc_positions(npc_positions: Dictionary):
+	# Try direct routing
+	var manager = get_parent().get_meta("npc_manager", null)
+	if manager:
+		manager.handle_sync_npc_positions(npc_positions)
+		return
+
 	var controller = get_parent()._find_node_with_script("dev_client_controller.gd")
 	if controller:
 		controller.handle_sync_npc_positions(npc_positions)

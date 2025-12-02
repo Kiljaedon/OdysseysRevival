@@ -13,7 +13,7 @@ const ARENA_SIZES = {
 	"large": Vector2i(20, 16)    # Raid bosses
 }
 
-const DEFAULT_GRASS_TILE: int = 568  # From test map
+const DEFAULT_GRASS_TILE: int = 568  # Basic grass terrain tile
 
 ## ========== MAP GENERATION ==========
 

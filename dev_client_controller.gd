@@ -162,7 +162,8 @@ func _ready():
 		load_character_classes()
 
 	# Restore NPCs if returning from battle
-	restore_npcs_from_battle()
+	if npc_manager:
+		npc_manager.restore_npcs_from_battle()
 
 	# Populate map dropdown
 	populate_map_dropdown()
@@ -293,6 +294,13 @@ func _initialize_managers() -> void:
 	# Sync server_npcs reference between managers
 	server_npcs = npc_manager.get_server_npcs()
 	input_handler_manager.server_npcs = server_npcs
+
+	# Register managers with ServerConnection for direct RPC routing
+	var server_conn = get_tree().root.get_node_or_null("ServerConnection")
+	if server_conn:
+		server_conn.set_meta("multiplayer_manager", multiplayer_manager)
+		server_conn.set_meta("npc_manager", npc_manager)
+		print("[DevClient] ✓ Registered managers with ServerConnection")
 
 	# Initialize realtime battle launcher
 	var BattleLauncherScript = load("res://scripts/realtime_battle/realtime_battle_launcher.gd")
@@ -746,101 +754,7 @@ func handle_spawn_accepted(player_data: Dictionary):
 	else:
 		print("WARNING: Multiplayer manager not initialized")
 
-func handle_spawn_rejected(reason: String):
-	"""Delegation wrapper for MultiplayerManager.handle_spawn_rejected()"""
-	if multiplayer_manager:
-		multiplayer_manager.handle_spawn_rejected(reason)
-	else:
-		print("WARNING: Multiplayer manager not initialized")
-
-func handle_player_spawned(peer_id: int, player_data: Dictionary):
-	"""Delegation wrapper for MultiplayerManager.handle_player_spawned()"""
-	if multiplayer_manager:
-		multiplayer_manager.handle_player_spawned(peer_id, player_data)
-	else:
-		print("WARNING: Multiplayer manager not initialized")
-
-func handle_player_despawned(peer_id: int):
-	"""Delegation wrapper for MultiplayerManager.handle_player_despawned()"""
-	if multiplayer_manager:
-		multiplayer_manager.handle_player_despawned(peer_id)
-	else:
-		print("WARNING: Multiplayer manager not initialized")
-
-@rpc
-func sync_positions(positions: Dictionary):
-	"""Delegation wrapper for MultiplayerManager.sync_positions()"""
-	if multiplayer_manager:
-		multiplayer_manager.sync_positions(positions)
-	else:
-		print("WARNING: Multiplayer manager not initialized")
-
-
-func handle_binary_positions(packet: PackedByteArray):
-	"""Delegation wrapper for MultiplayerManager.handle_binary_positions()"""
-	if multiplayer_manager and npc_manager:
-		multiplayer_manager.handle_binary_positions(packet, npc_manager.get_server_npcs())
-	else:
-		print("WARNING: Multiplayer or NPC manager not initialized")
-
-func receive_chat_message(player_name: String, message: String):
-	"""Delegation wrapper for MultiplayerManager.receive_chat_message()"""
-	if multiplayer_manager:
-		multiplayer_manager.receive_chat_message(player_name, message)
-	else:
-		print("WARNING: Multiplayer manager not initialized")
-
 ## ============================================================================
 ## NPC RPC HANDLERS (Delegated to NPCManager)
 ## ============================================================================
-
-func restore_npcs_from_battle():
-	"""Delegation wrapper for NPCManager.restore_npcs_from_battle()"""
-	if npc_manager:
-		npc_manager.restore_npcs_from_battle()
-		# Sync the reference after restoration
-		server_npcs = npc_manager.get_server_npcs()
-		if input_handler_manager:
-			input_handler_manager.server_npcs = server_npcs
-	else:
-		print("WARNING: NPC manager not initialized")
-
-func handle_npc_spawned(npc_id: int, npc_data: Dictionary):
-	"""Delegation wrapper for NPCManager.handle_npc_spawned()"""
-	if npc_manager:
-		npc_manager.handle_npc_spawned(npc_id, npc_data)
-		# Sync the reference after spawning
-		server_npcs = npc_manager.get_server_npcs()
-		if input_handler_manager:
-			input_handler_manager.server_npcs = server_npcs
-	else:
-		print("[DevClient] ERROR: NPC manager not initialized")
-
-@rpc
-func handle_sync_npc_positions(npc_positions: Dictionary):
-	"""Delegation wrapper for NPCManager.handle_sync_npc_positions()"""
-	if npc_manager:
-		npc_manager.handle_sync_npc_positions(npc_positions)
-	else:
-		print("WARNING: NPC manager not initialized")
-
-
-func handle_binary_combat_start(packet: PackedByteArray):
-	"""Delegation wrapper for MultiplayerManager.handle_binary_combat_start()"""
-	print("[DEV_CONTROLLER] handle_binary_combat_start called! Packet size: %d" % packet.size())
-	print("[DEV_CONTROLLER] multiplayer_manager: %s, npc_manager: %s" % [multiplayer_manager != null, npc_manager != null])
-
-	if multiplayer_manager and npc_manager:
-		print("[DEV_CONTROLLER] ✓ Forwarding to multiplayer_manager...")
-		multiplayer_manager.handle_binary_combat_start(packet, npc_manager.get_server_npcs())
-		print("[DEV_CONTROLLER] ✓ multiplayer_manager.handle_binary_combat_start() completed")
-	else:
-		print("[DEV_CONTROLLER] ✗ ERROR: Multiplayer or NPC manager not initialized!")
-		print("[DEV_CONTROLLER] multiplayer_manager=%s, npc_manager=%s" % [multiplayer_manager, npc_manager])
-
-func handle_combat_round_results(combat_id: int, results: Dictionary):
-	"""Delegation wrapper for MultiplayerManager.handle_combat_round_results()"""
-	if multiplayer_manager:
-		multiplayer_manager.handle_combat_round_results(combat_id, results)
-	else:
-		print("WARNING: Multiplayer manager not initialized")
+# Note: NPC handlers moved to direct routing via ServerConnection meta registration

@@ -22,6 +22,14 @@ func broadcast_chat_to_peer(peer_id: int, player_name: String, message: String):
 
 func on_receive_chat_message(player_name: String, message: String):
 	print("[ChatService] Chat from %s: %s" % [player_name, message])
+	
+	# Try direct routing to MultiplayerManager
+	var manager = get_parent().get_meta("multiplayer_manager", null)
+	if manager and manager.has_method("receive_chat_message"):
+		manager.receive_chat_message(player_name, message)
+		return
+	
+	# Fallback to controller
 	var controller = get_parent()._find_node_with_script("dev_client_controller.gd")
 	if controller and controller.has_method("receive_chat_message"):
 		controller.receive_chat_message(player_name, message)

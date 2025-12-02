@@ -4,7 +4,7 @@ extends Node
 ## Phase 3: UI System Manager - Manages all draggable panels and UI creation
 ## Handles: Panel factory, UI layout, draggable panel management, content creation
 
-const DraggablePanel = preload("res://draggable_panel.gd")
+const DraggablePanel = preload("res://source/client/ui/common/draggable_panel.gd")
 
 ## State tracking
 var draggable_panels: Array[Panel] = []

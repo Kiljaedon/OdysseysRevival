@@ -4,7 +4,7 @@ extends Node
 ## Stores accounts, characters, and game data with automatic fallback
 
 # CONFIGURATION
-const USE_SQLITE = true  # Set to true to enable SQLite backend (Phase 9)
+const USE_SQLITE = false  # SQLite disabled - using JSON storage (sqlite3 CLI not available on Windows)
 
 const ACCOUNTS_DIR = "res://data/accounts/"
 const CHARACTERS_DIR = "res://data/characters/"

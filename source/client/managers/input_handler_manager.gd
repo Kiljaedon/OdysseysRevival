@@ -41,7 +41,7 @@ var character_sheet: Panel = null
 # ============================================================================
 
 var server_npcs: Dictionary = {}  # Reference to server NPCs for hit detection
-var WanderingNPC = preload("res://wandering_npc.gd")  # NPC class for type checking
+var WanderingNPC = preload("res://source/client/gameplay/wandering_npc.gd")  # NPC class for type checking
 var on_npc_attacked: Callable = Callable()  # Callback when NPC is hit - set by parent controller
 
 # Weapon state reference (for sheath/unsheath toggle)

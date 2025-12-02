@@ -156,31 +156,43 @@ func _on_class_selected(index: int, class_dropdown: OptionButton) -> void:
 ## ============================================================================
 
 func load_maps() -> void:
-	"""Scan and load available TMX maps from res://maps/ directory.
+	"""Scan and load available TMX maps from res://maps/ directory and subdirectories.
 
-	Populates available_maps array with filenames.
+	Populates available_maps array with relative paths (e.g., "World Maps/sample_map").
 	Signal: maps_loaded(available_maps)
 	"""
 	print("[DevTools] Scanning for available maps...")
 
 	available_maps.clear()
 
-	# Scan for TMX files
+	# Scan for TMX files in root and subdirectories
 	var maps_dir = DirAccess.open(maps_directory)
 	if maps_dir:
 		maps_dir.list_dir_begin()
-		var file_name = maps_dir.get_next()
+		var entry_name = maps_dir.get_next()
 
-		while file_name != "":
-			if file_name.ends_with(".tmx"):
-				var map_name = file_name.get_basename()
+		while entry_name != "":
+			if maps_dir.current_is_dir() and not entry_name.begins_with("."):
+				# Scan subdirectory for TMX files
+				var subdir_path = maps_directory + entry_name
+				var subdir = DirAccess.open(subdir_path)
+				if subdir:
+					subdir.list_dir_begin()
+					var file_name = subdir.get_next()
+					while file_name != "":
+						if file_name.ends_with(".tmx"):
+							var map_path = entry_name + "/" + file_name.get_basename()
+							available_maps.append(map_path)
+							print("[DevTools] Found map: ", map_path)
+						file_name = subdir.get_next()
+					subdir.list_dir_end()
+			elif entry_name.ends_with(".tmx"):
+				# TMX file in root maps directory
+				var map_name = entry_name.get_basename()
 				available_maps.append(map_name)
 				print("[DevTools] Found map: ", map_name)
-			file_name = maps_dir.get_next()
+			entry_name = maps_dir.get_next()
 		maps_dir.list_dir_end()
-
-	# Add default test map option
-	available_maps.append("default_test")
 
 	print("[DevTools] ✓ Loaded %d maps" % available_maps.size())
 	maps_loaded.emit(available_maps)

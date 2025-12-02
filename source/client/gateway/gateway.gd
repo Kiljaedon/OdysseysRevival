@@ -419,7 +419,7 @@ func _on_sprite_creator_pressed():
 	print("Launching Odyssey Sprite Creator...")
 
 	# Launch the new Odyssey sprite maker
-	get_tree().change_scene_to_file("res://odyssey_sprite_maker.tscn")
+	get_tree().change_scene_to_file("res://tools/sprite_maker/odyssey_sprite_maker.tscn")
 
 func _on_tiled_editor_pressed():
 	print("Launching Tiled Map Editor...")

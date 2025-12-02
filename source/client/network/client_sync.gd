@@ -159,8 +159,9 @@ func _handle_combat_start(packet: PackedByteArray):
 	else:
 		push_warning("[CLIENT_SYNC] GameState not found - combat data may not be accessible to battle scene")
 
-	# Load battle scene
-	get_tree().change_scene_to_file("res://battle_window.tscn")
+	# NOTE: Battle scene loading is handled by RealtimeBattleLauncher via realtime_combat_network_service
+	# DO NOT use change_scene_to_file here - it destroys the current map and prevents map cloning
+	print("[CLIENT_SYNC] Combat data stored - waiting for realtime battle system to launch")
 
 
 ## ========== MAP TRANSITION HANDLERS ==========

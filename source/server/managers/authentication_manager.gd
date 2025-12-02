@@ -42,8 +42,6 @@ func request_create_account(username: String, password: String):
 	log_message("[DEBUG] request_create_account called by peer %d, username: %s" % [peer_id, username])
 	if debug_console:
 		debug_console.add_log("RPC: Create account from peer %d" % peer_id, "cyan")
-	else:
-		print("[DEBUG] debug_console is null in request_create_account")
 
 	# Validate username
 	if username.strip_edges().is_empty():

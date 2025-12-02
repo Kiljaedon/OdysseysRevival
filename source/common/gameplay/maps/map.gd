@@ -6,9 +6,8 @@ extends Node2D
 @export var replicated_props_container: ReplicatedPropsContainer
 @export var map_background_color := Color(0,0,0)
 
-## Path to the battle map scene used when combat occurs on this map
-## Example: "res://source/common/gameplay/maps/maps/Battle Maps/grassland_battle.tscn"
-## Arena size: 892 x 660 pixels
+## DEPRECATED: No longer used - world maps now serve as battle arenas directly
+## The realtime battle system uses the current world map as the battle background
 @export var battle_map_path: String = ""
 
 var warpers: Dictionary[int, Warper]

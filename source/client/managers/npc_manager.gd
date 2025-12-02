@@ -13,7 +13,7 @@ extends Node
 ## ============================================================================
 
 # Preloaded resources
-const WanderingNPC = preload("res://wandering_npc.gd")
+const WanderingNPC = preload("res://source/client/gameplay/wandering_npc.gd")
 
 # Dependencies (injected during initialization)
 var game_world: Node2D
