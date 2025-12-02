@@ -288,6 +288,9 @@ func send_player_despawned(peer_id: int, despawned_peer_id: int):
 func send_sync_positions(peer_id: int, positions: Dictionary):
 	world_service.send_sync_positions(peer_id, positions)
 
+func send_prediction_ack(peer_id: int, sequence: int, position: Vector2):
+	world_service.send_prediction_ack(peer_id, sequence, position)
+
 func broadcast_chat_to_peer(peer_id: int, player_name: String, message: String):
 	chat_service.broadcast_chat_to_peer(peer_id, player_name, message)
 

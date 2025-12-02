@@ -30,6 +30,11 @@ func send_binary_positions(peer_id: int, packet: PackedByteArray):
 	get_parent().binary_positions.rpc_id(peer_id, packet)
 
 
+func send_prediction_ack(peer_id: int, sequence: int, position: Vector2):
+	var packet = PacketEncoder.build_prediction_ack_packet(peer_id, sequence, position)
+	get_parent().binary_positions.rpc_id(peer_id, packet)
+
+
 func send_npc_spawn(peer_id: int, npc_id: int, npc_data: Dictionary):
 	print("[WorldService] Sending NPC spawn to peer %d: NPC %d" % [peer_id, npc_id])
 	get_parent().npc_spawned.rpc_id(peer_id, npc_id, npc_data)

@@ -280,6 +280,10 @@ func _initialize_managers() -> void:
 	multiplayer_manager.initialize(game_world, test_character, character_sprite_manager,
 									 spriteframes_cache, character_data_cache)
 
+	# Connect input handler to multiplayer manager for prediction
+	input_handler_manager.set_multiplayer_manager(multiplayer_manager)
+	multiplayer_manager.set_input_handler_manager(input_handler_manager)
+
 	# NPC Manager (Phase 5)
 	npc_manager = NPCManager.new()
 	add_child(npc_manager)
@@ -310,8 +314,7 @@ func _initialize_managers() -> void:
 		battle_launcher.name = "BattleLauncher"
 		add_child(battle_launcher)
 		battle_launcher.initialize(game_world)
-		# Register with ServerConnection
-		var server_conn = get_tree().root.get_node_or_null("ServerConnection")
+		# Register with ServerConnection (Reuse server_conn if available)
 		if server_conn:
 			server_conn.set_meta("realtime_battle_launcher", battle_launcher)
 		print("[DevClient] ✓ Realtime battle launcher initialized")
@@ -434,16 +437,8 @@ func _physics_process(delta):
 	if input_handler_manager:
 		input_handler_manager.process_movement(delta)
 
-	# Apply character movement
-	if test_character:
-		test_character.move_and_slide()
-
 	# Update frame display regularly
 	update_frame_display()
-
-	# Send position updates to server (delegated to MultiplayerManager)
-	if multiplayer_manager:
-		multiplayer_manager.update_multiplayer_position(delta)
 
 # NOTE: Movement and animation functions removed - call input_handler_manager directly
 

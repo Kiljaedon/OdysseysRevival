@@ -10,6 +10,7 @@ enum Type {
 	PLAYER_POSITION = 0x02,      # Player position update
 	NPC_POSITION = 0x03,         # Single NPC position
 	BULK_POSITIONS = 0x04,       # Multiple entity positions
+	PREDICTION_ACK = 0x05,       # Server acknowledgment of input with corrected position
 
 	# Entity state (unreliable UDP)
 	ENTITY_STATE = 0x10,         # Animation, direction, velocity
@@ -35,9 +36,10 @@ enum Type {
 
 ## Packet size constants (for validation)
 const PACKET_SIZE = {
-	Type.PLAYER_INPUT: 6,        # type(1) + flags(1) + timestamp(4)
+	Type.PLAYER_INPUT: 8,        # type(1) + flags(1) + sequence(2) + timestamp(4)
 	Type.PLAYER_POSITION: 11,    # type(1) + peer_id(2) + x(4) + y(4)
 	Type.NPC_POSITION: 11,       # type(1) + npc_id(2) + x(4) + y(4)
+	Type.PREDICTION_ACK: 13,     # type(1) + peer_id(2) + sequence(2) + x(4) + y(4)
 	Type.ENTITY_STATE: 7,        # type(1) + entity_id(2) + state(1) + dir(1) + vel_x(2) + vel_y(2)
 	Type.COMBAT_STATE: 9,        # type(1) + entity_id(2) + hp(2) + max_hp(2) + effects(2)
 }
@@ -49,6 +51,7 @@ static func get_packet_name(type: int) -> String:
 		Type.PLAYER_POSITION: return "PLAYER_POSITION"
 		Type.NPC_POSITION: return "NPC_POSITION"
 		Type.BULK_POSITIONS: return "BULK_POSITIONS"
+		Type.PREDICTION_ACK: return "PREDICTION_ACK"
 		Type.ENTITY_STATE: return "ENTITY_STATE"
 		Type.COMBAT_STATE: return "COMBAT_STATE"
 		Type.COMBAT_START: return "COMBAT_START"

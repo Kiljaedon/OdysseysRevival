@@ -139,9 +139,10 @@ static func get_class_name(cls_id: int) -> String:
 
 ## ========== PACKET BUILDERS ==========
 
-static func build_player_input_packet(up: bool, down: bool, left: bool, right: bool, timestamp: int) -> PackedByteArray:
-	"""Build PLAYER_INPUT packet (6 bytes)
-	Packs 4 boolean inputs into 1 byte as bit flags"""
+static func build_player_input_packet(up: bool, down: bool, left: bool, right: bool, sequence: int, timestamp: int) -> PackedByteArray:
+	"""Build PLAYER_INPUT packet (8 bytes)
+	Packs 4 boolean inputs into 1 byte as bit flags
+	Format: type(1) + flags(1) + sequence(2) + timestamp(4)"""
 	var packet = PackedByteArray()
 	packet.append(PacketTypes.Type.PLAYER_INPUT)
 
@@ -153,15 +154,28 @@ static func build_player_input_packet(up: bool, down: bool, left: bool, right: b
 	if right: flags |= (1 << 3)
 	packet.append(flags)
 
+	# Add sequence number (2 bytes)
+	packet.append_array(encode_u16(sequence))
+
 	# Add timestamp (4 bytes)
 	packet.append_array(encode_u32(timestamp))
-	return packet  # Total: 6 bytes
+	return packet  # Total: 8 bytes
 
 static func build_player_position_packet(peer_id: int, position: Vector2) -> PackedByteArray:
 	"""Build PLAYER_POSITION packet (11 bytes)"""
 	var packet = PackedByteArray()
 	packet.append(PacketTypes.Type.PLAYER_POSITION)
 	packet.append_array(encode_u16(peer_id))
+	packet.append_array(encode_vector2(position))
+	return packet
+
+static func build_prediction_ack_packet(peer_id: int, sequence: int, position: Vector2) -> PackedByteArray:
+	"""Build PREDICTION_ACK packet (13 bytes)
+	Format: type(1) + peer_id(2) + sequence(2) + x(4) + y(4)"""
+	var packet = PackedByteArray()
+	packet.append(PacketTypes.Type.PREDICTION_ACK)
+	packet.append_array(encode_u16(peer_id))
+	packet.append_array(encode_u16(sequence))
 	packet.append_array(encode_vector2(position))
 	return packet
 
@@ -278,7 +292,7 @@ static func build_combat_state_packet(entity_id: int, hp: int, max_hp: int, effe
 
 static func parse_player_input_packet(data: PackedByteArray) -> Dictionary:
 	"""Parse PLAYER_INPUT packet"""
-	if data.size() < 6:
+	if data.size() < 8:
 		push_error("PacketEncoder: Invalid PLAYER_INPUT packet size")
 		return {}
 
@@ -289,14 +303,18 @@ static func parse_player_input_packet(data: PackedByteArray) -> Dictionary:
 	var left = (flags & (1 << 2)) != 0
 	var right = (flags & (1 << 3)) != 0
 
+	# Extract sequence
+	var sequence = decode_u16(data, 2)
+
 	# Extract timestamp
-	var timestamp = decode_u32(data, 2)
+	var timestamp = decode_u32(data, 4)
 
 	return {
 		"up": up,
 		"down": down,
 		"left": left,
 		"right": right,
+		"sequence": sequence,
 		"timestamp": timestamp
 	}
 
@@ -309,6 +327,18 @@ static func parse_player_position_packet(data: PackedByteArray) -> Dictionary:
 	return {
 		"peer_id": decode_u16(data, 1),
 		"position": decode_vector2(data, 3)
+	}
+
+static func parse_prediction_ack_packet(data: PackedByteArray) -> Dictionary:
+	"""Parse PREDICTION_ACK packet"""
+	if data.size() < 13:
+		push_error("PacketEncoder: Invalid PREDICTION_ACK packet size")
+		return {}
+
+	return {
+		"peer_id": decode_u16(data, 1),
+		"sequence": decode_u16(data, 3),
+		"position": decode_vector2(data, 5)
 	}
 
 static func parse_npc_position_packet(data: PackedByteArray) -> Dictionary:

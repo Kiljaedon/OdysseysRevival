@@ -21,14 +21,13 @@ const ChatUI = preload("res://source/client/ui/chat_ui.tscn")
 var game_world: Node2D
 var test_character: CharacterBody2D
 var character_sprite_manager: Node
+var input_handler_manager: Node
 
 # Multiplayer state
 var client: Node  # WorldClient or ServerConnection reference
 var remote_players: Dictionary = {}  # peer_id -> RemotePlayer instance
 var chat_ui: Control
 var name_label: Label
-var position_update_timer: float = 0.0
-var position_update_rate: float = 0.05  # 20Hz
 var my_peer_id: int = 0
 var my_username: String = ""
 var my_character_data: Dictionary = {}
@@ -55,6 +54,9 @@ func initialize(
 	character_sprite_manager = _character_sprite_manager
 	spriteframes_cache = _spriteframes_cache
 	character_data_cache = _character_data_cache
+
+func set_input_handler_manager(mgr: Node) -> void:
+	input_handler_manager = mgr
 
 ## ============================================================================
 ## MULTIPLAYER INITIALIZATION
@@ -163,31 +165,16 @@ func create_chat_ui() -> void:
 ## POSITION UPDATES
 ## ============================================================================
 
-func update_multiplayer_position(delta: float) -> void:
-	"""Send input to server for server-side movement authority"""
+func send_player_input(packet: PackedByteArray) -> void:
+	"""Send binary input packet to server via unreliable RPC"""
 	if not client or not multiplayer.has_multiplayer_peer():
 		return
 
-	position_update_timer += delta
-	if position_update_timer >= position_update_rate:
-		position_update_timer = 0.0
-
-		# Build binary input packet (6 bytes + minimal RPC overhead ~16 bytes = 22 bytes total)
-		var up = Input.is_action_pressed("up")
-		var down = Input.is_action_pressed("down")
-		var left = Input.is_action_pressed("left")
-		var right = Input.is_action_pressed("right")
-		var timestamp = Time.get_ticks_msec()
-
-		var packet = PacketEncoder.build_player_input_packet(up, down, left, right, timestamp)
-
-		# Send via unreliable RPC (allows multiplayer API to route it)
-		var server_conn = get_tree().root.get_node_or_null("ServerConnection")
-		if server_conn and is_instance_valid(server_conn) and multiplayer.has_multiplayer_peer():
-			# CRITICAL FIX: Use rpc_id(1) to send to server
-			server_conn.binary_input.rpc_id(1, packet)
-		elif not multiplayer.has_multiplayer_peer():
-			print("[MULTIPLAYER] ERROR: Cannot send input - no multiplayer peer connected")
+	var server_conn = get_tree().root.get_node_or_null("ServerConnection")
+	if server_conn and is_instance_valid(server_conn) and multiplayer.has_multiplayer_peer():
+		server_conn.binary_input.rpc_id(1, packet)
+	elif not multiplayer.has_multiplayer_peer():
+		print("[MULTIPLAYER] ERROR: Cannot send input - no multiplayer peer connected")
 
 ## ============================================================================
 ## CHAT MESSAGE HANDLING
@@ -373,6 +360,14 @@ func handle_binary_positions(packet: PackedByteArray, server_npcs: Dictionary) -
 							npc.animated_sprite.play(anim_name)
 							npc.animated_sprite.pause()
 							npc.animated_sprite.frame = 0
+
+	elif packet_type == PacketTypes.Type.PREDICTION_ACK:
+		var data = PacketEncoder.parse_prediction_ack_packet(packet)
+		if data:
+			var peer_id = data.peer_id
+			if peer_id == my_peer_id and input_handler_manager:
+				if input_handler_manager.has_method("reconcile"):
+					input_handler_manager.reconcile(data.sequence, data.position)
 
 	elif packet_type == PacketTypes.Type.NPC_POSITION:
 		var npc_data = PacketEncoder.parse_npc_position_packet(packet)

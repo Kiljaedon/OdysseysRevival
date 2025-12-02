@@ -52,6 +52,11 @@ var map_manager: MapManager = null
 var transition_cooldown: float = 0.0
 const TRANSITION_COOLDOWN_TIME: float = 0.5  # Prevent rapid re-triggers
 
+# Prediction System
+var prediction_history: Array = []
+var current_sequence: int = 0
+var multiplayer_manager: Node
+
 # ============================================================================
 # INITIALIZATION
 # ============================================================================
@@ -81,6 +86,9 @@ func initialize(character: CharacterBody2D, cam: Camera2D, anim_mgr: AnimationCo
 			print("[InputHandlerManager] Found and connected to WeaponState - attacks enabled")
 		else:
 			print("[InputHandlerManager] WARNING: WeaponState not found - attacks will not check sheath status")
+
+func set_multiplayer_manager(mgr: Node) -> void:
+	multiplayer_manager = mgr
 
 # ============================================================================
 # INPUT PROCESSING
@@ -124,6 +132,19 @@ func process_movement(delta: float) -> void:
 		transition_cooldown -= delta
 
 	handle_movement()
+	
+	# Apply physics movement (Prediction)
+	if test_character:
+		test_character.move_and_slide()
+		
+		# Store prediction state AFTER movement
+		if not is_attacking and multiplayer_manager:
+			# Record the position we ended up at for this sequence
+			# The input for this sequence produced this position
+			if prediction_history.size() > 0:
+				var last_entry = prediction_history.back()
+				if last_entry.sequence == current_sequence:
+					last_entry.position = test_character.position
 
 func handle_movement() -> void:
 	"""Process WASD movement, zoom, and attack input"""
@@ -152,49 +173,68 @@ func handle_movement() -> void:
 
 	# Handle attack test first (before direction changes)
 	if Input.is_action_just_pressed("action"):
-		print("[INPUT] SPACEBAR DETECTED! Checking attack conditions...")
-		print("[INPUT] - is_attacking: ", is_attacking)
-		print("[INPUT] - weapon_state exists: ", weapon_state != null)
-		if weapon_state:
-			print("[INPUT] - weapon_state.has_method('can_attack'): ", weapon_state.has_method("can_attack"))
-			if weapon_state.has_method("can_attack"):
-				print("[INPUT] - weapon_state.can_attack(): ", weapon_state.can_attack())
-
 		# Check weapon state - can only attack if weapon is unsheathed
 		if not is_attacking and weapon_state and weapon_state.has_method("can_attack") and weapon_state.can_attack():
-			print("[INPUT] ✓ ALL CONDITIONS MET - Calling test_attack_animation()")
 			test_attack_animation()
 		elif weapon_state and weapon_state.has_method("can_attack") and not weapon_state.can_attack():
-			print("[ATTACK BLOCKED] Weapon is SHEATHED! Press TAB to unsheath and enable combat.")
+			pass # Silently ignore or show hint
 		else:
-			print("[INPUT] ✗ ATTACK FAILED - Conditions not met")
+			pass
 
 	# Only allow movement if not attacking
 	if not is_attacking:
-		# Handle input
-		if Input.is_action_pressed("up"):
+		# Capture Input
+		var up = Input.is_action_pressed("up")
+		var down = Input.is_action_pressed("down")
+		var left = Input.is_action_pressed("left")
+		var right = Input.is_action_pressed("right")
+		
+		# Calculate Velocity
+		if up:
 			velocity.y -= movement_speed
 			current_direction = "up"
 			moving = true
-		elif Input.is_action_pressed("down"):
+		elif down:
 			velocity.y += movement_speed
 			current_direction = "down"
 			moving = true
 
-		if Input.is_action_pressed("left"):
+		if left:
 			velocity.x -= movement_speed
 			current_direction = "left"
 			moving = true
-		elif Input.is_action_pressed("right"):
+		elif right:
 			velocity.x += movement_speed
 			current_direction = "right"
 			moving = true
 
-		# Update animation based on movement (only if not attacking)
+		# Update animation based on movement
 		if moving:
 			play_walk_animation()
 		else:
 			play_idle_animation()
+			
+		# CLIENT-SIDE PREDICTION
+		if multiplayer_manager and multiplayer_manager.has_method("send_player_input"):
+			# Increment sequence
+			current_sequence = (current_sequence + 1) % 65536
+			var timestamp = Time.get_ticks_msec()
+			
+			# Send input to server
+			var packet = PacketEncoder.build_player_input_packet(up, down, left, right, current_sequence, timestamp)
+			multiplayer_manager.send_player_input(packet)
+			
+			# Record prediction history (Position will be updated after move_and_slide)
+			prediction_history.append({
+				"sequence": current_sequence,
+				"timestamp": timestamp,
+				"velocity": velocity,
+				"position": Vector2.ZERO # Placeholder, updated in process_movement
+			})
+			
+			# Limit history size (keep ~1 second worth of 60fps frames = 60)
+			if prediction_history.size() > 120:
+				prediction_history.pop_front()
 	else:
 		# During attack, stop all movement
 		velocity = Vector2.ZERO
@@ -408,3 +448,58 @@ func _unhandled_input(event: InputEvent) -> void:
 				character_sheet.toggle()
 				print("[INPUT] Toggled Character Sheet")
 				get_viewport().set_input_as_handled()
+
+# ============================================================================
+# PREDICTION RECONCILIATION
+# ============================================================================
+
+func reconcile(server_sequence: int, server_position: Vector2) -> void:
+	"""Reconcile client prediction with server authority"""
+	if prediction_history.is_empty():
+		return
+
+	# 1. Find matching history entry
+	var match_index = -1
+	for i in range(prediction_history.size()):
+		if prediction_history[i].sequence == server_sequence:
+			match_index = i
+			break
+
+	if match_index == -1:
+		# Sequence not found (too old or future?)
+		# If server sequence is newer than our oldest, we probably dropped it.
+		# If older, we already processed it.
+		return
+
+	# 2. Compare positions
+	var predicted_pos = prediction_history[match_index].position
+	var error_distance = predicted_pos.distance_to(server_position)
+
+	if error_distance > 2.0:
+		print("[PREDICTION] Reconciling! Error: %.2f (Seq: %d)" % [error_distance, server_sequence])
+		
+		# 3. Snap to authoritative position
+		test_character.position = server_position
+		
+		# 4. Replay remaining history
+		# Remove processed entries (including the matched one, as we just corrected it)
+		# Actually, we need to keep the entries AFTER the matched one to replay them.
+		
+		# Slice history to keep only future inputs
+		# Note: slice is exclusive on end, so we want from match_index + 1 to end
+		var replay_history = prediction_history.slice(match_index + 1)
+		prediction_history = replay_history
+		
+		# Replay
+		for state in prediction_history:
+			test_character.velocity = state.velocity
+			test_character.move_and_slide()
+			state.position = test_character.position
+			
+	else:
+		# 5. Prediction was correct - discard history up to this point
+		# Keep only entries AFTER the matched one
+		if match_index < prediction_history.size() - 1:
+			prediction_history = prediction_history.slice(match_index + 1)
+		else:
+			prediction_history.clear()

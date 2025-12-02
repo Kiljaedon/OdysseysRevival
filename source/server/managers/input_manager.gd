@@ -69,7 +69,7 @@ func handle_player_input(input: Dictionary):
 	var new_position = result.position
 
 	# Validate and apply movement
-	apply_movement(peer_id, current_position, new_position)
+	apply_movement(peer_id, current_position, new_position, 0)
 
 
 # ========== BINARY INPUT HANDLING (Optimized) ==========
@@ -78,14 +78,14 @@ func handle_binary_input(peer_id: int, packet: PackedByteArray):
 	"""
 	Handle binary input packet from client (optimized for network efficiency)
 
-	Binary packets are ~6 bytes vs ~50+ bytes for Dictionary RPC
+	Binary packets are ~8 bytes vs ~50+ bytes for Dictionary RPC
 	This is the preferred input method for MMO scale
 
-	Packet format: [type:u8, seq:u16, input_flags:u8, delta:u16]
+	Packet format: [type:u8, flags:u8, seq:u16, timestamp:u32]
 	- type: Packet type (PLAYER_INPUT = 0x01)
-	- seq: Sequence number for packet ordering
-	- input_flags: Bitmask (0x01=left, 0x02=right, 0x04=up, 0x08=down)
-	- delta: Time delta in milliseconds
+	- flags: Bitmask (0x01=left, 0x02=right, 0x04=up, 0x08=down)
+	- seq: Sequence number for reconciliation
+	- timestamp: Time in milliseconds
 
 	Args:
 		peer_id: ID of peer sending input
@@ -95,8 +95,8 @@ func handle_binary_input(peer_id: int, packet: PackedByteArray):
 	if not player_manager or not player_manager.player_positions.has(peer_id):
 		return
 
-	# VALIDATION: Check packet size (minimum 6 bytes)
-	if packet.size() < 6:
+	# VALIDATION: Check packet size (minimum 8 bytes)
+	if packet.size() < 8:
 		if anti_cheat:
 			anti_cheat.log_violation(peer_id, "invalid_input", 1)
 		return
@@ -120,14 +120,15 @@ func handle_binary_input(peer_id: int, packet: PackedByteArray):
 	# SERVER-AUTHORITATIVE: Calculate new position server-side
 	var result = input_processor.process_input(current_position, input, tick_rate)
 	var new_position = result.position
+	var sequence = input.get("sequence", 0)
 
 	# Validate and apply movement
-	apply_movement(peer_id, current_position, new_position)
+	apply_movement(peer_id, current_position, new_position, sequence)
 
 
 # ========== MOVEMENT VALIDATION & APPLICATION ==========
 
-func apply_movement(peer_id: int, current_position: Vector2, new_position: Vector2):
+func apply_movement(peer_id: int, current_position: Vector2, new_position: Vector2, sequence: int = 0):
 	"""
 	Validate movement and update player position if valid
 
@@ -141,6 +142,7 @@ func apply_movement(peer_id: int, current_position: Vector2, new_position: Vecto
 		peer_id: ID of player making the move
 		current_position: Current server-side position
 		new_position: Requested new position
+		sequence: Input sequence number for reconciliation
 	"""
 	# VALIDATION: Check movement validity
 	if movement_validator:
@@ -152,6 +154,8 @@ func apply_movement(peer_id: int, current_position: Vector2, new_position: Vecto
 				anti_cheat.log_violation(peer_id, validation.reason, validation.severity, validation)
 
 			# REJECT MOVEMENT: Keep old position (client will be corrected)
+			# TODO: Send explicit correction/reject packet?
+			# For now, the next position update will correct them.
 			return
 
 	# MOVEMENT IS VALID: Update server-side position
@@ -168,6 +172,11 @@ func apply_movement(peer_id: int, current_position: Vector2, new_position: Vecto
 	# Update player data dictionary
 	if player_manager.connected_players.has(peer_id):
 		player_manager.connected_players[peer_id]["position"] = new_position
+		player_manager.connected_players[peer_id]["last_sequence"] = sequence
+
+	# Send ACK to client for reconciliation
+	if server_world and server_world.network_handler:
+		server_world.network_handler.send_prediction_ack(peer_id, sequence, new_position)
 
 
 # ========== FUTURE ENHANCEMENTS ==========

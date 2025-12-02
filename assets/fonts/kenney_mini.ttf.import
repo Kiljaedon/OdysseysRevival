@@ -3,11 +3,12 @@
 importer="font_data_dynamic"
 type="FontFile"
 uid="uid://b6hkljp38x3fi"
-valid=false
+path="res://.godot/imported/kenney_mini.ttf-3b5b1f6fae027daa26e3904a3b3b9a0e.fontdata"
 
 [deps]
 
 source_file="res://assets/fonts/kenney_mini.ttf"
+dest_files=["res://.godot/imported/kenney_mini.ttf-3b5b1f6fae027daa26e3904a3b3b9a0e.fontdata"]
 
 [params]
 
