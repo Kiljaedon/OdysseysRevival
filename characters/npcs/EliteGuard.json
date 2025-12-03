@@ -95,7 +95,7 @@
 		"wis": 9.0
 	},
 	"character_name": "EliteGuard",
-	"combat_role": "Melee",
+	"combat_role": "melee",
 	"created_date": "2025-10-04T10:48:48",
 	"derived_stats": {
 		"mag_def": 9.0,

@@ -94,7 +94,7 @@
 		"wis": 18
 	},
 	"character_name": "Cleric",
-	"combat_role": "Hybrid",
+	"combat_role": "hybrid",
 	"created_date": "2025-11-13T06:40:57",
 	"derived_stats": {
 		"mag_def": 16,

@@ -119,44 +119,54 @@ func _execute_attack(controller: Object) -> void:
 	# Auto-target if no target selected
 	if current_target_id.is_empty():
 		_auto_select_target(controller)
+		print("[INPUT] Auto-targeted: %s" % current_target_id)
 
 	# Still no target? Can't attack
 	if current_target_id.is_empty():
+		print("[INPUT] No target available - cannot attack")
 		return
 
 	# Validate target exists and is alive
 	if not controller.battle_scene:
+		print("[INPUT] No battle_scene - cannot attack")
 		return
 
 	var target = controller.battle_scene.get_unit(current_target_id)
 	if not target or target.unit_state == "dead":
+		print("[INPUT] Target invalid or dead: %s" % current_target_id)
 		current_target_id = ""
 		return
 
 	# Check range using player's actual attack range (role-specific)
 	var player = controller.battle_scene.get_player_unit()
 	if not player:
+		print("[INPUT] No player unit - cannot attack")
 		return
 
 	# Get player's attack range from their combat role (caster=280, melee=120, etc)
-	var player_attack_range = player.get("attack_range")
-	if player_attack_range == null:
-		player_attack_range = ATTACK_RANGE  # Fallback to default
-		print("[INPUT] WARNING: attack_range is null, using fallback: %.1f" % player_attack_range)
+	# Access node properties directly (not .get() which is for Dictionaries)
+	var player_attack_range = player.attack_range if player.attack_range > 0 else ATTACK_RANGE
+	var player_role = player.combat_role if player.combat_role else "melee"
 
-	var distance = player.position.distance_to(target.position)
+	# Use server_position for range check to match what server will validate
+	# This prevents client/server position desync causing attack rejection
+	var player_pos = player.server_position if player.server_position != Vector2.ZERO else player.position
+	var target_pos = target.server_position if target.server_position != Vector2.ZERO else target.position
+	var distance = player_pos.distance_to(target_pos)
 
-	# DEBUG: Log range check
-	var player_role = player.get("combat_role")
-	print("[INPUT] Attack check - role: '%s', range: %.1f, distance: %.1f, can_attack: %s" % [player_role, player_attack_range, distance, distance <= player_attack_range])
+	# DEBUG: Log detailed attack info
+	print("[INPUT] Attack check - player_pos=%s (client=%s), target_pos=%s, distance=%.1f" % [player_pos, player.position, target_pos, distance])
+	print("[INPUT] Attack check - role: '%s', range: %.1f, can_attack: %s" % [player_role, player_attack_range, distance <= player_attack_range])
 
 	if distance > player_attack_range:
+		print("[INPUT] Out of range (%.1f > %.1f) - move closer" % [distance, player_attack_range])
 		return  # Too far - let player move closer
 
 	# Valid target in range - execute attack
 	controller.attack_cooldown_timer = controller.ATTACK_COOLDOWN
 	controller.attack_freeze_timer = controller.ATTACK_FREEZE_TIME
 	_send_attack_to_server(controller, current_target_id)
+	print("[INPUT] Attack sent to server!")
 
 ## ========== DODGE ROLL INPUT ==========
 
@@ -311,6 +321,7 @@ func _auto_select_target(controller: Object) -> void:
 		return
 
 	var closest_dist: float = 999999.0
+	var closest_target_id: String = ""
 
 	for unit_id in controller.battle_scene.units:
 		var unit = controller.battle_scene.units[unit_id]
@@ -318,7 +329,11 @@ func _auto_select_target(controller: Object) -> void:
 			var dist = player.position.distance_to(unit.position)
 			if dist < closest_dist:
 				closest_dist = dist
-				current_target_id = unit_id
+				closest_target_id = unit_id
+
+	# Use set_target to properly show the target indicator
+	if not closest_target_id.is_empty():
+		set_target(controller, closest_target_id)
 
 func set_target(controller: Object, target_id: String) -> void:
 	"""Set current target and update indicators"""
@@ -348,8 +363,8 @@ func handle_click_target(controller: Object, screen_pos: Vector2) -> void:
 	# Convert screen position to world position
 	var world_pos = controller.battle_scene.camera.get_global_mouse_position() if controller.battle_scene.camera else screen_pos
 
-	# Find closest enemy unit
-	var closest_enemy: Node2D = null
+	# Find closest enemy unit to click position
+	var closest_target_id: String = ""
 	var closest_dist: float = 100.0  # Click radius
 
 	for unit_id in controller.battle_scene.units:
@@ -358,11 +373,10 @@ func handle_click_target(controller: Object, screen_pos: Vector2) -> void:
 			var dist = world_pos.distance_to(unit.position)
 			if dist < closest_dist:
 				closest_dist = dist
-				closest_enemy = unit
-				current_target_id = unit_id
+				closest_target_id = unit_id
 
-	if closest_enemy:
-		set_target(controller, current_target_id)
+	if not closest_target_id.is_empty():
+		set_target(controller, closest_target_id)
 		try_attack(controller)
 
 ## ========== NETWORK - OUTGOING ==========

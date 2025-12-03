@@ -95,7 +95,7 @@
 		"wis": 5.0
 	},
 	"character_name": "Goblin",
-	"combat_role": "Melee",
+	"combat_role": "melee",
 	"created_date": "2025-10-04T10:49:05",
 	"derived_stats": {
 		"mag_def": 5.0,

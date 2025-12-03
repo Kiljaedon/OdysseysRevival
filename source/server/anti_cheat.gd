@@ -4,8 +4,8 @@ extends Node
 ## Monitors player behavior and flags suspicious activity
 
 # Cheat detection thresholds
-const MAX_VIOLATIONS_BEFORE_FLAG = 100  # Increased for development
-const MAX_VIOLATIONS_BEFORE_KICK = 1000  # Effectively disabled for development
+const MAX_VIOLATIONS_BEFORE_FLAG = 10000  # Increased for development
+const MAX_VIOLATIONS_BEFORE_KICK = 50000  # Effectively disabled for development
 const POSITION_HISTORY_SIZE = 20
 
 # Player tracking data

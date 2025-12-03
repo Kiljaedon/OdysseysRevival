@@ -328,7 +328,7 @@ func _init_core_systems() -> void:
 func _init_game_managers() -> void:
 	# Initialize authentication manager
 	auth_manager = AuthenticationManager.new()
-	auth_manager.initialize(self, network_handler, GameDatabase, debug_console)
+	auth_manager.initialize(self, network_handler, null, debug_console) # GameDatabase deprecated
 	add_child(auth_manager)
 	log_message("[AUTH] Authentication manager initialized")
 

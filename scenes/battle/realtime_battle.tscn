@@ -1,0 +1,171 @@
+[gd_scene load_steps=2 format=3 uid="uid://c5q0353c7qjge"]
+
+[ext_resource type="Script" path="res://scripts/realtime_battle/realtime_battle_scene.gd" id="1_1f234"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1"]
+bg_color = Color(0.05, 0.05, 0.1, 0.7)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.3, 0.3, 0.4, 0.8)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hp_bg"]
+bg_color = Color(0.3, 0.1, 0.1, 0.8)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hp_fill"]
+bg_color = Color(0.85, 0.2, 0.2, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_mp_bg"]
+bg_color = Color(0.1, 0.1, 0.3, 0.8)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_mp_fill"]
+bg_color = Color(0.2, 0.4, 0.9, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ep_bg"]
+bg_color = Color(0.1, 0.25, 0.1, 0.8)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ep_fill"]
+bg_color = Color(0.3, 0.8, 0.3, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[node name="RealtimeBattle" type="Node2D"]
+script = ExtResource("1_1f234")
+
+[node name="ArenaRenderer" type="Node2D" parent="."]
+
+[node name="UnitsContainer" type="Node2D" parent="."]
+
+[node name="BattleCamera" type="Camera2D" parent="."]
+position_smoothing_enabled = true
+position_smoothing_speed = 8.0
+
+[node name="BattleUI" type="CanvasLayer" parent="."]
+layer = 10
+
+[node name="PlayerHUD" type="Control" parent="BattleUI"]
+layout_mode = 3
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -128.0
+offset_top = -120.0
+offset_right = -8.0
+offset_bottom = -8.0
+grow_horizontal = 0
+grow_vertical = 0
+mouse_filter = 2
+size_flags_horizontal = 8
+size_flags_vertical = 8
+
+[node name="HUDBg" type="Panel" parent="BattleUI/PlayerHUD"]
+layout_mode = 0
+offset_right = 120.0
+offset_bottom = 112.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_1")
+
+[node name="PlayerNameLabel" type="Label" parent="BattleUI/PlayerHUD"]
+layout_mode = 0
+offset_left = 6.0
+offset_top = 2.0
+offset_right = 114.0
+offset_bottom = 14.0
+theme_override_font_sizes/font_size = 10
+theme_override_colors/font_color = Color(0.9, 0.85, 0.7, 1)
+text = "Player"
+vertical_alignment = 1
+
+[node name="HPBar" type="ProgressBar" parent="BattleUI/PlayerHUD"]
+layout_mode = 0
+offset_left = 6.0
+offset_top = 16.0
+offset_right = 106.0
+offset_bottom = 26.0
+theme_override_styles/background = SubResource("StyleBoxFlat_hp_bg")
+theme_override_styles/fill = SubResource("StyleBoxFlat_hp_fill")
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="HPLabel" type="Label" parent="BattleUI/PlayerHUD/HPBar"]
+layout_mode = 0
+offset_left = 4.0
+offset_right = 104.0
+offset_bottom = 10.0
+theme_override_font_sizes/font_size = 8
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+text = "HP"
+vertical_alignment = 1
+
+[node name="MPBar" type="ProgressBar" parent="BattleUI/PlayerHUD"]
+layout_mode = 0
+offset_left = 6.0
+offset_top = 28.0
+offset_right = 106.0
+offset_bottom = 38.0
+theme_override_styles/background = SubResource("StyleBoxFlat_mp_bg")
+theme_override_styles/fill = SubResource("StyleBoxFlat_mp_fill")
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="MPLabel" type="Label" parent="BattleUI/PlayerHUD/MPBar"]
+layout_mode = 0
+offset_left = 4.0
+offset_right = 104.0
+offset_bottom = 10.0
+theme_override_font_sizes/font_size = 8
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+text = "MP"
+vertical_alignment = 1
+
+[node name="EPBar" type="ProgressBar" parent="BattleUI/PlayerHUD"]
+layout_mode = 0
+offset_left = 6.0
+offset_top = 40.0
+offset_right = 106.0
+offset_bottom = 50.0
+theme_override_styles/background = SubResource("StyleBoxFlat_ep_bg")
+theme_override_styles/fill = SubResource("StyleBoxFlat_ep_fill")
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="EPLabel" type="Label" parent="BattleUI/PlayerHUD/EPBar"]
+layout_mode = 0
+offset_left = 4.0
+offset_right = 104.0
+offset_bottom = 10.0
+theme_override_font_sizes/font_size = 8
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+text = "EP"
+vertical_alignment = 1

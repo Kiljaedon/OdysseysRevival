@@ -235,10 +235,11 @@ func do_request(
 func _on_login_button_pressed() -> void:
 	# Redirect to new server-based login screen
 	print("Redirecting to login screen...")
-	get_tree().change_scene_to_file("res://source/client/ui/login_screen.tscn")
+	SceneNavigation.goto_login()
 
 
 func _on_login_login_button_pressed() -> void:
+	# ... (Keep existing login logic for now as it uses GatewayAPI, planned for Phase 2) ...
 	var account_name_edit: LineEdit = $LoginPanel/VBoxContainer/VBoxContainer/VBoxContainer/LineEdit
 	var password_edit: LineEdit = $LoginPanel/VBoxContainer/VBoxContainer/VBoxContainer2/LineEdit
 	
@@ -391,140 +392,25 @@ func create_development_tools_panel():
 	vbox.add_child(back_button)
 
 func _on_art_studio_pressed():
-	print("Launching PixiEditor Art Studio...")
-
-	# Use portable PixiEditor from project folder
-	var portable_pixieditor = ProjectSettings.globalize_path("res://tools/pixieditor/PixiEditor/PixiEditor.exe")
-	var sprites_file = ProjectSettings.globalize_path("res://assets-odyssey/sprites.png")
-
-	# Check if portable PixiEditor exists
-	if FileAccess.file_exists(portable_pixieditor):
-		# Launch PixiEditor with Odyssey sprites.png file
-		OS.create_process(portable_pixieditor, [sprites_file])
-		print("Portable PixiEditor launched with Odyssey sprites")
-		print("PixiEditor executable: ", portable_pixieditor)
-		print("Opened file: ", sprites_file)
-	else:
-		print("PixiEditor not found at: ", portable_pixieditor)
-		print("Running download helper...")
-		# Launch the download helper batch file
-		var download_helper = ProjectSettings.globalize_path("res://tools/pixieditor/DOWNLOAD_PIXIEDITOR.bat")
-		if FileAccess.file_exists(download_helper):
-			OS.create_process(download_helper, [])
-		else:
-			print("Please download PixiEditor portable and extract to tools/pixieditor/")
-			print("Download from: https://pixieditor.net/")
+	DeveloperToolsService.launch_pixi_editor(ProjectSettings.globalize_path("res://"))
 
 func _on_sprite_creator_pressed():
 	print("Launching Odyssey Sprite Creator...")
-
-	# Launch the new Odyssey sprite maker
-	get_tree().change_scene_to_file("res://tools/sprite_maker/odyssey_sprite_maker.tscn")
+	SceneNavigation.goto_sprite_maker()
 
 func _on_tiled_editor_pressed():
-	print("Launching Tiled Map Editor...")
-
-	# Use portable Tiled from project folder - open sample map directly
-	# Check for map file
-	var map_file = ProjectSettings.globalize_path("res://maps/World Maps/sample_map.tmx")
-	if not FileAccess.file_exists(map_file):
-		print("ERROR: Map file not found at: ", map_file)
-		return
-	var portable_tiled = ProjectSettings.globalize_path("res://tools/tiled/tiled.exe")
-
-	print("Tiled path: ", portable_tiled)
-	print("Map file: ", map_file)
-	print("Tiled exists: ", FileAccess.file_exists(portable_tiled))
-	print("Map exists: ", FileAccess.file_exists(map_file))
-
-	# Check if portable Tiled exists
-	if FileAccess.file_exists(portable_tiled):
-		var pid = OS.create_process(portable_tiled, [map_file])
-		print("Tiled launched with PID: ", pid)
-		print("Opening map: ", map_file)
-	else:
-		print("ERROR: Portable Tiled not found at: ", portable_tiled)
-		print("Please download Tiled from https://www.mapeditor.org/")
+	DeveloperToolsService.launch_tiled_editor(ProjectSettings.globalize_path("res://"))
 
 func _on_map_linker_pressed():
 	print("Launching Map Linker tool...")
-	get_tree().change_scene_to_file("res://tools/map_linker/map_linker.tscn")
+	SceneNavigation.goto_map_linker()
 
 func _on_push_remote_pressed():
-	print("Pushing to Remote Server (Odyssey)...")
-
-	# Get project source path
-	var project_path = ProjectSettings.globalize_path("res://")
-	var source_path = project_path + "source"
-	var addons_path = project_path + "addons"
-
-	# Remote server details
-	var remote_host = "odyssey"
-	var remote_path = "/home/gameserver/odysseys_server_dev/"
-
-	# Create deployment batch script
-	var batch_content = """@echo off
-title Golden Sun MMO - Deploying to Remote Server
-echo ========================================
-echo   Deploying to Odyssey Server
-echo ========================================
-echo.
-
-echo [1/6] Syncing source files...
-rsync -avz --delete --exclude=".godot" "%s" %s:%ssource/
-if %%ERRORLEVEL%% NEQ 0 (
-    echo rsync failed, trying scp...
-    scp -r "%s" %s:%s
-)
-
-echo.
-echo [2/6] Syncing data files...
-rsync -avz "%sdata/" %s:%sdata/
-
-echo.
-echo [3/6] Syncing addons (map editor, sprite editor tools)...
-rsync -avz --delete "%s" %s:%saddons/
-
-echo.
-echo [4/6] Syncing sprite maker tool files...
-scp "%sodyssey_sprite_maker.gd" %s:%s
-scp "%sodyssey_sprite_maker.tscn" %s:%s
-
-echo.
-echo [5/6] Syncing assets...
-rsync -avz "%sassets-odyssey/" %s:%sassets-odyssey/
-
-echo.
-echo [6/6] Restarting remote server...
-ssh %s "killall -9 Godot_v4.5.1-stable_linux.x86_64 2>/dev/null; sleep 2; cd %s && nohup /opt/Godot_v4.5.1-stable_linux.x86_64 --headless source/server/server_world.tscn > server_output.log 2>&1 & sleep 3 && pgrep -c Godot && echo 'Server restarted successfully!' || echo 'Server failed to start'"
-
-echo.
-echo ========================================
-echo   Deployment Complete!
-echo   Synced: source, data, addons,
-echo          sprite maker, assets
-echo ========================================
-pause
-""" % [source_path, remote_host, remote_path, source_path, remote_host, remote_path, project_path, remote_host, remote_path, addons_path, remote_host, remote_path, project_path, remote_host, remote_path, project_path, remote_host, remote_path, project_path, remote_host, remote_path, remote_host, remote_path]
-
-	# Write batch file
-	var batch_path = project_path + "deploy_to_remote.bat"
-	var file = FileAccess.open(batch_path, FileAccess.WRITE)
-	if file:
-		file.store_string(batch_content)
-		file.close()
-		print("[OK] Created deployment script: ", batch_path)
-
-		# Run the batch file in a new window
-		OS.create_process("cmd.exe", ["/c", "start", batch_path])
-		print("[OK] Deployment started in new window")
-	else:
-		print("[ERROR] Failed to create deployment script")
-
+	DeveloperToolsService.deploy_to_remote(ProjectSettings.globalize_path("res://"))
 
 func _on_settings_pressed():
 	print("Opening Server Settings...")
-	get_tree().change_scene_to_file("res://source/client/ui/settings_screen.tscn")
+	SceneNavigation.goto_settings()
 
 func _on_dev_tools_back_pressed():
 	print("DEBUG: Returning from development tools. Showing main menu.")
@@ -539,7 +425,7 @@ func _on_dev_tools_back_pressed():
 func load_test_character_scene():
 	# Load Odyssey test scene with proper sprites and animation
 	print("Loading Odyssey test scene...")
-	get_tree().change_scene_to_file("res://odyssey_test.tscn")
+	SceneNavigation.goto_test_odyssey()
 
 
 func _on_world_selected(world_id: int) -> void:
@@ -686,7 +572,7 @@ func create_account() -> void:
 func _on_create_account_button_pressed() -> void:
 	# Redirect to new login screen (same as Development Client button)
 	print("Redirecting to login screen...")
-	get_tree().change_scene_to_file("res://source/client/ui/login_screen.tscn")
+	SceneNavigation.goto_login()
 
 
 func populate_worlds(world_info: Dictionary) -> void:

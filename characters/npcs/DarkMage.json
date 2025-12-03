@@ -95,7 +95,7 @@
 		"wis": 13
 	},
 	"character_name": "DarkMage",
-	"combat_role": "Caster",
+	"combat_role": "caster",
 	"created_date": "2025-11-28T15:39:11",
 	"derived_stats": {
 		"mag_def": 13,

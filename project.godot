@@ -25,6 +25,9 @@ PathRegistry="*res://source/common/registry/path_registry.gd"
 GameState="*res://game_state.gd"
 PlatformUtils="*res://source/common/utils/platform_utils.gd"
 ServerConnection="*res://source/common/network/server_connection.gd"
+SceneNavigation="*res://source/client/autoload/scene_navigation.gd"
+AuthenticationService="*res://source/common/services/authentication_service.gd"
+DeveloperToolsService="*res://source/client/tools/developer_tools_service.gd"
 
 [debug]
 

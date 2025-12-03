@@ -95,7 +95,7 @@
 		"wis": 7.0
 	},
 	"character_name": "RogueBandit",
-	"combat_role": "Melee",
+	"combat_role": "melee",
 	"created_date": "2025-10-01T15:21:57",
 	"derived_stats": {
 		"mag_def": 6.0,

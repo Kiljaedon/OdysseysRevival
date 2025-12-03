@@ -263,7 +263,7 @@ func _clamp_to_arena(pos: Vector2) -> Vector2:
 		return pos
 
 	var arena_size = battle_scene.get_arena_pixel_size()
-	var margin = 60.0  # Keep units away from edges (matches server ARENA_EDGE_PADDING)
+	var margin = 128.0  # Keep units away from edges (matches server MAP_EDGE_PADDING)
 
 	pos.x = clamp(pos.x, margin, arena_size.x - margin)
 	pos.y = clamp(pos.y, margin, arena_size.y - margin)
@@ -323,3 +323,18 @@ func on_dodge_roll_event(unit_id: String, direction: Vector2) -> void:
 	"""Handle dodge roll event from server"""
 	if battle_scene:
 		battle_scene.on_dodge_roll_event(unit_id, direction)
+
+func on_projectile_spawn(proj_data: Dictionary) -> void:
+	"""Handle projectile spawn from server"""
+	if battle_scene:
+		battle_scene.on_projectile_spawn(proj_data)
+
+func on_projectile_hit(projectile_id: String, target_id: String, hit_position: Vector2) -> void:
+	"""Handle projectile hit from server"""
+	if battle_scene:
+		battle_scene.on_projectile_hit(projectile_id, target_id, hit_position)
+
+func on_projectile_miss(projectile_id: String, final_position: Vector2) -> void:
+	"""Handle projectile miss from server"""
+	if battle_scene:
+		battle_scene.on_projectile_miss(projectile_id, final_position)

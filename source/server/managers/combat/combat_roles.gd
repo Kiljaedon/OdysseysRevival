@@ -42,7 +42,7 @@ const ROLE_DATA = {
 	},
 	"caster": {
 		"name": "Caster",
-		"attack_range": 280.0,
+		"attack_range": 450.0,  # Long range spellcaster
 		"move_speed_mult": 0.90,  # 10% slower
 		"flank_front": 1.25,  # +25% always (glass cannon)
 		"flank_side": 1.25,  # +25%
@@ -56,8 +56,8 @@ const ROLE_DATA = {
 ## ========== GETTERS ==========
 
 static func get_role_data(role: String) -> Dictionary:
-	"""Get all data for a combat role"""
-	return ROLE_DATA.get(role, ROLE_DATA["melee"])
+	"""Get all data for a combat role (case-insensitive)"""
+	return ROLE_DATA.get(role.to_lower(), ROLE_DATA["melee"])
 
 static func get_attack_range(role: String) -> float:
 	"""Get attack range for role"""
@@ -87,8 +87,8 @@ static func get_projectile_texture(role: String) -> String:
 ## ========== VALIDATION ==========
 
 static func is_valid_role(role: String) -> bool:
-	"""Check if role exists"""
-	return role in ROLE_DATA
+	"""Check if role exists (case-insensitive)"""
+	return role.to_lower() in ROLE_DATA
 
 static func get_all_roles() -> Array:
 	"""Get list of all valid roles"""

@@ -9,8 +9,8 @@ var game_world: Node = null  # Reference to game world
 var hidden_world_nodes: Array[Node] = []  # Nodes hidden during battle
 
 ## Preloads
-var RealtimeBattleSceneScript = preload("res://scripts/realtime_battle/realtime_battle_scene.gd")
 var RealtimeBattleControllerScript = preload("res://scripts/realtime_battle/realtime_battle_controller.gd")
+var RealtimeBattleSceneResource = preload("res://scenes/battle/realtime_battle.tscn")
 
 func initialize(world_node: Node) -> void:
 	"""Set the game world reference"""
@@ -35,9 +35,8 @@ func start_battle(battle_data: Dictionary) -> void:
 			hidden_world_nodes.append(child)
 
 	# Create battle scene and add to game world
-	active_battle_scene = Node2D.new()
-	active_battle_scene.set_script(RealtimeBattleSceneScript)
-	active_battle_scene.name = "RealtimeBattle"
+	active_battle_scene = RealtimeBattleSceneResource.instantiate()
+	active_battle_scene.name = "RealtimeBattle" # Ensure the name is consistent
 	game_world.add_child(active_battle_scene)
 
 	# Tell battle scene to use the current map as arena background
@@ -91,13 +90,19 @@ func end_battle() -> void:
 	if server_conn and server_conn.has_meta("active_realtime_battle_controller"):
 		server_conn.remove_meta("active_realtime_battle_controller")
 
+	# Clear in_server_battle flag so world input resumes
+	var game_state = get_node_or_null("/root/GameState")
+	if game_state:
+		game_state.set_meta("in_server_battle", false)
+		print("[RT_LAUNCHER] Cleared in_server_battle flag")
+
 	print("[RT_LAUNCHER] Battle ended - returned to main screen")
 
 func _on_battle_ended(result: String, rewards: Dictionary) -> void:
 	"""Handle battle end signal"""
 	print("[RT_LAUNCHER] Battle result: %s" % result)
-	# Delay cleanup to allow animations to finish
-	await get_tree().create_timer(1.0).timeout
+	# Delay cleanup to allow player to see the result
+	await get_tree().create_timer(3.0).timeout
 	end_battle()
 
 func is_in_battle() -> bool:

@@ -80,8 +80,8 @@ static func select_target_by_archetype(unit: Dictionary, enemies: Array) -> Dict
 			# Random target (retreat handled elsewhere)
 			return enemies.pick_random()
 		"TACTICAL":
-			# Prioritize casters/ranged
-			var priority = enemies.filter(func(e): return e.combat_role in ["caster", "ranged"])
+			# Prioritize casters/ranged (case-insensitive check)
+			var priority = enemies.filter(func(e): return e.get("combat_role", "melee").to_lower() in ["caster", "ranged"])
 			if not priority.is_empty():
 				priority.sort_custom(func(a, b): return a.hp < b.hp)
 				return priority[0]

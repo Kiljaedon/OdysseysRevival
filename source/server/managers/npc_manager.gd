@@ -117,6 +117,8 @@ func spawn_server_npcs():
 			"hp": npc_data.get("hp", 100),
 			"max_hp": npc_data.get("max_hp", 100),
 			"base_stats": npc_data.get("base_stats", {}),
+			"derived_stats": npc_data.get("derived_stats", {}),
+			"combat_role": npc_data.get("combat_role", "melee"),  # Combat role for range/projectiles
 			"ai_archetype": npc_data.get("ai_archetype", "AGGRESSIVE")
 		}
 		npc_positions[npc_id] = spawn_pos

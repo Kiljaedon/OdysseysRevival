@@ -514,7 +514,7 @@ func handle_binary_combat_start(packet: PackedByteArray, server_npcs: Dictionary
 
 func handle_combat_round_results(combat_id: int, results: Dictionary) -> void:
 	"""Server sends combat round results - forward to battle_window if active"""
-	var battle_window = get_tree().root.get_node_or_null("BattleWindow")
+	var battle_window = get_tree().root.get_node_or_null("RealtimeBattle")
 	if battle_window:
 		battle_window.receive_round_results(results)
 	else:

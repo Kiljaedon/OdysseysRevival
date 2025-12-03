@@ -110,9 +110,27 @@ static func _create_unit_data(unit_id: String, source_data: Dictionary, team: St
 	var attack_cooldown = max(1.0, 1.0 / base_attack_speed)
 
 	# Get combat role and its properties
-	var combat_role = source_data.get("combat_role", "melee")
+	# First check source_data, then look up from class_name if player character
+	var combat_role = source_data.get("combat_role", "")
+	var role_source = "source_data"
+
+	print("[RT_SPAWNER] Creating unit %s - checking combat_role in source_data: '%s'" % [unit_id, combat_role])
+
+	if combat_role == "":
+		# Try to get combat_role from class definition
+		var class_name_str = source_data.get("class_name", "")
+		print("[RT_SPAWNER] No combat_role in source_data, checking class_name: '%s'" % class_name_str)
+		if class_name_str != "":
+			var class_data = _load_class_data(class_name_str)
+			combat_role = class_data.get("combat_role", "melee")
+			role_source = "class_def:" + class_name_str
+		else:
+			combat_role = "melee"
+			role_source = "default"
+
 	var attack_range = CombatRoles.get_attack_range(combat_role)
 	var move_speed_mult = CombatRoles.get_move_speed_mult(combat_role)
+	print("[RT_SPAWNER] Unit %s FINAL: combat_role='%s' (from %s), attack_range=%.1f" % [unit_id, combat_role, role_source, attack_range])
 
 	var unit = {
 		"id": unit_id,
@@ -151,4 +169,24 @@ static func _create_unit_data(unit_id: String, source_data: Dictionary, team: St
 
 	return unit
 
-# Removed - now using CombatRoles.get_attack_range()
+## ========== HELPER FUNCTIONS ==========
+
+static func _load_class_data(class_name_str: String) -> Dictionary:
+	"""Load class definition to get combat_role and other class-specific data"""
+	var file_path = "res://characters/classes/%s.json" % class_name_str
+	if not FileAccess.file_exists(file_path):
+		print("[RT_SPAWNER] Class file not found: %s, defaulting to melee" % file_path)
+		return {"combat_role": "melee"}
+
+	var file = FileAccess.open(file_path, FileAccess.READ)
+	var json_text = file.get_as_text()
+	file.close()
+
+	var json = JSON.new()
+	if json.parse(json_text) == OK:
+		var data = json.data
+		print("[RT_SPAWNER] Loaded class '%s' with combat_role: %s" % [class_name_str, data.get("combat_role", "melee")])
+		return data
+
+	print("[RT_SPAWNER] Failed to parse class file: %s" % file_path)
+	return {"combat_role": "melee"}

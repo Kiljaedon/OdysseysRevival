@@ -95,7 +95,7 @@
 		"wis": 6.0
 	},
 	"character_name": "OrcWarrior",
-	"combat_role": "Melee",
+	"combat_role": "melee",
 	"created_date": "2025-10-04T10:49:18",
 	"derived_stats": {
 		"mag_def": 5.0,

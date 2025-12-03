@@ -12,6 +12,7 @@ var auth_manager = null
 var spatial_manager = null
 var npc_manager = null
 var map_manager = null  # For collision-free spawn checking
+var char_service: CharacterService
 
 # ========== PLAYER STATE ==========
 var connected_players: Dictionary = {}    # peer_id -> player data dictionary
@@ -22,6 +23,8 @@ var player_maps: Dictionary = {}           # peer_id -> map name (e.g., "sample_
 
 func _ready():
 	print("[PLAYER_MANAGER] Player Manager ready")
+	char_service = CharacterService.new()
+	add_child(char_service)
 
 
 ## Called by ServerWorld to set dependencies
@@ -131,7 +134,7 @@ func request_create_character(peer_id: int, username: String, character_data: Di
 	}
 
 	# Create the character in database
-	var result = GameDatabase.create_character(username, new_character_data)
+	var result = char_service.create_character(username, new_character_data)
 
 	if not result.success:
 		log_message("[PLAYER_MANAGER] Failed to create character for %s: %s" % [username, result.get("error", "Unknown error")])
@@ -181,7 +184,7 @@ func request_delete_character(username: String, character_id: String):
 			return
 
 	# Verify the character belongs to this account
-	var char_result = GameDatabase.get_character(character_id)
+	var char_result = char_service.get_character(character_id)
 	if not char_result.success:
 		send_character_deletion_response(peer_id, false, "Character not found")
 		return
@@ -193,7 +196,7 @@ func request_delete_character(username: String, character_id: String):
 		return
 
 	# Delete the character
-	var result = GameDatabase.delete_character(username, character_id)
+	var result = char_service.delete_character(username, character_id)
 
 	if not result.success:
 		log_message("[PLAYER_MANAGER] Failed to delete character %s: %s" % [character_id, result.get("error", "Unknown error")])
@@ -228,7 +231,7 @@ func request_spawn_character(username: String, character_id: String):
 			return
 
 	# Load character data from database
-	var char_result = GameDatabase.get_character(character_id)
+	var char_result = char_service.get_character(character_id)
 	if not char_result.success:
 		log_message("[PLAYER_MANAGER] Character %s not found for spawn" % character_id)
 		if network_handler:
@@ -266,8 +269,13 @@ func request_spawn_character(username: String, character_id: String):
 		"hp": character.get("hp", 100),
 		"max_hp": character.get("max_hp", 100),
 		"mp": character.get("mp", 50),
-		"max_mp": character.get("max_mp", 50)
+		"max_mp": character.get("max_mp", 50),
+		"base_stats": character.get("stats", {}),
+		"derived_stats": character.get("derived_stats", {})
 	}
+
+	# Log the class for debugging combat role issues
+	print("[PLAYER_MANAGER] Spawning %s with class: %s" % [player_data.character_name, player_data.class_name])
 
 	# Add to connected players
 	connected_players[peer_id] = player_data
@@ -367,12 +375,12 @@ func remove_player(peer_id: int):
 		var position = player_positions.get(peer_id, Vector2.ZERO)
 		if not character_id.is_empty():
 			# Get current character data and update position
-			var char_result = GameDatabase.get_character(character_id)
+			var char_result = char_service.get_character(character_id)
 			if char_result.success:
 				var char_data = char_result.character
 				char_data["position_x"] = position.x
 				char_data["position_y"] = position.y
-				GameDatabase.save_character(character_id, char_data)
+				char_service.save_character(character_id, char_data)
 
 		# Remove from tracking
 		connected_players.erase(peer_id)
@@ -412,7 +420,7 @@ func grant_rewards(peer_id: int, rewards: Dictionary):
 	var character_id = player_data.get("character_id", "")
 	
 	# Load authoritative data from DB to ensure no sync issues
-	var char_result = GameDatabase.get_character(character_id)
+	var char_result = char_service.get_character(character_id)
 	if not char_result.success:
 		print("[PLAYER_MANAGER] ERROR: Character %s not found in DB" % character_id)
 		return
@@ -451,7 +459,7 @@ func grant_rewards(peer_id: int, rewards: Dictionary):
 		character["mp"] = character.get("max_mp", 50)
 	
 	# Save back to DB
-	GameDatabase.save_character(character_id, character)
+	char_service.save_character(character_id, character)
 	
 	# Update cached session data
 	connected_players[peer_id]["level"] = character["level"]

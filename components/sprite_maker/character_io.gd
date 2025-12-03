@@ -68,7 +68,7 @@ func save_character(char_name: String, current_type: String, character_data: Dic
 		"character_name": char_name,
 		"type": current_type,
 		"element": element,
-		"combat_role": stats.combat_role if stats.combat_role != "" else "Melee",
+		"combat_role": stats.combat_role.to_lower() if stats.combat_role != "" else "melee",
 		"ai_archetype": ai_archetype,
 		"level_range": {
 			"min": stats.min_level,
@@ -342,7 +342,7 @@ func _prepare_upload_data(char_name: String, current_type: String, character_dat
 		"character_name": char_name,
 		"type": current_type,
 		"element": element,
-		"combat_role": stats.combat_role if stats.combat_role != "" else "Melee",
+		"combat_role": stats.combat_role.to_lower() if stats.combat_role != "" else "melee",
 		"ai_archetype": ai_archetype,
 		"level_range": {
 			"min": stats.min_level,
@@ -415,7 +415,7 @@ func _get_default_stats() -> Dictionary:
 		"ai_archetype": 0,
 		"min_level": 1, "max_level": 1,
 		"xp_reward": 50, "gold_reward": 10,
-		"combat_role": "Melee",
+		"combat_role": "melee",
 		"description": ""
 	}
 

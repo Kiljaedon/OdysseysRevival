@@ -94,7 +94,7 @@
 		"wis": 10
 	},
 	"character_name": "Commander",
-	"combat_role": "Melee",
+	"combat_role": "melee",
 	"created_date": "2025-11-13T06:41:06",
 	"derived_stats": {
 		"mag_def": 10,

@@ -11,30 +11,19 @@ signal unit_damaged(unit_id: String, damage: int, flank_type: String)
 signal unit_died(unit_id: String)
 
 ## ========== CONSTANTS ==========
-const ARENA_PADDING: int = 60  # Keep units away from edges
+const ARENA_PADDING: int = 128  # Keep units away from edges (matches server MAP_EDGE_PADDING)
 
 ## ========== MAP DATA ==========
 var arena_width: int = 2560   # Default: 20 tiles * 128px scaled (overwritten by battle_data)
 var arena_height: int = 1920  # Default: 15 tiles * 128px scaled (overwritten by battle_data)
 var battle_map_name: String = "sample_map"
 
-## ========== CHILD NODES ==========
-var arena_renderer: Node2D
-var units_container: Node2D
-var ui_layer: CanvasLayer
-var camera: Camera2D
-
-## Player corner HUD elements
-var player_hp_bar: ProgressBar
-var player_mp_bar: ProgressBar
-var player_ep_bar: ProgressBar
-var player_name_label: Label
-
 ## ========== STATE ==========
 var battle_id: int = -1
 var battle_active: bool = false
 var player_unit_id: String = ""
 var units: Dictionary = {}  # unit_id -> RealtimeBattleUnit
+var projectiles: Dictionary = {}  # projectile_id -> projectile node (server-authoritative)
 var map_snapshot: TextureRect = null  # Captured map background
 
 ## World-to-arena coordinate mapping
@@ -52,42 +41,18 @@ func world_to_arena_pos(world_pos: Vector2) -> Vector2:
 ## ========== PRELOADS ==========
 var RealtimeBattleUnit = preload("res://scripts/realtime_battle/realtime_battle_unit.gd")
 
-## ========== LIFECYCLE ==========
+## ========== CHILD NODES ==========
+@onready var arena_renderer: Node2D = $ArenaRenderer
+@onready var units_container: Node2D = $UnitsContainer
+@onready var camera: Camera2D = $BattleCamera
+@onready var ui_layer: CanvasLayer = $BattleUI
+@onready var player_name_label: Label = $BattleUI/PlayerHUD/PlayerNameLabel
+@onready var player_hp_bar: ProgressBar = $BattleUI/PlayerHUD/HPBar
+@onready var player_mp_bar: ProgressBar = $BattleUI/PlayerHUD/MPBar
+@onready var player_ep_bar: ProgressBar = $BattleUI/PlayerHUD/EPBar
 
 func _ready():
-	_create_scene_structure()
 	print("[RT_BATTLE_SCENE] Ready")
-
-func _create_scene_structure():
-	# Arena background layer
-	arena_renderer = Node2D.new()
-	arena_renderer.name = "ArenaRenderer"
-	add_child(arena_renderer)
-
-	# Units layer
-	units_container = Node2D.new()
-	units_container.name = "UnitsContainer"
-	add_child(units_container)
-
-	# Camera following player (centered on arena for fullscreen)
-	camera = Camera2D.new()
-	camera.name = "BattleCamera"
-	# Zoom to fit arena nicely on screen
-	camera.zoom = Vector2(1.0, 1.0)
-	camera.position_smoothing_enabled = true
-	camera.position_smoothing_speed = 8.0
-	# Center camera on arena (no scrolling needed for fullscreen)
-	camera.position = Vector2(arena_width / 2.0, arena_height / 2.0)
-	add_child(camera)
-
-	# UI layer for battle effects (if needed later)
-	ui_layer = CanvasLayer.new()
-	ui_layer.name = "BattleUI"
-	ui_layer.layer = 10
-	add_child(ui_layer)
-
-	# Bottom-left corner HUD removed - using overhead bars only
-
 func _process(_delta: float):
 	if not battle_active:
 		return
@@ -142,6 +107,12 @@ func end_battle(result: String, rewards: Dictionary) -> void:
 		if is_instance_valid(unit):
 			unit.queue_free()
 	units.clear()
+
+	# Clear projectiles
+	for proj in projectiles.values():
+		if is_instance_valid(proj):
+			proj.queue_free()
+	projectiles.clear()
 
 	# Clear arena
 	for child in arena_renderer.get_children():
@@ -458,74 +429,25 @@ func on_state_update(units_state: Array) -> void:
 				)
 
 func on_damage_event(attacker_id: String, target_id: String, damage: int, flank_type: String) -> void:
-	"""Handle damage event from server"""
+	"""Handle damage event from server (damage already confirmed by server)"""
 	if not attacker_id in units or not target_id in units:
 		return
 
 	var attacker = units[attacker_id]
 	var target = units[target_id]
 
-	# Play attack animation on attacker
-	attacker.play_attack_animation()
+	# Play attack animation on attacker (melee only - ranged already triggered on projectile spawn)
+	var combat_role = attacker.combat_role if attacker.combat_role else "melee"
+	var combat_role_lower = combat_role.to_lower()
 
-	# Check if attacker uses projectiles (ranged/caster)
-	var combat_role = attacker.get("combat_role")
-	var combat_role_lower = combat_role.to_lower() if combat_role else "melee"
+	if combat_role_lower not in ["ranged", "caster"]:
+		# Melee/Hybrid - play attack animation
+		attacker.play_attack_animation()
 
-	# DEBUG: Log projectile check
-	print("[BATTLE_SCENE] Damage event - attacker role: '%s' (lower: '%s'), uses_projectiles: %s" % [combat_role, combat_role_lower, combat_role_lower in ["ranged", "caster"]])
-
-	if combat_role_lower in ["ranged", "caster"]:
-		# Store damage for later (when projectile hits)
-		target.set_meta("pending_damage", damage)
-		target.set_meta("pending_flank", flank_type)
-		# Spawn projectile
-		print("[BATTLE_SCENE] Spawning projectile for role: %s" % combat_role_lower)
-		_spawn_projectile(attacker, target, combat_role_lower)
-	else:
-		# Melee/Hybrid - show damage immediately
-		print("[BATTLE_SCENE] Melee/Hybrid attack - showing damage immediately")
-		target.show_damage(damage, flank_type)
+	# Show damage on target (server confirmed the hit)
+	target.show_damage(damage, flank_type)
 
 	unit_damaged.emit(target_id, damage, flank_type)
-
-func _spawn_projectile(attacker: Node2D, target: Node2D, role: String):
-	"""Spawn a visual projectile from attacker to target"""
-	var projectile_scene = preload("res://scenes/projectile.tscn")
-	var projectile = projectile_scene.instantiate()
-	add_child(projectile)
-
-	# Set projectile texture based on role (case-insensitive)
-	var texture_path = ""
-	var role_lower = role.to_lower() if role else ""
-	match role_lower:
-		"ranged":
-			texture_path = "res://assets/projectiles/Light Bolt.png"
-		"caster":
-			texture_path = "res://assets/projectiles/Arcane Bolt.png"
-
-	if texture_path and projectile.has_node("Sprite2D"):
-		var sprite = projectile.get_node("Sprite2D")
-		sprite.texture = load(texture_path)
-
-	# Calculate direction
-	var direction = (target.position - attacker.position).normalized()
-
-	# Initialize projectile
-	projectile.initialize(attacker.position, direction, 0, "", "")
-
-	# Make projectile hit target after travel time
-	var distance = attacker.position.distance_to(target.position)
-	var travel_time = distance / projectile.speed
-	await get_tree().create_timer(travel_time).timeout
-
-	# Show damage when projectile reaches target
-	if is_instance_valid(target):
-		var dmg = target.get_meta("pending_damage", 0)
-		var flank = target.get_meta("pending_flank", "front")
-		target.show_damage(dmg, flank)
-		target.remove_meta("pending_damage")
-		target.remove_meta("pending_flank")
 
 func on_unit_death(unit_id: String) -> void:
 	"""Handle unit death from server"""
@@ -538,95 +460,101 @@ func on_dodge_roll_event(unit_id: String, direction: Vector2) -> void:
 	if unit_id in units:
 		units[unit_id].play_dodge_roll(direction)
 
+## ========== SERVER-AUTHORITATIVE PROJECTILES ==========
 
-## ========== PLAYER CORNER HUD ==========
+func on_projectile_spawn(proj_data: Dictionary) -> void:
+	"""Handle server-spawned projectile"""
+	var proj_id = proj_data.get("id", "")
+	var attacker_id = proj_data.get("attacker_id", "")
+	var start_pos = proj_data.get("position", Vector2.ZERO)
+	var velocity = proj_data.get("velocity", Vector2.ZERO)
+	var texture_path = proj_data.get("texture", "")
 
-func _create_player_corner_hud() -> void:
-	"""Create compact player stats HUD in bottom-left corner"""
-	var hud_container = Control.new()
-	hud_container.name = "PlayerHUD"
-	hud_container.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	hud_container.position = Vector2(8, -60)  # 8px from left, 60px from bottom
-	hud_container.size = Vector2(120, 52)
-	hud_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	ui_layer.add_child(hud_container)
+	# Convert world position to arena position
+	start_pos = world_to_arena_pos(start_pos)
 
-	# Semi-transparent background panel
-	var bg = Panel.new()
-	bg.name = "HUDBg"
-	bg.size = Vector2(120, 52)
-	bg.position = Vector2.ZERO
-	var bg_style = StyleBoxFlat.new()
-	bg_style.bg_color = Color(0.05, 0.05, 0.1, 0.7)
-	bg_style.set_corner_radius_all(4)
-	bg_style.set_border_width_all(1)
-	bg_style.border_color = Color(0.3, 0.3, 0.4, 0.8)
-	bg.add_theme_stylebox_override("panel", bg_style)
-	hud_container.add_child(bg)
+	print("[BATTLE_SCENE] Projectile spawn: %s from %s at %s, velocity=%s, texture=%s" % [proj_id, attacker_id, start_pos, velocity, texture_path])
 
-	# Player name label
-	player_name_label = Label.new()
-	player_name_label.text = "Player"
-	player_name_label.position = Vector2(6, 2)
-	player_name_label.size = Vector2(108, 12)
-	player_name_label.add_theme_font_size_override("font_size", 10)
-	player_name_label.add_theme_color_override("font_color", Color(0.9, 0.85, 0.7))
-	hud_container.add_child(player_name_label)
+	# Play attack animation on attacker
+	if attacker_id in units:
+		units[attacker_id].play_attack_animation()
 
-	# Stat bars - compact horizontal layout
-	var bar_width = 100
-	var bar_height = 10
-	var bar_x = 6
-	var bar_y = 16
+	# Create projectile visual
+	var projectile_scene = preload("res://scenes/projectile.tscn")
+	var projectile = projectile_scene.instantiate()
+	projectile.name = proj_id
 
-	# HP bar (red)
-	player_hp_bar = _create_hud_bar(hud_container, "HP", bar_x, bar_y, bar_width, bar_height,
-		Color(0.85, 0.2, 0.2), Color(0.3, 0.1, 0.1, 0.8))
-	bar_y += bar_height + 2
+	# Set texture BEFORE adding to tree (so it's ready when _ready() runs)
+	var frame_count = 8
+	var texture_loaded = false
+	if texture_path and projectile.has_node("Sprite2D"):
+		var sprite = projectile.get_node("Sprite2D")
+		if ResourceLoader.exists(texture_path):
+			var texture = load(texture_path)
+			if texture:
+				sprite.texture = texture
+				sprite.hframes = frame_count
+				sprite.frame = 0
+				projectile.total_frames = frame_count
+				texture_loaded = true
+				print("[BATTLE_SCENE] Projectile texture loaded: %s (hframes=%d)" % [texture_path, frame_count])
+			else:
+				print("[BATTLE_SCENE] ERROR: Failed to load texture: %s" % texture_path)
+		else:
+			print("[BATTLE_SCENE] ERROR: Texture not found: %s" % texture_path)
 
-	# MP bar (blue)
-	player_mp_bar = _create_hud_bar(hud_container, "MP", bar_x, bar_y, bar_width, bar_height,
-		Color(0.2, 0.4, 0.9), Color(0.1, 0.1, 0.3, 0.8))
-	bar_y += bar_height + 2
+	if not texture_loaded:
+		print("[BATTLE_SCENE] WARNING: Projectile %s has no texture!" % proj_id)
 
-	# EP bar (green/yellow)
-	player_ep_bar = _create_hud_bar(hud_container, "EP", bar_x, bar_y, bar_width, bar_height,
-		Color(0.3, 0.8, 0.3), Color(0.1, 0.25, 0.1, 0.8))
+	# Add to units_container for proper z-ordering (above units)
+	if units_container:
+		units_container.add_child(projectile)
+	else:
+		add_child(projectile)
 
-func _create_hud_bar(parent: Control, label_text: String, x: float, y: float,
-		width: float, height: float, fill_color: Color, bg_color: Color) -> ProgressBar:
-	"""Create a labeled progress bar for the HUD"""
-	var bar = ProgressBar.new()
-	bar.position = Vector2(x, y)
-	bar.size = Vector2(width, height)
-	bar.max_value = 100
-	bar.value = 100
-	bar.show_percentage = false
+	# Set high z-index so projectile renders above units
+	projectile.z_index = 100
 
-	# Style the bar
-	var bg_style = StyleBoxFlat.new()
-	bg_style.bg_color = bg_color
-	bg_style.set_corner_radius_all(2)
+	# Calculate direction from velocity
+	var direction = velocity.normalized() if velocity.length() > 0 else Vector2.RIGHT
 
-	var fill_style = StyleBoxFlat.new()
-	fill_style.bg_color = fill_color
-	fill_style.set_corner_radius_all(2)
+	# Initialize projectile (will move based on velocity)
+	projectile.position = start_pos
+	projectile.initialize(start_pos, direction, 0, attacker_id, "")
 
-	bar.add_theme_stylebox_override("background", bg_style)
-	bar.add_theme_stylebox_override("fill", fill_style)
-	parent.add_child(bar)
+	# Override with server velocity (authoritative)
+	projectile.set_server_velocity(velocity)
 
-	# Label inside bar
-	var label = Label.new()
-	label.text = label_text
-	label.position = Vector2(4, 0)
-	label.size = Vector2(width - 8, height)
-	label.add_theme_font_size_override("font_size", 8)
-	label.add_theme_color_override("font_color", Color.WHITE)
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	bar.add_child(label)
+	projectiles[proj_id] = projectile
+	print("[BATTLE_SCENE] Projectile %s added at position %s, z_index=%d" % [proj_id, projectile.position, projectile.z_index])
 
-	return bar
+func on_projectile_hit(projectile_id: String, target_id: String, hit_position: Vector2) -> void:
+	"""Handle projectile hit from server"""
+	print("[BATTLE_SCENE] Projectile %s HIT %s at %s" % [projectile_id, target_id, hit_position])
+
+	# Remove projectile visual
+	if projectile_id in projectiles:
+		var projectile = projectiles[projectile_id]
+		if is_instance_valid(projectile):
+			# Optional: Play hit effect at target position
+			projectile.queue_free()
+		projectiles.erase(projectile_id)
+
+	# Damage event will come separately from server
+
+func on_projectile_miss(projectile_id: String, final_position: Vector2) -> void:
+	"""Handle projectile miss from server (despawn)"""
+	print("[BATTLE_SCENE] Projectile %s MISSED at %s" % [projectile_id, final_position])
+
+	# Remove projectile visual
+	if projectile_id in projectiles:
+		var projectile = projectiles[projectile_id]
+		if is_instance_valid(projectile):
+			# Optional: Play miss/fizzle effect
+			projectile.queue_free()
+		projectiles.erase(projectile_id)
+
+
 
 func update_player_hud(hp: int, max_hp: int, mp: int, max_mp: int, ep: int, max_ep: int, name: String = "") -> void:
 	"""Update player corner HUD with current stats"""

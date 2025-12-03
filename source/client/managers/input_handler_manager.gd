@@ -214,16 +214,19 @@ func handle_movement() -> void:
 		else:
 			play_idle_animation()
 			
-		# CLIENT-SIDE PREDICTION
-		if multiplayer_manager and multiplayer_manager.has_method("send_player_input"):
+		# CLIENT-SIDE PREDICTION (only when NOT in combat)
+		var game_state = get_node_or_null("/root/GameState")
+		var in_battle = game_state and game_state.has_meta("in_server_battle") and game_state.get_meta("in_server_battle")
+
+		if not in_battle and multiplayer_manager and multiplayer_manager.has_method("send_player_input"):
 			# Increment sequence
 			current_sequence = (current_sequence + 1) % 65536
 			var timestamp = Time.get_ticks_msec()
-			
+
 			# Send input to server
 			var packet = PacketEncoder.build_player_input_packet(up, down, left, right, current_sequence, timestamp)
 			multiplayer_manager.send_player_input(packet)
-			
+
 			# Record prediction history (Position will be updated after move_and_slide)
 			prediction_history.append({
 				"sequence": current_sequence,
@@ -231,7 +234,7 @@ func handle_movement() -> void:
 				"velocity": velocity,
 				"position": Vector2.ZERO # Placeholder, updated in process_movement
 			})
-			
+
 			# Limit history size (keep ~1 second worth of 60fps frames = 60)
 			if prediction_history.size() > 120:
 				prediction_history.pop_front()

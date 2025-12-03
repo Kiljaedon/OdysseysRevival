@@ -94,7 +94,7 @@
 		"wis": 8
 	},
 	"character_name": "Warrior",
-	"combat_role": "Melee",
+	"combat_role": "melee",
 	"created_date": "2025-11-13T06:41:21",
 	"derived_stats": {
 		"mag_def": 7,

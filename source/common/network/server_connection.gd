@@ -227,6 +227,18 @@ func rt_dodge_roll_event(unit_id: String, direction_x: float, direction_y: float
 func rt_battle_end(battle_id: int, result: String, rewards: Dictionary):
 	rt_combat_service.on_rt_battle_end(battle_id, result, rewards)
 
+@rpc
+func rt_projectile_spawn(proj_data: Dictionary):
+	rt_combat_service.on_rt_projectile_spawn(proj_data)
+
+@rpc
+func rt_projectile_hit(projectile_id: String, target_id: String, hit_position: Vector2):
+	rt_combat_service.on_rt_projectile_hit(projectile_id, target_id, hit_position)
+
+@rpc
+func rt_projectile_miss(projectile_id: String, final_position: Vector2):
+	rt_combat_service.on_rt_projectile_miss(projectile_id, final_position)
+
 
 # ==================== CHAT RPCs ====================
 

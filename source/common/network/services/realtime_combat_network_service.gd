@@ -84,6 +84,24 @@ func on_rt_battle_end(battle_id: int, result: String, rewards: Dictionary):
 	if controller and controller.has_method("on_battle_end"):
 		controller.on_battle_end(battle_id, result, rewards)
 
+func on_rt_projectile_spawn(proj_data: Dictionary):
+	"""Handle projectile spawn on client"""
+	var controller = _find_realtime_battle_controller()
+	if controller and controller.has_method("on_projectile_spawn"):
+		controller.on_projectile_spawn(proj_data)
+
+func on_rt_projectile_hit(projectile_id: String, target_id: String, hit_position: Vector2):
+	"""Handle projectile hit on client"""
+	var controller = _find_realtime_battle_controller()
+	if controller and controller.has_method("on_projectile_hit"):
+		controller.on_projectile_hit(projectile_id, target_id, hit_position)
+
+func on_rt_projectile_miss(projectile_id: String, final_position: Vector2):
+	"""Handle projectile miss on client"""
+	var controller = _find_realtime_battle_controller()
+	if controller and controller.has_method("on_projectile_miss"):
+		controller.on_projectile_miss(projectile_id, final_position)
+
 ## ========== UTILITY ==========
 
 func _find_realtime_battle_controller() -> Node:

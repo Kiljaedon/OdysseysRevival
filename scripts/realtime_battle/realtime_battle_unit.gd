@@ -33,6 +33,7 @@ var attack_range: float = 120.0  # Attack range in pixels
 var server_position: Vector2 = Vector2.ZERO
 var server_velocity: Vector2 = Vector2.ZERO
 var server_attack_state: String = ""  # Track attack state from server
+var _position_initialized: bool = false  # Prevents snapping before proper init
 
 ## Entity interpolator for smooth remote unit movement
 var interpolator: EntityInterpolator = null
@@ -155,18 +156,30 @@ func _create_visuals():
 	_create_target_indicator()
 
 func _create_target_indicator() -> void:
-	"""Create small target indicator ring under unit feet"""
-	# Small ellipse at feet using Line2D
-	var ring = Line2D.new()
-	ring.width = 2.0
-	ring.default_color = Color(1.0, 0.3, 0.3, 0.8)  # Red target ring
-	# Draw small ellipse
-	var points = PackedVector2Array()
-	for i in range(17):
-		var angle = i * PI * 2 / 16
-		points.append(Vector2(cos(angle) * 20, sin(angle) * 8))
-	ring.points = points
-	target_indicator.add_child(ring)
+	"""Create pronounced target indicator ring at unit feet"""
+	# Outer glowing ring at feet (y = 0)
+	var outer_ring = Line2D.new()
+	outer_ring.name = "OuterRing"
+	outer_ring.width = 4.0
+	outer_ring.default_color = Color(1.0, 0.2, 0.2, 0.9)  # Bright red
+	var outer_points = PackedVector2Array()
+	for i in range(33):
+		var angle = i * PI * 2 / 32
+		outer_points.append(Vector2(cos(angle) * 50, sin(angle) * 20))
+	outer_ring.points = outer_points
+	target_indicator.add_child(outer_ring)
+
+	# Inner bright ring
+	var inner_ring = Line2D.new()
+	inner_ring.name = "InnerRing"
+	inner_ring.width = 2.0
+	inner_ring.default_color = Color(1.0, 0.6, 0.0, 1.0)  # Orange/yellow
+	var inner_points = PackedVector2Array()
+	for i in range(33):
+		var angle = i * PI * 2 / 32
+		inner_points.append(Vector2(cos(angle) * 42, sin(angle) * 16))
+	inner_ring.points = inner_points
+	target_indicator.add_child(inner_ring)
 
 func _create_slim_bar(x: float, y: float, width: float, height: float, fill_color: Color) -> ProgressBar:
 	"""Create a slim progress bar for overhead stats - no labels, no background panel"""
@@ -256,6 +269,10 @@ func _process(delta: float):
 		interpolator.cleanup_old_states(Time.get_ticks_msec())
 	else:
 		# Player unit: client-side prediction with server reconciliation
+		# Don't apply server position until properly initialized
+		if not _position_initialized:
+			return
+
 		var is_in_special_movement = (server_attack_state in ["winding_up", "attacking", "recovering"]) or is_dodge_rolling
 
 		if is_in_special_movement:
@@ -266,7 +283,8 @@ func _process(delta: float):
 			# Normal movement: use client-side prediction with gentle reconciliation
 			var diff = position.distance_to(server_position)
 			if diff > SNAP_DISTANCE:
-				# Large desync - snap immediately
+				# Large desync - snap immediately but log it
+				print("[RT_UNIT] SNAP: Player snapped %.1f pixels (from %s to %s)" % [diff, position, server_position])
 				position = server_position
 			elif diff > 100:
 				# Moderate desync - gentle reconciliation
@@ -342,6 +360,7 @@ func initialize(data: Dictionary) -> void:
 
 	server_position = data.get("position", Vector2.ZERO)
 	position = server_position
+	_position_initialized = true  # Now we can accept server updates
 
 	var npc_type = data.get("npc_type", "")
 	print("[RT_UNIT] Init data: class=%s, npc_type=%s, team=%s, name=%s" % [class_name_id, npc_type, team, unit_name])
@@ -545,7 +564,19 @@ func get_facing_direction() -> Vector2:
 
 func apply_server_state(state: Dictionary) -> void:
 	"""Apply authoritative server state"""
-	server_position = state.get("position", server_position)
+	var new_position = state.get("position", server_position)
+
+	# Validate position - reject obviously wrong values
+	if new_position != null and new_position is Vector2:
+		# Reject positions that are too far from current (likely corrupted data)
+		# Unless we haven't initialized yet (server_position is ZERO)
+		var max_jump = 500.0  # Max reasonable position change per update
+		if server_position == Vector2.ZERO or position.distance_to(new_position) < max_jump:
+			server_position = new_position
+		else:
+			# Log suspicious position jump but don't apply it
+			print("[RT_UNIT] WARNING: Rejected large position jump: %s -> %s (dist: %.1f)" % [position, new_position, position.distance_to(new_position)])
+
 	server_velocity = state.get("velocity", Vector2.ZERO)
 	server_attack_state = state.get("attack_state", "")
 

@@ -139,3 +139,43 @@ static func send_battle_end(peer_id: int, battle_id: int, result: String, reward
 			network_handler.rt_battle_end.rpc_id(peer_id, battle_id, result, rewards)
 		else:
 			print("[RT_COMBAT] Skipping battle_end for disconnected peer: %d" % peer_id)
+
+## ========== PROJECTILE BROADCASTS ==========
+
+static func broadcast_projectile_spawn(battle: Dictionary, projectile: Dictionary, network_handler: Node) -> void:
+	"""Notify clients of projectile spawn"""
+	if not network_handler:
+		return
+
+	var connected_peers = network_handler.multiplayer.get_peers()
+	var proj_data = {
+		"id": projectile.id,
+		"attacker_id": projectile.attacker_id,
+		"position": projectile.position,
+		"velocity": projectile.velocity,
+		"texture": projectile.texture
+	}
+
+	for peer_id in battle.participants:
+		if peer_id in connected_peers:
+			network_handler.rt_projectile_spawn.rpc_id(peer_id, proj_data)
+
+static func broadcast_projectile_hit(battle: Dictionary, projectile_id: String, target_id: String, hit_position: Vector2, network_handler: Node) -> void:
+	"""Notify clients of projectile hit"""
+	if not network_handler:
+		return
+
+	var connected_peers = network_handler.multiplayer.get_peers()
+	for peer_id in battle.participants:
+		if peer_id in connected_peers:
+			network_handler.rt_projectile_hit.rpc_id(peer_id, projectile_id, target_id, hit_position)
+
+static func broadcast_projectile_miss(battle: Dictionary, projectile_id: String, final_position: Vector2, network_handler: Node) -> void:
+	"""Notify clients of projectile miss (despawn)"""
+	if not network_handler:
+		return
+
+	var connected_peers = network_handler.multiplayer.get_peers()
+	for peer_id in battle.participants:
+		if peer_id in connected_peers:
+			network_handler.rt_projectile_miss.rpc_id(peer_id, projectile_id, final_position)
