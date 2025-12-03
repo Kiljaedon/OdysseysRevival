@@ -43,7 +43,7 @@ var network_handler = null
 
 ## ========== IMPORTS ==========
 const CombatRules = preload("res://source/server/managers/combat_rules.gd")
-const RealtimeCombatAI = preload("res://source/server/managers/combat/realtime_combat_ai.gd")
+const RealtimeCombatAI = preload("res://source/server/managers/realtime_combat_ai.gd")
 const StatsCalculator = preload("res://source/common/combat/stats_calculator.gd")
 const ElementalSystem = preload("res://source/common/combat/elemental_system.gd")
 const RealTimeCombatSpawner = preload("res://source/server/managers/combat/realtime_combat_spawner.gd")
