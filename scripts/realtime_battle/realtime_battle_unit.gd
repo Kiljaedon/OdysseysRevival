@@ -28,6 +28,7 @@ var is_player_controlled: bool = false
 ## Server position for interpolation (fallback for player)
 var server_position: Vector2 = Vector2.ZERO
 var server_velocity: Vector2 = Vector2.ZERO
+var server_attack_state: String = ""  # Track attack state from server
 
 ## Entity interpolator for smooth remote unit movement
 var interpolator: EntityInterpolator = null
@@ -250,12 +251,23 @@ func _process(delta: float):
 
 		interpolator.cleanup_old_states(Time.get_ticks_msec())
 	else:
-		# Player unit: client-side prediction with gentle server reconciliation
-		var diff = position.distance_to(server_position)
-		if diff > SNAP_DISTANCE:
-			position = server_position
-		elif diff > 50:
-			position = position.lerp(server_position, 3.0 * delta)
+		# Player unit: client-side prediction with server reconciliation
+		var is_in_special_movement = (server_attack_state in ["winding_up", "attacking", "recovering"]) or is_dodge_rolling
+
+		if is_in_special_movement:
+			# During special movements (attacks, dodge rolls): trust server completely
+			# Server is applying lunge/dodge physics that client doesn't predict
+			position = position.lerp(server_position, 10.0 * delta)  # Fast tracking
+		else:
+			# Normal movement: use client-side prediction with gentle reconciliation
+			var diff = position.distance_to(server_position)
+			if diff > SNAP_DISTANCE:
+				# Large desync - snap immediately
+				position = server_position
+			elif diff > 100:
+				# Moderate desync - gentle reconciliation
+				position = position.lerp(server_position, 2.0 * delta)
+			# Small differences < 100 pixels: trust client prediction
 
 	# Handle attack animation timer
 	if is_playing_attack:
@@ -523,6 +535,7 @@ func apply_server_state(state: Dictionary) -> void:
 	"""Apply authoritative server state"""
 	server_position = state.get("position", server_position)
 	server_velocity = state.get("velocity", Vector2.ZERO)
+	server_attack_state = state.get("attack_state", "")
 
 	# Add state to interpolator for remote units
 	if not is_player_controlled and interpolator:
