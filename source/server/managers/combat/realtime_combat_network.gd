@@ -10,6 +10,12 @@ static func broadcast_all_battle_states(active_battles: Dictionary, network_hand
 
 static func _broadcast_battle_state(battle: Dictionary, network_handler: Node) -> void:
 	"""Send unit states to participants"""
+	if not network_handler:
+		return
+
+	# Get list of connected peers
+	var connected_peers = network_handler.multiplayer.get_peers()
+
 	var server_timestamp = Time.get_ticks_msec()  # Timestamp for interpolation
 	var units_state = []
 	for unit in battle.units.values():
@@ -29,30 +35,49 @@ static func _broadcast_battle_state(battle: Dictionary, network_handler: Node) -
 		})
 
 	for peer_id in battle.participants:
-		if network_handler:
+		# Only send to connected peers
+		if peer_id in connected_peers:
 			network_handler.rt_state_update.rpc_id(peer_id, units_state)
 
 static func broadcast_damage_event(battle: Dictionary, attacker_id: String, target_id: String, damage: int, flank_type: String, network_handler: Node) -> void:
 	"""Notify clients of damage"""
+	if not network_handler:
+		return
+
+	var connected_peers = network_handler.multiplayer.get_peers()
 	for peer_id in battle.participants:
-		if network_handler:
+		if peer_id in connected_peers:
 			network_handler.rt_damage_event.rpc_id(peer_id, attacker_id, target_id, damage, flank_type)
 
 static func broadcast_unit_death(battle: Dictionary, unit_id: String, network_handler: Node) -> void:
 	"""Notify clients of unit death"""
+	if not network_handler:
+		return
+
+	var connected_peers = network_handler.multiplayer.get_peers()
 	for peer_id in battle.participants:
-		if network_handler:
+		if peer_id in connected_peers:
 			network_handler.rt_unit_death.rpc_id(peer_id, unit_id)
 
 static func broadcast_dodge_roll_event(battle: Dictionary, unit_id: String, direction: Vector2, network_handler: Node) -> void:
 	"""Notify clients of dodge roll activation"""
+	if not network_handler:
+		return
+
+	var connected_peers = network_handler.multiplayer.get_peers()
 	for peer_id in battle.participants:
-		if network_handler:
+		if peer_id in connected_peers:
 			network_handler.rt_dodge_roll_event.rpc_id(peer_id, unit_id, direction.x, direction.y)
 
 static func send_battle_start(peer_id: int, battle: Dictionary, player_manager: Node, network_handler: Node) -> void:
 	"""Send battle start to client"""
 	if not network_handler:
+		return
+
+	# Check if peer is connected
+	var connected_peers = network_handler.multiplayer.get_peers()
+	if not peer_id in connected_peers:
+		print("[RT_NETWORK] Cannot send battle_start to disconnected peer: %d" % peer_id)
 		return
 
 	# Get player's world position for map tile capture
