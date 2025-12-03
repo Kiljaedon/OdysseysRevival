@@ -459,14 +459,65 @@ func on_state_update(units_state: Array) -> void:
 
 func on_damage_event(attacker_id: String, target_id: String, damage: int, flank_type: String) -> void:
 	"""Handle damage event from server"""
-	# Play attack animation on attacker
-	if attacker_id in units:
-		units[attacker_id].play_attack_animation()
+	if not attacker_id in units or not target_id in units:
+		return
 
-	# Show damage on target
-	if target_id in units:
-		units[target_id].show_damage(damage, flank_type)
+	var attacker = units[attacker_id]
+	var target = units[target_id]
+
+	# Play attack animation on attacker
+	attacker.play_attack_animation()
+
+	# Check if attacker uses projectiles (ranged/caster)
+	var combat_role = attacker.get("combat_role")
+	if combat_role in ["ranged", "caster"]:
+		# Store damage for later (when projectile hits)
+		target.set_meta("pending_damage", damage)
+		target.set_meta("pending_flank", flank_type)
+		# Spawn projectile
+		_spawn_projectile(attacker, target, combat_role)
+	else:
+		# Melee/Hybrid - show damage immediately
+		target.show_damage(damage, flank_type)
+
 	unit_damaged.emit(target_id, damage, flank_type)
+
+func _spawn_projectile(attacker: Node2D, target: Node2D, role: String):
+	"""Spawn a visual projectile from attacker to target"""
+	var projectile_scene = preload("res://scenes/projectile.tscn")
+	var projectile = projectile_scene.instantiate()
+	add_child(projectile)
+
+	# Set projectile texture based on role
+	var texture_path = ""
+	match role:
+		"ranged":
+			texture_path = "res://assets/projectiles/Light Bolt.png"
+		"caster":
+			texture_path = "res://assets/projectiles/Arcane Bolt.png"
+
+	if texture_path and projectile.has_node("Sprite2D"):
+		var sprite = projectile.get_node("Sprite2D")
+		sprite.texture = load(texture_path)
+
+	# Calculate direction
+	var direction = (target.position - attacker.position).normalized()
+
+	# Initialize projectile
+	projectile.initialize(attacker.position, direction, 0, "", "")
+
+	# Make projectile hit target after travel time
+	var distance = attacker.position.distance_to(target.position)
+	var travel_time = distance / projectile.speed
+	await get_tree().create_timer(travel_time).timeout
+
+	# Show damage when projectile reaches target
+	if is_instance_valid(target):
+		var dmg = target.get_meta("pending_damage", 0)
+		var flank = target.get_meta("pending_flank", "front")
+		target.show_damage(dmg, flank)
+		target.remove_meta("pending_damage")
+		target.remove_meta("pending_flank")
 
 func on_unit_death(unit_id: String) -> void:
 	"""Handle unit death from server"""

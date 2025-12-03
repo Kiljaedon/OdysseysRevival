@@ -49,6 +49,7 @@ const ElementalSystem = preload("res://source/common/combat/elemental_system.gd"
 const RealTimeCombatSpawner = preload("res://source/server/managers/combat/realtime_combat_spawner.gd")
 const RealTimeCombatNetwork = preload("res://source/server/managers/combat/realtime_combat_network.gd")
 const RealTimeCombatInput = preload("res://source/server/managers/combat/realtime_combat_input.gd")
+const CombatRoles = preload("res://source/server/managers/combat/combat_roles.gd")
 
 ## ========== BATTLE STATE ==========
 var active_battles: Dictionary = {}  # battle_id -> battle data
@@ -302,9 +303,10 @@ func _execute_attack(battle: Dictionary, attacker: Dictionary, target: Dictionar
 	# 3. Apply Game Balance (Rules) & Hits-to-Kill Logic
 	var damage = CombatRules.calculate_balanced_damage(damage_after_element, attacker, target)
 
-	# Apply flanking bonus
+	# Apply role-specific flanking bonus
 	var flank_type = _get_flank_type(attacker, target)
-	var flank_mult = _get_flank_multiplier(flank_type)
+	var attacker_role = attacker.get("combat_role", "melee")
+	var flank_mult = CombatRoles.get_flank_multiplier(attacker_role, flank_type)
 	damage = int(damage * flank_mult)
 
 	# Apply weakness (Monster specific weaknesses beyond elements)
@@ -344,12 +346,7 @@ func _get_flank_type(attacker: Dictionary, defender: Dictionary) -> String:
 	else:
 		return "side"
 
-func _get_flank_multiplier(flank_type: String) -> float:
-	match flank_type:
-		"front": return FLANK_FRONT
-		"side": return FLANK_SIDE
-		"back": return FLANK_BACK
-	return FLANK_FRONT
+# Removed - now using CombatRoles.get_flank_multiplier()
 
 func _get_weakness_multiplier(damage_type: String, weaknesses: Dictionary) -> float:
 	return weaknesses.get(damage_type, 1.0)

@@ -3,6 +3,7 @@ extends RefCounted
 
 ## ========== IMPORTS ==========
 const CombatRules = preload("res://source/server/managers/combat_rules.gd")
+const CombatRoles = preload("res://source/server/managers/combat/combat_roles.gd")
 
 ## ========== CONSTANTS ==========
 const BATTLE_TILE_SPACING: int = 12
@@ -108,6 +109,11 @@ static func _create_unit_data(unit_id: String, source_data: Dictionary, team: St
 	var move_speed = 300.0
 	var attack_cooldown = max(1.0, 1.0 / base_attack_speed)
 
+	# Get combat role and its properties
+	var combat_role = source_data.get("combat_role", "melee")
+	var attack_range = CombatRoles.get_attack_range(combat_role)
+	var move_speed_mult = CombatRoles.get_move_speed_mult(combat_role)
+
 	var unit = {
 		"id": unit_id,
 		"name": source_data.get("character_name", source_data.get("name", "Unit")),
@@ -122,11 +128,11 @@ static func _create_unit_data(unit_id: String, source_data: Dictionary, team: St
 		"energy": energy,
 		"max_energy": max_energy,
 		"dex": dex,
-		"move_speed": move_speed,
+		"move_speed": move_speed * move_speed_mult,  # Apply role speed modifier
 		"attack_cooldown": attack_cooldown,
 		"cooldown_timer": 0.0,
-		"combat_role": source_data.get("combat_role", "melee"),
-		"attack_range": _get_attack_range(source_data.get("combat_role", "melee")),
+		"combat_role": combat_role,
+		"attack_range": attack_range,
 		"size": source_data.get("size", "standard"),
 		"state": "idle",
 		"target_id": "",
@@ -145,10 +151,4 @@ static func _create_unit_data(unit_id: String, source_data: Dictionary, team: St
 
 	return unit
 
-static func _get_attack_range(combat_role: String) -> float:
-	match combat_role:
-		"melee": return 100.0
-		"hybrid": return 180.0
-		"caster": return 280.0
-		"ranged": return 350.0
-	return 100.0
+# Removed - now using CombatRoles.get_attack_range()
