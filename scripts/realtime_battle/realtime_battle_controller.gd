@@ -1,42 +1,44 @@
 class_name RealtimeBattleController
 extends Node
-## Realtime Battle Controller - Handles player input and server communication
-## Sends input to server, receives and applies state updates
+## Realtime Battle Controller - Battle lifecycle and network coordination
+## REFACTORED: Input handling extracted to BattleInputHandler
+## PURPOSE: Manage battle state, network sync, and coordinate input/state systems
 
 ## ========== SIGNALS ==========
 signal battle_ready
 signal battle_ended(result: String, rewards: Dictionary)
 
+## ========== IMPORTS ==========
+const BattleInputHandler = preload("res://scripts/realtime_battle/battle_input_handler.gd")
+
 ## ========== CONSTANTS ==========
 const INPUT_SEND_RATE: float = 0.05  # 20 times per second
+const ATTACK_COOLDOWN: float = 0.8  # Must match server's total attack duration
+const ATTACK_FREEZE_TIME: float = 0.4  # Time player can't move during attack wind-up
+const DODGE_ROLL_COOLDOWN: float = 1.0  # Must match server
 
 ## ========== REFERENCES ==========
 var battle_scene: RealtimeBattleScene
 var network_service: Node  # RealtimeCombatNetworkService
+var input_handler: BattleInputHandler  # Handles all input processing
 
 ## ========== STATE ==========
 var in_battle: bool = false
 var battle_id: int = -1
 var input_timer: float = 0.0
-var last_velocity: Vector2 = Vector2.ZERO
-var current_target_id: String = ""
 var movement_speed: float = 300.0  # Base walk speed (same as server)
 
-## ========== ATTACK COOLDOWN ==========
-const ATTACK_COOLDOWN: float = 0.8  # Must match server's total attack duration
-const ATTACK_FREEZE_TIME: float = 0.4  # Time player can't move during attack wind-up
+## Attack/dodge cooldowns (read by input_handler)
 var attack_cooldown_timer: float = 0.0  # Prevents spamming attacks to server
 var attack_freeze_timer: float = 0.0  # Prevents movement during attack
-
-## ========== TAB TARGETING ==========
-const SPELL_TARGET_RANGE: float = 350.0  # Max range for spell targeting
-var targetable_enemies: Array = []  # Array of unit_ids in range
-var target_index: int = -1  # Current index in targetable_enemies
+var dodge_roll_cooldown_timer: float = 0.0
 
 ## ========== LIFECYCLE ==========
 
 func _ready():
 	set_process(false)  # Disabled until battle starts
+	input_handler = BattleInputHandler.new()
+	input_handler.initialize(self)
 
 func initialize(scene: RealtimeBattleScene, net_service: Node) -> void:
 	"""Set up controller with scene and network references"""
@@ -68,45 +70,38 @@ func _process(delta: float):
 	if dodge_roll_cooldown_timer > 0:
 		dodge_roll_cooldown_timer -= delta
 
-	# Handle input
-	_process_movement_input(delta)
-	_process_action_input()
+	# Process input via handler
+	var input_result = input_handler.process_input(delta)
+	var velocity = input_result.velocity
+
+	# Apply local prediction with collision
+	_apply_local_movement(velocity, delta)
 
 	# Send input to server at fixed rate
 	input_timer += delta
 	if input_timer >= INPUT_SEND_RATE:
 		input_timer = 0.0
-		_send_movement_to_server()
+		_send_movement_to_server(velocity)
 
 func _input(event: InputEvent):
-	"""Use _input instead of _unhandled_input to receive events before GUI elements"""
+	"""Handle high-priority input events (before GUI)"""
 	if not in_battle:
 		return
 
-	# Handle key inputs for combat actions (check these first)
+	# Delegate dodge roll to input handler (just-pressed events)
 	if event is InputEventKey and event.pressed and not event.echo:
-		# Space for attack
-		if event.keycode == KEY_SPACE:
-			print("[RT_CONTROLLER] SPACE pressed! Attacking...")
-			_try_attack()
-			get_viewport().set_input_as_handled()
-			return
-
-		# Shift for dodge roll
 		if event.keycode == KEY_SHIFT:
-			print("[RT_CONTROLLER] SHIFT pressed! Dodge rolling...")
-			_try_dodge_roll()
+			input_handler.try_dodge_roll(self)
 			get_viewport().set_input_as_handled()
 			return
 
-	# Handle Action Map inputs (if not handled by keycode above)
 	if event.is_action_pressed("defend"):
-		print("[RT_CONTROLLER] Defend Action pressed! Dodge rolling...")
-		_try_dodge_roll()
+		input_handler.try_dodge_roll(self)
 		get_viewport().set_input_as_handled()
 		return
 
 func _unhandled_input(event: InputEvent):
+	"""Handle lower-priority input events (after GUI)"""
 	if not in_battle:
 		return
 
@@ -121,33 +116,19 @@ func _unhandled_input(event: InputEvent):
 			get_viewport().set_input_as_handled()
 			return
 
-	# Mouse click for targeting
+	# Mouse click for targeting (delegate to handler)
 	if event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_LEFT:
-			_handle_click_target(event.position)
+			input_handler.handle_click_target(self, event.position)
+			get_viewport().set_input_as_handled()
+			return
 
-	# Handle key inputs for combat actions
+	# Handle key inputs (delegate to handler)
 	if event is InputEventKey and event.pressed and not event.echo:
 		# T or Tab for cycling targets
 		if event.keycode == KEY_T or event.keycode == KEY_TAB:
-			if event.shift_pressed:
-				_cycle_target(-1)  # Shift+T/Tab = previous target
-			else:
-				_cycle_target(1)   # T/Tab = next target
-			get_viewport().set_input_as_handled()
-			return
-
-		# Space or action key for attack
-		if event.keycode == KEY_SPACE or event.is_action_pressed("action"):
-			print("[RT_CONTROLLER] SPACE/ACTION key pressed via _unhandled_input!")
-			_try_attack()
-			get_viewport().set_input_as_handled()
-			return
-
-		# Shift for dodge roll
-		if event.keycode == KEY_SHIFT or event.is_action_pressed("defend"):
-			print("[RT_CONTROLLER] SHIFT/DEFEND key pressed via _unhandled_input - dodge roll!")
-			_try_dodge_roll()
+			var direction = -1 if event.shift_pressed else 1
+			input_handler.cycle_target(self, direction)
 			get_viewport().set_input_as_handled()
 			return
 
@@ -204,66 +185,34 @@ func _on_battle_ended(result: String, rewards: Dictionary):
 	in_battle = false
 	set_process(false)
 
-## ========== INPUT HANDLING ==========
+## ========== LOCAL MOVEMENT (CLIENT-SIDE PREDICTION) ==========
 
 var _debug_move_counter: int = 0
 
-func _process_movement_input(delta: float) -> void:
-	"""Read WASD input and calculate velocity"""
-	# Freeze movement during attack animation
-	if attack_freeze_timer > 0:
-		last_velocity = Vector2.ZERO
-		# Also freeze local animation
-		if battle_scene:
-			var player = battle_scene.get_player_unit()
-			if player and player.is_player_controlled:
-				player.set_local_velocity(Vector2.ZERO)
+func _apply_local_movement(velocity: Vector2, delta: float) -> void:
+	"""Apply velocity locally for client-side prediction"""
+	if not battle_scene:
 		return
 
-	var velocity = Vector2.ZERO
+	var player = battle_scene.get_player_unit()
+	if not player or not player.is_player_controlled:
+		return
 
-	if Input.is_action_pressed("up"):
-		velocity.y -= 1
-	if Input.is_action_pressed("down"):
-		velocity.y += 1
-	if Input.is_action_pressed("left"):
-		velocity.x -= 1
-	if Input.is_action_pressed("right"):
-		velocity.x += 1
+	# Set local velocity for animation
+	player.set_local_velocity(velocity)
 
-	if velocity.length() > 0:
-		velocity = velocity.normalized() * movement_speed
-
-	last_velocity = velocity
-
-	# Debug: log every 60 frames when pressing move keys
+	# Debug logging
 	_debug_move_counter += 1
 	if velocity.length() > 0 and _debug_move_counter % 60 == 0:
-		print("[RT_CONTROLLER] Movement debug:")
-		print("  - velocity: %s" % velocity)
-		print("  - battle_scene: %s" % (battle_scene != null))
-		if battle_scene:
-			var player = battle_scene.get_player_unit()
-			print("  - player unit: %s" % (player != null))
-			if player:
-				print("  - is_player_controlled: %s" % player.is_player_controlled)
-				print("  - player position: %s" % player.position)
-				print("  - arena size: %s" % battle_scene.get_arena_pixel_size())
+		print("[RT_CONTROLLER] Movement: velocity=%s, pos=%s" % [velocity, player.position])
 
-	# Apply locally for prediction with collision
-	if battle_scene:
-		var player = battle_scene.get_player_unit()
-		if player and player.is_player_controlled:
-			# Set local velocity for animation
-			player.set_local_velocity(velocity)
-
-			if velocity.length() > 0:
-				var new_pos = player.position + velocity * delta
-				# Unit collision DISABLED - will be used as spell later
-				# new_pos = _check_unit_collision(player, new_pos)
-				# Clamp to arena bounds
-				new_pos = _clamp_to_arena(new_pos)
-				player.position = new_pos
+	# Apply movement with collision
+	if velocity.length() > 0:
+		var new_pos = player.position + velocity * delta
+		# Unit collision DISABLED - will be used as spell later
+		# new_pos = _check_unit_collision(player, new_pos)
+		new_pos = _clamp_to_arena(new_pos)
+		player.position = new_pos
 
 ## ========== UNIT COLLISION ==========
 const COLLISION_RADIUS: float = 40.0  # Unit collision radius
@@ -320,272 +269,34 @@ func _clamp_to_arena(pos: Vector2) -> Vector2:
 	pos.y = clamp(pos.y, margin, arena_size.y - margin)
 	return pos
 
-func _process_action_input() -> void:
-	"""Check for attack/defend inputs"""
-	# Attack with spacebar (held) - auto-attacks at cooldown pace
-	if Input.is_action_pressed("action") or Input.is_key_pressed(KEY_SPACE):
-		_try_attack()
-
-	# Dodge roll with shift or dedicated key
-	if Input.is_action_just_pressed("defend"):
-		_try_dodge_roll()
-
-	# Tab to cycle through targets in range (handled in _unhandled_input)
-
-func _handle_click_target(screen_pos: Vector2) -> void:
-	"""Handle click to select target"""
-	if not battle_scene:
-		return
-
-	# Convert screen position to world position
-	var world_pos = battle_scene.camera.get_global_mouse_position() if battle_scene.camera else screen_pos
-
-	# Find closest enemy unit
-	var closest_enemy: Node2D = null
-	var closest_dist: float = 100.0  # Click radius
-
-	for unit_id in battle_scene.units:
-		var unit = battle_scene.units[unit_id]
-		if unit.team == "enemy" and unit.unit_state != "dead":
-			var dist = world_pos.distance_to(unit.position)
-			if dist < closest_dist:
-				closest_dist = dist
-				closest_enemy = unit
-				current_target_id = unit_id
-
-	if closest_enemy:
-		_set_target(current_target_id)
-		_try_attack()
-
-func _set_target(target_id: String) -> void:
-	"""Set current target and update indicators"""
-	var old_target_id = current_target_id
-
-	# Clear old target indicator (only if different)
-	if old_target_id != target_id and not old_target_id.is_empty() and battle_scene:
-		var old_target = battle_scene.get_unit(old_target_id)
-		if old_target and old_target.has_method("set_targeted"):
-			old_target.set_targeted(false)
-
-	current_target_id = target_id
-
-	# Show new target indicator
-	if not current_target_id.is_empty() and battle_scene:
-		var new_target = battle_scene.get_unit(current_target_id)
-		if new_target and new_target.has_method("set_targeted"):
-			new_target.set_targeted(true)
-		if old_target_id != target_id:
-			print("[RT_CONTROLLER] Target set: %s" % current_target_id)
-
-func _try_attack() -> void:
-	"""Attempt to attack current target - validates locally before sending to server"""
-	# Check attack cooldown - prevents spamming the server
-	if attack_cooldown_timer > 0:
-		return
-
-	if current_target_id.is_empty():
-		# Auto-target closest enemy if none selected
-		_auto_select_target()
-
-	if current_target_id.is_empty():
-		# No valid target found - don't spam server
-		return
-
-	# Validate target exists and is alive before sending
-	if not battle_scene:
-		return
-
-	var target = battle_scene.get_unit(current_target_id)
-	if not target or target.unit_state == "dead":
-		# Target invalid or dead - clear it and don't send
-		current_target_id = ""
-		return
-
-	# Check if in attack range (basic melee range check)
-	var player = battle_scene.get_player_unit()
-	if not player:
-		return
-
-	var distance = player.position.distance_to(target.position)
-	const ATTACK_RANGE: float = 120.0  # Melee attack range
-	if distance > ATTACK_RANGE:
-		# Too far - don't send attack, let player move closer
-		return
-
-	# Valid target in range - send attack to server and start cooldown
-	attack_cooldown_timer = ATTACK_COOLDOWN
-	attack_freeze_timer = ATTACK_FREEZE_TIME  # Freeze movement during attack
-	_send_attack_to_server(current_target_id)
-
-## ========== DODGE ROLL ==========
-const DODGE_ROLL_COOLDOWN: float = 1.0  # Must match server
-var dodge_roll_cooldown_timer: float = 0.0
-
-func _try_dodge_roll() -> void:
-	"""Attempt to perform a dodge roll"""
-	print("[RT_CONTROLLER] Attempting Dodge Roll... Cooldown: %.2f" % dodge_roll_cooldown_timer)
-	
-	# Check cooldown locally to prevent spamming server
-	if dodge_roll_cooldown_timer > 0:
-		return
-
-	# Get roll direction from current movement, or backward if stationary
-	var direction = last_velocity.normalized()
-	if direction.length() < 0.1:
-		# Roll backward based on player facing
-		var player = battle_scene.get_player_unit() if battle_scene else null
-		if player:
-			var facing = player.get("facing") if player.has_method("get") else "down"
-			match facing:
-				"up": direction = Vector2.DOWN
-				"down": direction = Vector2.UP
-				"left": direction = Vector2.RIGHT
-				"right": direction = Vector2.LEFT
-				_: direction = Vector2.DOWN
-		else:
-			direction = Vector2.DOWN
-
-	# Start local cooldown
-	dodge_roll_cooldown_timer = DODGE_ROLL_COOLDOWN
-
-	# Send to server
-	_send_dodge_roll_to_server(direction)
-
-func _auto_select_target() -> void:
-	"""Select closest enemy as target"""
-	if not battle_scene:
-		return
-
-	var player = battle_scene.get_player_unit()
-	if not player:
-		return
-
-	var closest_dist: float = 999999.0
-
-	for unit_id in battle_scene.units:
-		var unit = battle_scene.units[unit_id]
-		if unit.team == "enemy" and unit.unit_state != "dead":
-			var dist = player.position.distance_to(unit.position)
-			if dist < closest_dist:
-				closest_dist = dist
-				current_target_id = unit_id
-
-
-## ========== TAB TARGETING SYSTEM ==========
-
-func _update_targetable_enemies() -> void:
-	"""Update list of enemies within spell range"""
-	targetable_enemies.clear()
-
-	if not battle_scene:
-		return
-
-	var player = battle_scene.get_player_unit()
-	if not player:
-		return
-
-	# Build list of enemies within range, sorted by distance
-	var enemies_with_dist: Array = []
-
-	for unit_id in battle_scene.units:
-		var unit = battle_scene.units[unit_id]
-		if unit.team == "enemy" and unit.unit_state != "dead":
-			var dist = player.position.distance_to(unit.position)
-			if dist <= SPELL_TARGET_RANGE:
-				enemies_with_dist.append({"id": unit_id, "dist": dist})
-
-	# Sort by distance
-	enemies_with_dist.sort_custom(func(a, b): return a.dist < b.dist)
-
-	# Extract just the IDs
-	for enemy in enemies_with_dist:
-		targetable_enemies.append(enemy.id)
-
-
-func _cycle_target(direction: int) -> void:
-	"""Cycle through targetable enemies. direction: 1 for next, -1 for previous"""
-	_update_targetable_enemies()
-
-	if targetable_enemies.is_empty():
-		print("[RT_CONTROLLER] No targets in range")
-		return
-
-	# Find current target's index in the list
-	if current_target_id in targetable_enemies:
-		target_index = targetable_enemies.find(current_target_id)
-	else:
-		target_index = -1
-
-	# Move to next/previous
-	target_index += direction
-
-	# Wrap around
-	if target_index >= targetable_enemies.size():
-		target_index = 0
-	elif target_index < 0:
-		target_index = targetable_enemies.size() - 1
-
-	# Set new target
-	var new_target_id = targetable_enemies[target_index]
-	_set_target(new_target_id)
-
-	print("[RT_CONTROLLER] Tab target: %s (%d/%d)" % [
-		new_target_id,
-		target_index + 1,
-		targetable_enemies.size()
-	])
-
+## ========== PUBLIC API FOR SPELL TARGETING (FUTURE) ==========
 
 func get_targets_in_range() -> Array:
-	"""Get list of enemy unit IDs within spell range"""
-	_update_targetable_enemies()
-	return targetable_enemies
-
+	"""Get list of enemy unit IDs within spell range (for spell UI)"""
+	# Delegate to input handler for future spell targeting UI
+	if input_handler:
+		input_handler.cycle_target(self, 0)  # Updates targetable_enemies
+		return input_handler.targetable_enemies
+	return []
 
 func has_target_in_range() -> bool:
-	"""Check if current target is within spell range"""
-	if current_target_id.is_empty():
-		return false
+	"""Check if current target is within spell range (for spell UI)"""
+	return input_handler and input_handler.has_target()
 
-	if not battle_scene:
-		return false
-
-	var player = battle_scene.get_player_unit()
-	var target = battle_scene.get_unit(current_target_id)
-
-	if not player or not target:
-		return false
-
-	return player.position.distance_to(target.position) <= SPELL_TARGET_RANGE
+func get_current_target() -> String:
+	"""Get current target ID (for spell UI)"""
+	return input_handler.get_current_target() if input_handler else ""
 
 ## ========== NETWORK - OUTGOING ==========
 
-func _send_movement_to_server() -> void:
+func _send_movement_to_server(velocity: Vector2) -> void:
 	"""Send current velocity to server via RPC"""
 	var server_conn = get_tree().root.get_node_or_null("ServerConnection")
 	if not server_conn:
 		return
 
 	# Send velocity to server via RPC
-	server_conn.rt_player_move.rpc_id(1, last_velocity.x, last_velocity.y)
-
-func _send_attack_to_server(target_id: String) -> void:
-	"""Send attack command to server via RPC"""
-	var server_conn = get_tree().root.get_node_or_null("ServerConnection")
-	if not server_conn:
-		return
-
-	server_conn.rt_player_attack.rpc_id(1, target_id)
-	print("[RT_CONTROLLER] Attack sent: target=%s" % target_id)
-
-func _send_dodge_roll_to_server(direction: Vector2) -> void:
-	"""Send dodge roll command to server via RPC"""
-	var server_conn = get_tree().root.get_node_or_null("ServerConnection")
-	if not server_conn:
-		return
-
-	server_conn.rt_player_dodge_roll.rpc_id(1, direction.x, direction.y)
-	print("[RT_CONTROLLER] Dodge roll sent: direction=%s" % direction)
+	server_conn.rt_player_move.rpc_id(1, velocity.x, velocity.y)
 
 ## ========== NETWORK - INCOMING ==========
 
@@ -605,8 +316,8 @@ func on_unit_death(unit_id: String) -> void:
 		battle_scene.on_unit_death(unit_id)
 
 	# Clear target if it died
-	if unit_id == current_target_id:
-		_set_target("")
+	if input_handler and unit_id == input_handler.get_current_target():
+		input_handler.set_target(self, "")
 
 func on_dodge_roll_event(unit_id: String, direction: Vector2) -> void:
 	"""Handle dodge roll event from server"""
