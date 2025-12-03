@@ -133,13 +133,18 @@ func _execute_attack(controller: Object) -> void:
 		current_target_id = ""
 		return
 
-	# Check range
+	# Check range using player's actual attack range (role-specific)
 	var player = controller.battle_scene.get_player_unit()
 	if not player:
 		return
 
+	# Get player's attack range from their combat role (caster=280, melee=120, etc)
+	var player_attack_range = player.get("attack_range")
+	if player_attack_range == null:
+		player_attack_range = ATTACK_RANGE  # Fallback to default
+
 	var distance = player.position.distance_to(target.position)
-	if distance > ATTACK_RANGE:
+	if distance > player_attack_range:
 		return  # Too far - let player move closer
 
 	# Valid target in range - execute attack
