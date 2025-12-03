@@ -1,0 +1,46 @@
+=== FINAL FILE SIZE AUDIT ===
+
+Combat System Files:
+ 1209 total
+  298 source/server/managers/combat/combat_input_buffer.gd
+  187 source/server/managers/combat/combat_dodge_system.gd
+  167 source/server/managers/combat/combat_combo_system.gd
+  165 source/server/managers/combat/combat_timing.gd
+  151 source/server/managers/combat/realtime_combat_spawner.gd
+  127 source/server/managers/combat/realtime_combat_input.gd
+  114 source/server/managers/combat/realtime_combat_network.gd
+
+Client Combat Files:
+328 source/client/combat/entity_interpolator.gd
+
+Battle Scripts:
+ 2132 total
+  637 scripts/realtime_battle/realtime_battle_unit.gd
+  584 scripts/realtime_battle/realtime_battle_scene.gd
+  397 scripts/realtime_battle/battle_input_handler.gd
+  324 scripts/realtime_battle/realtime_battle_controller.gd
+  190 scripts/realtime_battle/realtime_battle_launcher.gd
+
+
+Core Combat Files:
+  380 source/server/managers/combat_rules.gd
+  447 source/server/managers/realtime_combat_manager.gd
+  827 total
+
+=== VIOLATIONS (>450 lines) ===
+source/client/gateway/gateway.gd = 714 lines ❌
+source/client/managers/input_handler_manager.gd = 505 lines ❌
+source/client/managers/map_manager.gd = 584 lines ❌
+source/client/managers/multiplayer_manager.gd = 537 lines ❌
+source/client/managers/ui_panel_manager.gd = 468 lines ❌
+source/client/ui/character_select_screen.gd = 464 lines ❌
+source/client/ui/chat_ui.gd = 538 lines ❌
+source/client/ui/login_screen.gd = 725 lines ❌
+source/common/database/game_database.gd = 915 lines ❌
+source/common/gameplay/combat/components/ability_system_component.gd = 512 lines ❌
+source/server/managers/map_manager.gd = 660 lines ❌
+source/server/managers/player_manager.gd = 529 lines ❌
+source/server/managers/ui_manager.gd = 675 lines ❌
+source/server/server_world.gd = 771 lines ❌
+scripts/realtime_battle/realtime_battle_scene.gd = 584 lines ❌
+scripts/realtime_battle/realtime_battle_unit.gd = 637 lines ❌
