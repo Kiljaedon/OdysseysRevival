@@ -431,10 +431,17 @@ func _update_sprite_frame() -> void:
 				sprite.texture = tex
 
 func play_attack_animation() -> void:
-	"""Start playing attack animation"""
+	"""Start playing attack animation with visual flash"""
 	is_playing_attack = true
 	attack_timer = ATTACK_ANIM_DURATION
 	_update_sprite_frame()
+
+	# Visual flash effect to make attacks visible
+	if sprite:
+		sprite.modulate = Color(2.0, 2.0, 2.0, 1.0)  # Bright flash
+		# Fade back to normal over attack duration
+		var tween = create_tween()
+		tween.tween_property(sprite, "modulate", Color(1.0, 1.0, 1.0, 1.0), ATTACK_ANIM_DURATION)
 
 func _load_frame_texture(frame_info) -> Texture2D:
 	"""Load texture from frame info dictionary"""
@@ -577,7 +584,13 @@ func is_targeted() -> bool:
 ## ========== VISUAL EFFECTS ==========
 
 func show_damage(damage: int, flank_type: String) -> void:
-	"""Display floating damage number"""
+	"""Display floating damage number and hurt flash"""
+	# Red hurt flash on sprite
+	if sprite:
+		sprite.modulate = Color(2.5, 0.5, 0.5, 1.0)  # Red flash
+		var flash_tween = create_tween()
+		flash_tween.tween_property(sprite, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.15)
+
 	if damage_label:
 		damage_label.text = str(damage)
 		if flank_type == "back":
