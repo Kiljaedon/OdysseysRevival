@@ -1,0 +1,20 @@
+=== BASELINE FILE SIZES - Combat Flow Refactor ===
+Date: Tue, Dec  2, 2025  9:14:12 PM
+
+Server Combat Files:
+  127 source/server/managers/combat/realtime_combat_input.gd
+  112 source/server/managers/combat/realtime_combat_network.gd
+  151 source/server/managers/combat/realtime_combat_spawner.gd
+  390 total
+
+Battle Scripts:
+  613 scripts/realtime_battle/realtime_battle_controller.gd
+  190 scripts/realtime_battle/realtime_battle_launcher.gd
+  584 scripts/realtime_battle/realtime_battle_scene.gd
+  622 scripts/realtime_battle/realtime_battle_unit.gd
+ 2009 total
+
+Core Combat Files:
+  485 source/server/managers/combat_rules.gd
+  499 source/server/managers/realtime_combat_manager.gd
+  984 total

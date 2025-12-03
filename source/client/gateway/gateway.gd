@@ -425,7 +425,11 @@ func _on_tiled_editor_pressed():
 	print("Launching Tiled Map Editor...")
 
 	# Use portable Tiled from project folder - open sample map directly
-	var map_file = ProjectSettings.globalize_path("res://maps/sample_map.tmx")
+	# Check for map file
+	var map_file = ProjectSettings.globalize_path("res://maps/World Maps/sample_map.tmx")
+	if not FileAccess.file_exists(map_file):
+		print("ERROR: Map file not found at: ", map_file)
+		return
 	var portable_tiled = ProjectSettings.globalize_path("res://tools/tiled/tiled.exe")
 
 	print("Tiled path: ", portable_tiled)

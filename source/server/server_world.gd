@@ -85,6 +85,7 @@ const ServerMapManager = preload("res://source/server/managers/map_manager.gd")
 const NetworkManager = preload("res://source/server/managers/network_manager.gd")
 const ChatManager = preload("res://source/server/managers/chat_manager.gd")
 const InputManager = preload("res://source/server/managers/input_manager.gd")
+const ContentManager = preload("res://source/server/managers/content_manager.gd")
 const ConnectionManager = preload("res://source/server/managers/connection_manager.gd")
 # RealtimeCombatManager, BattleMapLoader, BattleInstanceManager use class_name - no preload needed
 
@@ -118,6 +119,7 @@ var connection_manager = null  # Connection manager
 var realtime_combat_manager = null  # Realtime combat manager (new tactical combat system)
 var battle_map_loader = null  # Battle map loader (loads battle maps and spawn points)
 var battle_instance_manager = null  # Battle instance manager (isolated battle instances)
+var content_manager = null  # Content manager (uploads)
 
 ################################################################################
 # SECTION 2: CONVENIENCE ACCESSORS
@@ -174,8 +176,48 @@ func _ready():
 	# Track server start time for uptime display
 	server_start_time = Time.get_ticks_msec() / 1000.0
 
+	# 1. Initialize Core Systems (DB, Config, Server Base, Spatial)
+	_init_core_systems()
+	
+	# 2. Initialize Game Managers (Auth, Player, NPC, Combat)
+	_init_game_managers()
+	
+	# 3. Initialize Network Services (Chat, Input, Content, Connection)
+	_init_network_services()
+
+	# CRITICAL: Set authentication callback BEFORE starting server
+	# This must happen before init_multiplayer_api() is called
+	server.authentication_callback = connection_manager.handle_authentication_callback
+
+	# Initialize multiplayer API with authentication callback set
+	server.init_multiplayer_api()
+
+	# Connect connection/disconnection signals AFTER multiplayer_api is initialized
+	server.multiplayer_api.peer_connected.connect(connection_manager.handle_player_connected)
+	server.multiplayer_api.peer_disconnected.connect(connection_manager.handle_player_disconnected)
+
+	# NOW start the server - it's ready to authenticate clients
+	server.start_server()
+
+	log_message("[SERVER] Starting on port %d..." % server_port)
+	log_message("[SERVER] Waiting for players to connect...")
+
+	if ui_manager:
+		ui_manager.update_status("RUNNING", Color.GREEN)
+
+	# Update debug console with server status
+	if debug_console:
+		debug_console.update_stats("SERVER RUNNING - Port 9123", -1, 0)
+		debug_console.add_log("Server started successfully", "green")
+		debug_console.add_log("Listening on UDP port 9123 (ENet)", "cyan")
+
+	# Update admin UI stats now that all managers are initialized
+	if admin_ui:
+		admin_ui.update_server_stats()
+
+
+func _init_core_systems() -> void:
 	# ServerConnection is now an autoload - get it from root
-	# The ServerConnection is shared between server and client for bidirectional communication
 	network_handler = get_tree().root.get_node_or_null("ServerConnection")
 	if network_handler:
 		network_handler.server_world = self
@@ -183,17 +225,6 @@ func _ready():
 	else:
 		print("[SERVER] ERROR: ServerConnection autoload not found!")
 
-	# Debug console disabled - server runs without UI overlay
-	# To re-enable, uncomment the block below
-	#if DisplayServer.get_name() != "headless":
-	#	var console_script = load("res://source/common/debug/debug_console.gd")
-	#	if console_script:
-	#		debug_console = console_script.new()
-	#		debug_console.name = "DebugConsole"
-	#		get_tree().root.add_child(debug_console)
-	#		debug_console.set_motd("Welcome to Odysseys Revival!")
-	pass
-	
 	# Initialize database
 	GameDatabase.init_database()
 	log_message("[DATABASE] Initialized")
@@ -210,13 +241,6 @@ func _ready():
 	print("[NETWORK] Detected local IP: %s" % detected_local_ip)
 
 	print("[DEBUG] Step 6: Detecting Public IP")
-	# Detect public IP asynchronously
-	# ConfigManager.get_public_ip_async(func(public_ip):
-	# 	detected_public_ip = public_ip
-	# 	print("[NETWORK] Detected public IP: %s" % public_ip)
-	# 	if ui_manager:
-	# 		ui_manager.update_connection_info_display()
-	# )
 	print("[NETWORK] Public IP detection skipped for stability.")
 
 	print("[DEBUG] Step 7: Init UI Manager")
@@ -243,10 +267,7 @@ func _ready():
 	spatial_manager.grid_cell_size = 512  # 4 tiles at 128px
 	spatial_manager.visibility_radius = 2  # 2 grid cells around player
 	add_child(spatial_manager)
-	log_message("[SPATIAL] Interest management initialized (cell_size=%d, radius=%d)" % [
-		spatial_manager.grid_cell_size,
-		spatial_manager.visibility_radius
-	])
+	log_message("[SPATIAL] Interest management initialized")
 
 	# Initialize network sync (binary packet broadcasting)
 	network_sync = NetworkSync.new()
@@ -258,11 +279,7 @@ func _ready():
 
 	# If network_handler was set before network_sync existed, set it now
 	if network_handler:
-		print("[SERVER] Re-setting network_handler on network_sync (timing fix)")
 		network_sync.set_network_handler(network_handler)
-
-	# Wait for NetworkHandler to be ready (it registers itself with us)
-	# network_sync.set_network_handler() will be called by set_network_handler()
 
 	# Initialize input processor (server-side movement authority)
 	input_processor = InputProcessor.new()
@@ -283,8 +300,8 @@ func _ready():
 	add_child(map_manager)
 	log_message("[MAP] Map manager initialized")
 
-	# Load map collision data (same map as client uses)
-	map_manager.load_map_collision("res://maps/sample_map.tmx")
+	# Load default map collision
+	map_manager.load_map_collision("res://maps/World Maps/sample_map.tmx")
 
 	# Initialize movement validator (after collision world is created)
 	movement_validator = MovementValidator.new()
@@ -293,7 +310,7 @@ func _ready():
 	movement_validator.teleport_distance_threshold = 100.0
 	movement_validator.collision_world = collision_world  # Pass collision reference
 	add_child(movement_validator)
-	log_message("[MOVEMENT_VALIDATOR] Movement validation enabled (with collision checking)")
+	log_message("[MOVEMENT_VALIDATOR] Movement validation enabled")
 
 	# Initialize anti-cheat system
 	anti_cheat = AntiCheat.new()
@@ -307,6 +324,8 @@ func _ready():
 	add_child(rate_limiter)
 	log_message("[RATE_LIMITER] RPC rate limiting enabled")
 
+
+func _init_game_managers() -> void:
 	# Initialize authentication manager
 	auth_manager = AuthenticationManager.new()
 	auth_manager.initialize(self, network_handler, GameDatabase, debug_console)
@@ -358,6 +377,8 @@ func _ready():
 	add_child(stats_manager)
 	log_message("[STATS] Stats manager initialized")
 
+
+func _init_network_services() -> void:
 	# Initialize network manager
 	network_manager = NetworkManager.new()
 	network_manager.initialize(self)
@@ -376,6 +397,12 @@ func _ready():
 	add_child(input_manager)
 	log_message("[INPUT] Input manager initialized")
 
+	# Initialize content manager
+	content_manager = ContentManager.new()
+	content_manager.initialize(self, network_handler, auth_manager)
+	add_child(content_manager)
+	log_message("[CONTENT] Content manager initialized")
+
 	# Initialize connection manager (must be after all other managers)
 	connection_manager = ConnectionManager.new()
 	connection_manager.initialize(
@@ -392,36 +419,6 @@ func _ready():
 	)
 	add_child(connection_manager)
 	log_message("[CONNECTION] Connection manager initialized")
-
-	# CRITICAL: Set authentication callback BEFORE starting server
-	# This must happen before init_multiplayer_api() is called
-	server.authentication_callback = connection_manager.handle_authentication_callback
-
-	# Initialize multiplayer API with authentication callback set
-	server.init_multiplayer_api()
-
-	# Connect connection/disconnection signals AFTER multiplayer_api is initialized
-	server.multiplayer_api.peer_connected.connect(connection_manager.handle_player_connected)
-	server.multiplayer_api.peer_disconnected.connect(connection_manager.handle_player_disconnected)
-
-	# NOW start the server - it's ready to authenticate clients
-	server.start_server()
-
-	log_message("[SERVER] Starting on port %d..." % server_port)
-	log_message("[SERVER] Waiting for players to connect...")
-
-	if ui_manager:
-		ui_manager.update_status("RUNNING", Color.GREEN)
-
-	# Update debug console with server status
-	if debug_console:
-		debug_console.update_stats("SERVER RUNNING - Port 9123", -1, 0)
-		debug_console.add_log("Server started successfully", "green")
-		debug_console.add_log("Listening on UDP port 9123 (ENet)", "cyan")
-
-	# Update admin UI stats now that all managers are initialized
-	if admin_ui:
-		admin_ui.update_server_stats()
 
 
 func _exit_tree():
@@ -756,128 +753,19 @@ func _on_toggle_console_pressed():
 # SECURITY: Only accepts uploads from localhost (127.0.0.1) connections.
 # Production servers should have these disabled or removed entirely.
 
-func _is_localhost_connection(peer_id: int) -> bool:
-	"""Check if the peer is connecting from localhost"""
-	# In Godot's ENet, we can check the peer's address
-	var peer = multiplayer.multiplayer_peer
-	if peer and peer is ENetMultiplayerPeer:
-		var enet_peer = peer.get_peer(peer_id)
-		if enet_peer:
-			var address = enet_peer.get_remote_address()
-			return address == "127.0.0.1" or address == "::1" or address == "localhost"
-	# Fallback: If we can't determine, reject for safety
-	return false
-
-
 func upload_class(class_name_str: String, class_data: Dictionary):
 	"""Handle class upload from admin tool - LOCALHOST ONLY"""
-	var peer_id = multiplayer.get_remote_sender_id()
-
-	# SECURITY: Only allow uploads from localhost
-	if not _is_localhost_connection(peer_id):
-		log_message("[SECURITY] Rejected class upload from non-localhost peer %d" % peer_id)
-		if network_handler:
-			network_handler.send_upload_response(peer_id, false, "Upload rejected: Only localhost uploads allowed")
-		return
-
-	# Check admin level
-	var admin_level = auth_manager.get_admin_level(peer_id) if auth_manager else 0
-	if admin_level < 1:
-		log_message("[SECURITY] Rejected class upload from non-admin peer %d" % peer_id)
-		if network_handler:
-			network_handler.send_upload_response(peer_id, false, "Upload rejected: Admin privileges required")
-		return
-
-	# Save class data to file
-	var save_dir = "res://characters/classes/"
-	if not DirAccess.dir_exists_absolute(save_dir):
-		DirAccess.open("res://").make_dir_recursive("characters/classes")
-
-	var save_path = save_dir + class_name_str + ".json"
-	var file = FileAccess.open(save_path, FileAccess.WRITE)
-	if file:
-		file.store_string(JSON.stringify(class_data, "\t"))
-		file.close()
-		log_message("[UPLOAD] Class '%s' saved by admin (peer %d)" % [class_name_str, peer_id])
-		if network_handler:
-			network_handler.send_upload_response(peer_id, true, "Class '%s' uploaded successfully" % class_name_str)
-	else:
-		log_message("[UPLOAD] ERROR: Failed to save class '%s'" % class_name_str)
-		if network_handler:
-			network_handler.send_upload_response(peer_id, false, "Failed to save class file")
+	if content_manager:
+		content_manager.upload_class(class_name_str, class_data)
 
 
 func upload_npc(npc_name: String, npc_data: Dictionary):
 	"""Handle NPC upload from admin tool - LOCALHOST ONLY"""
-	var peer_id = multiplayer.get_remote_sender_id()
-
-	# SECURITY: Only allow uploads from localhost
-	if not _is_localhost_connection(peer_id):
-		log_message("[SECURITY] Rejected NPC upload from non-localhost peer %d" % peer_id)
-		if network_handler:
-			network_handler.send_upload_response(peer_id, false, "Upload rejected: Only localhost uploads allowed")
-		return
-
-	# Check admin level
-	var admin_level = auth_manager.get_admin_level(peer_id) if auth_manager else 0
-	if admin_level < 1:
-		log_message("[SECURITY] Rejected NPC upload from non-admin peer %d" % peer_id)
-		if network_handler:
-			network_handler.send_upload_response(peer_id, false, "Upload rejected: Admin privileges required")
-		return
-
-	# Save NPC data to file
-	var save_dir = "res://characters/npcs/"
-	if not DirAccess.dir_exists_absolute(save_dir):
-		DirAccess.open("res://").make_dir_recursive("characters/npcs")
-
-	var save_path = save_dir + npc_name + ".json"
-	var file = FileAccess.open(save_path, FileAccess.WRITE)
-	if file:
-		file.store_string(JSON.stringify(npc_data, "\t"))
-		file.close()
-		log_message("[UPLOAD] NPC '%s' saved by admin (peer %d)" % [npc_name, peer_id])
-		if network_handler:
-			network_handler.send_upload_response(peer_id, true, "NPC '%s' uploaded successfully" % npc_name)
-	else:
-		log_message("[UPLOAD] ERROR: Failed to save NPC '%s'" % npc_name)
-		if network_handler:
-			network_handler.send_upload_response(peer_id, false, "Failed to save NPC file")
+	if content_manager:
+		content_manager.upload_npc(npc_name, npc_data)
 
 
 func upload_map(map_name: String, map_data: String):
 	"""Handle map upload from admin tool - LOCALHOST ONLY"""
-	var peer_id = multiplayer.get_remote_sender_id()
-
-	# SECURITY: Only allow uploads from localhost
-	if not _is_localhost_connection(peer_id):
-		log_message("[SECURITY] Rejected map upload from non-localhost peer %d" % peer_id)
-		if network_handler:
-			network_handler.send_upload_response(peer_id, false, "Upload rejected: Only localhost uploads allowed")
-		return
-
-	# Check admin level
-	var admin_level = auth_manager.get_admin_level(peer_id) if auth_manager else 0
-	if admin_level < 1:
-		log_message("[SECURITY] Rejected map upload from non-admin peer %d" % peer_id)
-		if network_handler:
-			network_handler.send_upload_response(peer_id, false, "Upload rejected: Admin privileges required")
-		return
-
-	# Save map data to file
-	var save_dir = "res://maps/"
-	if not DirAccess.dir_exists_absolute(save_dir):
-		DirAccess.open("res://").make_dir("maps")
-
-	var save_path = save_dir + map_name + ".tmx"
-	var file = FileAccess.open(save_path, FileAccess.WRITE)
-	if file:
-		file.store_string(map_data)
-		file.close()
-		log_message("[UPLOAD] Map '%s' saved by admin (peer %d)" % [map_name, peer_id])
-		if network_handler:
-			network_handler.send_upload_response(peer_id, true, "Map '%s' uploaded successfully" % map_name)
-	else:
-		log_message("[UPLOAD] ERROR: Failed to save map '%s'" % map_name)
-		if network_handler:
-			network_handler.send_upload_response(peer_id, false, "Failed to save map file")
+	if content_manager:
+		content_manager.upload_map(map_name, map_data)

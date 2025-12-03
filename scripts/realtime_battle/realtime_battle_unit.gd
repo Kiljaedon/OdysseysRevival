@@ -3,8 +3,11 @@ extends Node2D
 ## Realtime Battle Unit - Visual representation of a combat unit
 ## Handles sprite, animations, health bar, damage numbers
 
+## ========== IMPORTS ==========
+const EntityInterpolator = preload("res://source/client/combat/entity_interpolator.gd")
+
 ## ========== CONSTANTS ==========
-const INTERPOLATION_SPEED: float = 8.0  # Reduced for smoother movement
+const INTERPOLATION_SPEED: float = 8.0  # Fallback lerp speed
 const SNAP_DISTANCE: float = 200.0  # Distance at which to snap to server position
 const WALK_FRAME_DURATION: float = 0.15  # Seconds per walk frame
 const SPRITE_SCALE: float = 4.0  # Match overworld sprite scale
@@ -22,9 +25,12 @@ var unit_state: String = "idle"
 var is_dodge_rolling: bool = false
 var is_player_controlled: bool = false
 
-## Server position for interpolation
+## Server position for interpolation (fallback for player)
 var server_position: Vector2 = Vector2.ZERO
 var server_velocity: Vector2 = Vector2.ZERO
+
+## Entity interpolator for smooth remote unit movement
+var interpolator: EntityInterpolator = null
 
 ## Animation state
 var walk_frame: int = 1  # 1 or 2
@@ -55,6 +61,10 @@ var max_energy: int = 100
 
 func _ready():
 	_create_visuals()
+
+	# Initialize interpolator for remote units (not for local player)
+	if not is_player_controlled:
+		interpolator = EntityInterpolator.new()
 
 func _create_visuals():
 	var scaled_size = BASE_SPRITE_SIZE * SPRITE_SCALE  # 128px
@@ -226,24 +236,25 @@ func _style_thin_bar(bar: ProgressBar, fill_color: Color, bg_color: Color) -> vo
 	bar.add_theme_stylebox_override("fill", fill_style)
 
 func _process(delta: float):
-	# Interpolate toward server position
-	var diff = position.distance_to(server_position)
+	# Remote units: Use interpolator for smooth movement
+	if not is_player_controlled and interpolator:
+		var interp_state = interpolator.get_interpolated_state(Time.get_ticks_msec())
 
-	if not is_player_controlled:
-		# NPC units: smooth interpolation toward server position
-		if diff > SNAP_DISTANCE:
-			# Too far off, snap immediately
-			position = server_position
-		elif diff > 5:
-			# Smooth interpolation
-			position = position.lerp(server_position, INTERPOLATION_SPEED * delta)
+		if interp_state.has("position"):
+			# Check for teleport (too far off)
+			var diff = position.distance_to(interp_state.position)
+			if diff > SNAP_DISTANCE:
+				position = interp_state.position  # Snap
+			else:
+				position = interp_state.position  # Use interpolated position directly
+
+		interpolator.cleanup_old_states(Time.get_ticks_msec())
 	else:
-		# Player unit: client-side prediction with server reconciliation
-		# Only correct if significantly off from server
+		# Player unit: client-side prediction with gentle server reconciliation
+		var diff = position.distance_to(server_position)
 		if diff > SNAP_DISTANCE:
 			position = server_position
 		elif diff > 50:
-			# Gentle correction toward server position
 			position = position.lerp(server_position, 3.0 * delta)
 
 	# Handle attack animation timer
@@ -505,6 +516,10 @@ func apply_server_state(state: Dictionary) -> void:
 	"""Apply authoritative server state"""
 	server_position = state.get("position", server_position)
 	server_velocity = state.get("velocity", Vector2.ZERO)
+
+	# Add state to interpolator for remote units
+	if not is_player_controlled and interpolator:
+		interpolator.add_state(state)
 
 	var old_facing = facing
 	var old_state = unit_state

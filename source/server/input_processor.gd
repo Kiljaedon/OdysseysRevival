@@ -4,6 +4,9 @@ extends Node
 ## Processes client inputs and calculates authoritative positions
 ## Prevents position hacking by not trusting client positions
 
+# Security settings
+const MAX_TIMESTAMP_DIFF: int = 2000  # 2 seconds tolerance for lag/drift
+
 # Movement settings
 var movement_speed: float = 200.0
 var diagonal_speed_multiplier: float = 0.707  # sqrt(2)/2 for normalized diagonal
@@ -66,9 +69,8 @@ func validate_input(input: Dictionary) -> bool:
 	var current_time = Time.get_ticks_msec()
 	var time_diff = abs(current_time - timestamp)
 
-	# Reject inputs with excessive time drift (60 seconds for development, reduce in production)
-	# This accounts for network latency, clock drift, and client/server time desync
-	if time_diff > 60000:
+	# Reject inputs with excessive time drift (security hardened to 2s)
+	if time_diff > MAX_TIMESTAMP_DIFF:
 		return false
 
 	# Validate input types are boolean

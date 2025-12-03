@@ -3,7 +3,19 @@
     "allow": [
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(python -c:*)",
+      "Bash(find:*)",
+      "WebSearch",
+      "Bash(git log:*)",
+      "Bash(cat:*)",
+      "Bash(test:*)",
+      "Bash(for file in \"source/server/managers/combat_rules.gd\" \"source/server/managers/combat/realtime_combat_ai.gd\" \"source/common/combat/stats_calculator.gd\" \"source/common/combat/elemental_system.gd\" \"source/server/managers/combat/realtime_combat_spawner.gd\" \"source/server/managers/combat/realtime_combat_network.gd\" \"source/server/managers/combat/realtime_combat_input.gd\")",
+      "Bash(do if [ -f \"$file\" ])",
+      "Bash(then echo \"✅ $file\")",
+      "Bash(else echo \"❌ MISSING: $file\")",
+      "Bash(fi)",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []

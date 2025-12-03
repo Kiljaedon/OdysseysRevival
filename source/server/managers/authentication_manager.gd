@@ -54,9 +54,11 @@ func request_create_account(username: String, password: String):
 			network_handler.send_account_creation_response(peer_id, false, "Username must be at least 3 characters")
 		return
 
-	if password.length() < 3:
+	# Validate password complexity
+	var password_valid = validate_password(password)
+	if not password_valid.valid:
 		if network_handler:
-			network_handler.send_account_creation_response(peer_id, false, "Password must be at least 3 characters")
+			network_handler.send_account_creation_response(peer_id, false, password_valid.error)
 		return
 
 	# Check if account already exists
@@ -148,14 +150,14 @@ func request_login(username: String, password: String):
 	print("[DEBUG_LOGIN] Verifying password (hash length: %d)" % password_hash.length())
 	
 	if password_hash.is_empty():
-		# Old account with plain text password (migration support)
-		if account.get("password", "") != password:
-			log_message("[LOGIN] Failed login attempt for %s: incorrect password" % username)
-			if network_handler:
-				network_handler.send_login_response(peer_id, false, "Incorrect password", {})
-			return
+		# Legacy account with no hash - SECURITY RISK
+		# We reject this login to enforce security migration (or manual reset)
+		log_message("[LOGIN] Failed login attempt for %s: legacy unhashed account" % username)
+		if network_handler:
+			network_handler.send_login_response(peer_id, false, "Account security update required. Please contact support.", {})
+		return
 	else:
-		# New account with hashed password
+		# Standard secure login
 		if not game_database.verify_password(password, password_hash):
 			log_message("[LOGIN] Failed login attempt for %s: incorrect password" % username)
 			if network_handler:
@@ -310,3 +312,42 @@ func log_activity(msg: String):
 		server_world.log_activity(msg)
 	else:
 		print(msg)
+
+
+func validate_password(password: String) -> Dictionary:
+	"""
+	Validate password complexity.
+	Returns { "valid": bool, "error": String }
+	"""
+	if password.length() < 8:
+		return {"valid": false, "error": "Password must be at least 8 characters long"}
+		
+	# Check for uppercase
+	var has_upper = false
+	for i in range(password.length()):
+		if password[i] >= "A" and password[i] <= "Z":
+			has_upper = true
+			break
+	if not has_upper:
+		return {"valid": false, "error": "Password must contain at least one uppercase letter"}
+		
+	# Check for number
+	var has_number = false
+	for i in range(password.length()):
+		if password[i] >= "0" and password[i] <= "9":
+			has_number = true
+			break
+	if not has_number:
+		return {"valid": false, "error": "Password must contain at least one number"}
+		
+	# Check for special character (not alphanumeric)
+	var has_special = false
+	var special_chars = "!@#$%^&*()_+-=[]{}|;:,.<>?/"
+	for i in range(password.length()):
+		if special_chars.find(password[i]) != -1:
+			has_special = true
+			break
+	if not has_special:
+		return {"valid": false, "error": "Password must contain at least one special character (!@#$ etc.)"}
+		
+	return {"valid": true, "error": ""}

@@ -367,14 +367,34 @@ function resolveMapPath(currentMapPath, relativePath) {
     let lastSlash = Math.max(currentMapPath.lastIndexOf('/'), currentMapPath.lastIndexOf('\\'));
     let currentDir = currentMapPath.substring(0, lastSlash + 1);
 
-    // Handle ../ in relative path
-    let targetPath = relativePath;
-    while (targetPath.startsWith("../")) {
-        targetPath = targetPath.substring(3);
-        lastSlash = Math.max(currentDir.lastIndexOf('/', currentDir.length - 2), currentDir.lastIndexOf('\\', currentDir.length - 2));
-        currentDir = currentDir.substring(0, lastSlash + 1);
+    // Standard resolution
+    let targetPath = resolveStandard(currentDir, relativePath);
+
+    // Check if file exists
+    if (File.exists(targetPath)) {
+        return targetPath;
     }
 
+    // Fallback: Try going up one level (in case map was moved to a subdir like "World Maps")
+    let upOneDir = resolveStandard(currentDir, "../" + relativePath);
+    if (File.exists(upOneDir)) {
+        tiled.log("Found map at parent directory: " + upOneDir);
+        return upOneDir;
+    }
+
+    return targetPath;
+}
+
+function resolveStandard(baseDir, relPath) {
+    let targetPath = relPath;
+    let currentDir = baseDir;
+    
+    while (targetPath.startsWith("../")) {
+        targetPath = targetPath.substring(3);
+        let lastSlash = Math.max(currentDir.lastIndexOf('/', currentDir.length - 2), currentDir.lastIndexOf('\\', currentDir.length - 2));
+        if (lastSlash === -1) break; // Cannot go up further
+        currentDir = currentDir.substring(0, lastSlash + 1);
+    }
     return currentDir + targetPath;
 }
 
