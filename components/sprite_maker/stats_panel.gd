@@ -734,13 +734,13 @@ func _on_add_role_pressed():
 	var index = role_dropdown.selected
 	match index:
 		0:
-			selected_combat_role = "Melee"
+			selected_combat_role = "melee"  # Lowercase to match combat system
 		1:
-			selected_combat_role = "Ranged"
+			selected_combat_role = "ranged"
 		2:
-			selected_combat_role = "Caster"
+			selected_combat_role = "caster"
 		3:
-			selected_combat_role = "Hybrid"
+			selected_combat_role = "hybrid"
 		_:
 			return
 

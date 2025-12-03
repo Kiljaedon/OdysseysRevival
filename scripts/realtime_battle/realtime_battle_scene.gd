@@ -470,12 +470,14 @@ func on_damage_event(attacker_id: String, target_id: String, damage: int, flank_
 
 	# Check if attacker uses projectiles (ranged/caster)
 	var combat_role = attacker.get("combat_role")
-	if combat_role in ["ranged", "caster"]:
+	var combat_role_lower = combat_role.to_lower() if combat_role else "melee"
+
+	if combat_role_lower in ["ranged", "caster"]:
 		# Store damage for later (when projectile hits)
 		target.set_meta("pending_damage", damage)
 		target.set_meta("pending_flank", flank_type)
 		# Spawn projectile
-		_spawn_projectile(attacker, target, combat_role)
+		_spawn_projectile(attacker, target, combat_role_lower)
 	else:
 		# Melee/Hybrid - show damage immediately
 		target.show_damage(damage, flank_type)
@@ -488,9 +490,10 @@ func _spawn_projectile(attacker: Node2D, target: Node2D, role: String):
 	var projectile = projectile_scene.instantiate()
 	add_child(projectile)
 
-	# Set projectile texture based on role
+	# Set projectile texture based on role (case-insensitive)
 	var texture_path = ""
-	match role:
+	var role_lower = role.to_lower() if role else ""
+	match role_lower:
 		"ranged":
 			texture_path = "res://assets/projectiles/Light Bolt.png"
 		"caster":
