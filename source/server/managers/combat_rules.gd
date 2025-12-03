@@ -248,6 +248,13 @@ static func process_resource_regen(unit: Dictionary, delta: float) -> void:
 		current_mp = min(current_mp + CombatTiming.MANA_REGEN_RATE * delta, max_mp)
 		unit["mp"] = int(current_mp)
 
+## ========== COMBO SYSTEM (DELEGATED) ==========
+## Thin wrapper that delegates to CombatComboSystem
+
+static func process_combo_window(unit: Dictionary, delta: float) -> void:
+	"""Update combo window timer (delegates to CombatComboSystem)"""
+	CombatComboSystem.process_combo_window(unit, delta)
+
 ## ========== DODGE ROLL (DELEGATED) ==========
 ## These are now thin wrappers that delegate to CombatDodgeSystem
 
