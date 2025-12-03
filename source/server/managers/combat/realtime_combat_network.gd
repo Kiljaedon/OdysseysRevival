@@ -116,6 +116,8 @@ static func send_battle_start(peer_id: int, battle: Dictionary, player_manager: 
 			"state": unit.state,
 			"is_player_controlled": unit.is_player_controlled,
 			"is_dodge_rolling": unit.get("is_dodge_rolling", false),
+			"combat_role": unit.get("combat_role", "melee"),  # NEEDED for client-side range checks!
+			"attack_range": unit.get("attack_range", 120.0),  # NEEDED for client-side range checks!
 			"class_name": unit.source_data.get("class_name", ""),
 			"npc_type": unit.source_data.get("npc_type", unit.source_data.get("name", ""))
 		}

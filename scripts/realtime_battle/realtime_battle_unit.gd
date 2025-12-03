@@ -25,6 +25,10 @@ var unit_state: String = "idle"
 var is_dodge_rolling: bool = false
 var is_player_controlled: bool = false
 
+## Combat properties
+var combat_role: String = "melee"  # melee, ranged, caster, hybrid
+var attack_range: float = 120.0  # Attack range in pixels
+
 ## Server position for interpolation (fallback for player)
 var server_position: Vector2 = Vector2.ZERO
 var server_velocity: Vector2 = Vector2.ZERO
@@ -327,6 +331,10 @@ func initialize(data: Dictionary) -> void:
 	unit_state = data.get("state", "idle")
 	is_dodge_rolling = data.get("is_dodge_rolling", false)
 	is_player_controlled = data.get("is_player_controlled", false)
+
+	# Combat properties (needed for client-side range checks)
+	combat_role = data.get("combat_role", "melee")
+	attack_range = data.get("attack_range", 120.0)
 
 	server_position = data.get("position", Vector2.ZERO)
 	position = server_position
