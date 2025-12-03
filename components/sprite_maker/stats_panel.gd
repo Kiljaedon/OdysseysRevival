@@ -718,13 +718,13 @@ func _on_role_dropdown_selected(index: int):
 
 	match index:
 		0:
-			role_description.text = "Melee: Full damage in front row. 50% damage in back row. 25% damage minimum when back row attacks back row. Normal defense."
+			role_description.text = "Melee: Frontline tank. 120px range, 100% move speed. Flanking: Front 1.0x, Side 1.15x, Back 1.30x. Standard melee fighter."
 		1:
-			role_description.text = "Ranged: Full damage in back row. 50% damage in front row (forced melee). Normal defense."
+			role_description.text = "Ranged: Kiting specialist. 350px range with projectiles, 115% move speed. Flanking: Front 1.0x, Side 0.90x, Back 0.80x. Penalized when surrounded - must maintain distance!"
 		2:
-			role_description.text = "Caster: Full damage from any position (can melee OR cast). Takes 20% EXTRA damage (weak defense)."
+			role_description.text = "Caster: Glass cannon mage. 280px range with magic projectiles, 90% move speed (slow). Flanking: 1.25x ALL directions (+25% always). High damage, doesn't care about positioning."
 		3:
-			role_description.text = "Hybrid: 80% damage from any position (versatile). Takes 20% EXTRA damage (weak defense)."
+			role_description.text = "Hybrid: Skilled duelist. 180px range, 105% move speed. Flanking: Front 1.0x, Side 1.25x, Back 1.50x (+50%!). Enhanced flanking rewards skilled positioning."
 
 
 func _on_add_role_pressed():

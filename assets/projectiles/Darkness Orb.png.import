@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ideyhuo8ab3u"
-path="res://.godot/imported/Arcane Bolt.png-9396075cfa43317388203ebc98fcf337.ctex"
+uid="uid://8chimvy4otm3"
+path="res://.godot/imported/Darkness Orb.png-251bcca0849b8f6285c2e1f8c6ce25c6.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/projectiles/Arcane Bolt.png"
-dest_files=["res://.godot/imported/Arcane Bolt.png-9396075cfa43317388203ebc98fcf337.ctex"]
+source_file="res://assets/projectiles/Darkness Orb.png"
+dest_files=["res://.godot/imported/Darkness Orb.png-251bcca0849b8f6285c2e1f8c6ce25c6.ctex"]
 
 [params]
 

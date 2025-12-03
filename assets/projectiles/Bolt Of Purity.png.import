@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ideyhuo8ab3u"
-path="res://.godot/imported/Arcane Bolt.png-9396075cfa43317388203ebc98fcf337.ctex"
+uid="uid://b1fnh7uceregi"
+path="res://.godot/imported/Bolt Of Purity.png-eee0a27c58a0095b2ceb35a5e7e8d0b7.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/projectiles/Arcane Bolt.png"
-dest_files=["res://.godot/imported/Arcane Bolt.png-9396075cfa43317388203ebc98fcf337.ctex"]
+source_file="res://assets/projectiles/Bolt Of Purity.png"
+dest_files=["res://.godot/imported/Bolt Of Purity.png-eee0a27c58a0095b2ceb35a5e7e8d0b7.ctex"]
 
 [params]
 

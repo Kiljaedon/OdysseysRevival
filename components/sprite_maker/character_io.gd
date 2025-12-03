@@ -289,8 +289,10 @@ func upload_character(char_name: String, current_type: String, character_data: D
 		error_occurred.emit("Uploads only allowed to local server (127.0.0.1)")
 		return false
 
-	# Check if admin
-	if GameState.admin_level < 1:
+	# Check if admin (disabled for local development)
+	# Allow uploads in local/development environment
+	var is_local_dev = multiplayer.get_unique_id() == 1 or multiplayer.get_peers().size() == 0
+	if not is_local_dev and GameState.admin_level < 1:
 		print("[SpriteMakerIO] Upload failed: Not an admin")
 		error_occurred.emit("Upload requires admin privileges")
 		return false

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ideyhuo8ab3u"
-path="res://.godot/imported/Arcane Bolt.png-9396075cfa43317388203ebc98fcf337.ctex"
+uid="uid://dbkjo7nlejfil"
+path="res://.godot/imported/Firebomb.png-20002019e254218cbbd96790aa269614.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/projectiles/Arcane Bolt.png"
-dest_files=["res://.godot/imported/Arcane Bolt.png-9396075cfa43317388203ebc98fcf337.ctex"]
+source_file="res://assets/projectiles/Firebomb.png"
+dest_files=["res://.godot/imported/Firebomb.png-20002019e254218cbbd96790aa269614.ctex"]
 
 [params]
 

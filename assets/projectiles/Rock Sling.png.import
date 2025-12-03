@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ideyhuo8ab3u"
-path="res://.godot/imported/Arcane Bolt.png-9396075cfa43317388203ebc98fcf337.ctex"
+uid="uid://d2enp3qmpn7rw"
+path="res://.godot/imported/Rock Sling.png-5d28acba9decfb9497803b2d9926b2a6.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/projectiles/Arcane Bolt.png"
-dest_files=["res://.godot/imported/Arcane Bolt.png-9396075cfa43317388203ebc98fcf337.ctex"]
+source_file="res://assets/projectiles/Rock Sling.png"
+dest_files=["res://.godot/imported/Rock Sling.png-5d28acba9decfb9497803b2d9926b2a6.ctex"]
 
 [params]
 

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ideyhuo8ab3u"
-path="res://.godot/imported/Arcane Bolt.png-9396075cfa43317388203ebc98fcf337.ctex"
+uid="uid://b3j7pkw6uljjr"
+path="res://.godot/imported/Hands.png-d47f4a284ba47a7f32d674a4eb41e234.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/projectiles/Arcane Bolt.png"
-dest_files=["res://.godot/imported/Arcane Bolt.png-9396075cfa43317388203ebc98fcf337.ctex"]
+source_file="res://assets/weapons/Hands/Hands.png"
+dest_files=["res://.godot/imported/Hands.png-d47f4a284ba47a7f32d674a4eb41e234.ctex"]
 
 [params]
 

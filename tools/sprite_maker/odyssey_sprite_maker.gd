@@ -449,7 +449,7 @@ func _update_upload_button_text():
 
 func _init_combat_role_dropdown():
 	if role_dropdown:
-		role_dropdown.add_item("Melee - Full damage front row, 50% back row (25% min)", 0)
-		role_dropdown.add_item("Ranged - Full damage back row, 50% front row", 1)
-		role_dropdown.add_item("Caster - Full damage both rows, 20% extra damage taken", 2)
-		role_dropdown.add_item("Hybrid - 80% damage both rows, 20% extra damage taken", 3)
+		role_dropdown.add_item("Melee - 120 range, standard flanking, 100% speed", 0)
+		role_dropdown.add_item("Ranged - 350 range, projectiles, 115% speed", 1)
+		role_dropdown.add_item("Caster - 280 range, projectiles, 125% damage", 2)
+		role_dropdown.add_item("Hybrid - 180 range, 105% speed, enhanced flanking", 3)

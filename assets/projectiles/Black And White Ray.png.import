@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ideyhuo8ab3u"
-path="res://.godot/imported/Arcane Bolt.png-9396075cfa43317388203ebc98fcf337.ctex"
+uid="uid://c11qtjim7q8kx"
+path="res://.godot/imported/Black And White Ray.png-32808cd21a3f5561c00f987dc2df76ef.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/projectiles/Arcane Bolt.png"
-dest_files=["res://.godot/imported/Arcane Bolt.png-9396075cfa43317388203ebc98fcf337.ctex"]
+source_file="res://assets/projectiles/Black And White Ray.png"
+dest_files=["res://.godot/imported/Black And White Ray.png-32808cd21a3f5561c00f987dc2df76ef.ctex"]
 
 [params]
 

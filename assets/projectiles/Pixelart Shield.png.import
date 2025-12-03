@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ideyhuo8ab3u"
-path="res://.godot/imported/Arcane Bolt.png-9396075cfa43317388203ebc98fcf337.ctex"
+uid="uid://d8f3ocx5p2ue"
+path="res://.godot/imported/Pixelart Shield.png-d4052ec2c49b8c065d92ffa05cbf864c.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/projectiles/Arcane Bolt.png"
-dest_files=["res://.godot/imported/Arcane Bolt.png-9396075cfa43317388203ebc98fcf337.ctex"]
+source_file="res://assets/projectiles/Pixelart Shield.png"
+dest_files=["res://.godot/imported/Pixelart Shield.png-d4052ec2c49b8c065d92ffa05cbf864c.ctex"]
 
 [params]
 

@@ -1,4 +1,5 @@
 {
+	"ai_archetype": "AGGRESSIVE",
 	"animations": {
 		"attack_down": [
 			{
@@ -95,12 +96,12 @@
 	},
 	"character_name": "Mage",
 	"combat_role": "Caster",
-	"created_date": "2025-11-13T06:40:51",
+	"created_date": "2025-12-03T05:55:25",
 	"derived_stats": {
 		"mag_def": 15,
-		"mag_dmg": 52.0,
+		"mag_dmg": 52,
 		"max_ep": 60,
-		"max_hp": 154,
+		"max_hp": 77,
 		"max_mp": 170,
 		"phys_def": 5,
 		"phys_dmg": 19
@@ -111,6 +112,15 @@
 		"description": "Master of arcane arts, wielding devastating magical spells from afar."
 	},
 	"level": 1,
+	"level_range": {
+		"max": 1,
+		"min": 1
+	},
+	"loot_table": {
+		"gold_reward": 10,
+		"items": [],
+		"xp_reward": 50
+	},
 	"manual_stats": {
 		"ep": -1,
 		"hp": -1,

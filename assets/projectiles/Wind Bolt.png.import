@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ideyhuo8ab3u"
-path="res://.godot/imported/Arcane Bolt.png-9396075cfa43317388203ebc98fcf337.ctex"
+uid="uid://bioe0f50y51u8"
+path="res://.godot/imported/Wind Bolt.png-494de6004981698aa023bc8f7064f54d.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/projectiles/Arcane Bolt.png"
-dest_files=["res://.godot/imported/Arcane Bolt.png-9396075cfa43317388203ebc98fcf337.ctex"]
+source_file="res://assets/projectiles/Wind Bolt.png"
+dest_files=["res://.godot/imported/Wind Bolt.png-494de6004981698aa023bc8f7064f54d.ctex"]
 
 [params]
 
