@@ -18,7 +18,7 @@ var sprite_textures: Dictionary = {}
 var attack_hitbox: Area2D = null
 
 var available_maps = [
-	"res://maps/sample_map.tmx",
+	"res://maps/World Maps/sample_map.tmx",
 	"res://maps/odyssey_map_template.tmx",
 	"res://maps/odyssey_enhanced_template.tmx"
 ]

@@ -269,14 +269,21 @@ func load_tiles_from_csv(csv_data: String, map_width: int, map_height: int, targ
 				# Convert Tiled tile ID to Godot format
 				if tile_id > 0:
 					# Determine which tileset source to use
-					# tiles_part1: firstgid=1, contains tiles 1-3584
-					# tiles_part2: firstgid=3585, contains tiles 3585+
+					# tiles_part1: firstgid=1, tiles 1-3584 (source_id=0)
+					# tiles_part2: firstgid=3585, tiles 3585-6979 (source_id=1)
+					# collision: firstgid=6980, tiles 6980+ (source_id=2)
 					var source_id = 0
 					var adjusted_tile_id = tile_id - 1  # Convert to 0-based
 					var source_x = 0
 					var source_y = 0
 
-					if tile_id >= 3585:
+					if tile_id >= 6980:
+						# collision tileset
+						source_id = 2
+						adjusted_tile_id = tile_id - 6980
+						source_x = adjusted_tile_id % 7
+						source_y = adjusted_tile_id / 7
+					elif tile_id >= 3585:
 						# tiles_part2
 						source_id = 1
 						adjusted_tile_id = tile_id - 3585  # Adjust for second tileset

@@ -108,3 +108,13 @@ func setup_tileset_tiles() -> void:
 	print("  - Drag corners to resize collision areas")
 	print("  - Objects converted to StaticBody2D collision shapes in Godot")
 	print("  - No more fixed tile-grid collision - fully customizable!")
+
+	# FORCE SAVE to fix editor visibility
+	var err = ResourceSaver.save(tileset, tileset.resource_path)
+	if err == OK:
+		print("[TilesetManager] Saved tileset with %d source 0 tiles and %d source 1 tiles" % [
+			tileset.get_source(0).get_tiles_count() if tileset.get_source_count() > 0 else 0,
+			tileset.get_source(1).get_tiles_count() if tileset.get_source_count() > 1 else 0
+		])
+	else:
+		print("[TilesetManager] ERROR saving tileset: ", err)

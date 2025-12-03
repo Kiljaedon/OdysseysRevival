@@ -1,6 +1,0 @@
-[gd_scene load_steps=2 format=3 uid="uid://test_turn_order_runner"]
-
-[ext_resource type="Script" path="res://tests/battle/test_turn_order.gd" id="1"]
-
-[node name="TestTurnOrderRunner" type="Node"]
-script = ExtResource("1")
