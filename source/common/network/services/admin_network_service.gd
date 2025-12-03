@@ -32,6 +32,24 @@ func send_upload_response(peer_id: int, success: bool, message: String):
 
 func on_upload_response(success: bool, message: String):
 	print("[AdminService] Upload response: success=%s, message=%s" % [success, message])
+
+	# Try to find admin panel (for admin tools)
 	var handler = get_parent()._find_node_with_script("admin_panel.gd")
 	if handler and handler.has_method("on_upload_response"):
 		handler.on_upload_response(success, message)
+		return
+
+	# Try to find sprite maker (for odyssey sprite maker)
+	var sprite_maker = get_parent()._find_node_with_script("odyssey_sprite_maker.gd")
+	if sprite_maker and sprite_maker.has_method("on_upload_response"):
+		sprite_maker.on_upload_response(success, message)
+		return
+
+	# Fallback: Try character_io component
+	var tree = get_tree()
+	if tree and tree.root:
+		var all_nodes = tree.root.find_children("*", "RefCounted", true, false)
+		for node in all_nodes:
+			if node.has_method("on_upload_response"):
+				node.on_upload_response(success, message)
+				return

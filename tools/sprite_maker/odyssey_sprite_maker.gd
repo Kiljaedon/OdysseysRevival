@@ -453,3 +453,15 @@ func _init_combat_role_dropdown():
 		role_dropdown.add_item("Ranged - 350 range, projectiles, 115% speed", 1)
 		role_dropdown.add_item("Caster - 280 range, projectiles, 125% damage", 2)
 		role_dropdown.add_item("Hybrid - 180 range, 105% speed, enhanced flanking", 3)
+
+
+func on_upload_response(success: bool, message: String):
+	"""Handle upload response from server"""
+	if success:
+		print("[SpriteMaker] Upload successful: %s" % message)
+		if character_io:
+			character_io.status_changed.emit("✓ Upload successful: %s" % message)
+	else:
+		print("[SpriteMaker] Upload failed: %s" % message)
+		if character_io:
+			character_io.error_occurred.emit("✗ Upload failed: %s" % message)
