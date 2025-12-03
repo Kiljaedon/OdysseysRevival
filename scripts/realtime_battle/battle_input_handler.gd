@@ -142,8 +142,14 @@ func _execute_attack(controller: Object) -> void:
 	var player_attack_range = player.get("attack_range")
 	if player_attack_range == null:
 		player_attack_range = ATTACK_RANGE  # Fallback to default
+		print("[INPUT] WARNING: attack_range is null, using fallback: %.1f" % player_attack_range)
 
 	var distance = player.position.distance_to(target.position)
+
+	# DEBUG: Log range check
+	var player_role = player.get("combat_role")
+	print("[INPUT] Attack check - role: '%s', range: %.1f, distance: %.1f, can_attack: %s" % [player_role, player_attack_range, distance, distance <= player_attack_range])
+
 	if distance > player_attack_range:
 		return  # Too far - let player move closer
 

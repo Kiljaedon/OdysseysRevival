@@ -472,14 +472,19 @@ func on_damage_event(attacker_id: String, target_id: String, damage: int, flank_
 	var combat_role = attacker.get("combat_role")
 	var combat_role_lower = combat_role.to_lower() if combat_role else "melee"
 
+	# DEBUG: Log projectile check
+	print("[BATTLE_SCENE] Damage event - attacker role: '%s' (lower: '%s'), uses_projectiles: %s" % [combat_role, combat_role_lower, combat_role_lower in ["ranged", "caster"]])
+
 	if combat_role_lower in ["ranged", "caster"]:
 		# Store damage for later (when projectile hits)
 		target.set_meta("pending_damage", damage)
 		target.set_meta("pending_flank", flank_type)
 		# Spawn projectile
+		print("[BATTLE_SCENE] Spawning projectile for role: %s" % combat_role_lower)
 		_spawn_projectile(attacker, target, combat_role_lower)
 	else:
 		# Melee/Hybrid - show damage immediately
+		print("[BATTLE_SCENE] Melee/Hybrid attack - showing damage immediately")
 		target.show_damage(damage, flank_type)
 
 	unit_damaged.emit(target_id, damage, flank_type)

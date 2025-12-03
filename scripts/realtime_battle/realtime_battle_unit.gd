@@ -336,6 +336,10 @@ func initialize(data: Dictionary) -> void:
 	combat_role = data.get("combat_role", "melee")
 	attack_range = data.get("attack_range", 120.0)
 
+	# DEBUG: Log combat properties for player units
+	if is_player_controlled:
+		print("[RT_UNIT] Player unit initialized - combat_role: '%s', attack_range: %.1f" % [combat_role, attack_range])
+
 	server_position = data.get("position", Vector2.ZERO)
 	position = server_position
 
