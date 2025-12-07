@@ -5,11 +5,13 @@
 extends Node
 class_name AuthenticationManager
 
+const AuthenticationServiceScript = preload("res://source/common/services/authentication_service.gd")
+
 # ========== DEPENDENCIES ========== 
 var server_world: Node = null
 var network_handler = null
 var debug_console = null
-var auth_service: AuthenticationService
+var auth_service: Node # Type hint removed as class_name is gone
 
 # ========== AUTHENTICATION STATE ========== 
 var authenticated_peers: Dictionary = {}      # peer_id -> username
@@ -20,7 +22,7 @@ var connected_players: Dictionary = {}        # Reference to server_world's conn
 
 func _ready():
 	print("!!!! AUTHENTICATION MANAGER READY !!!!")
-	auth_service = AuthenticationService.new()
+	auth_service = AuthenticationServiceScript.new()
 	add_child(auth_service)
 
 

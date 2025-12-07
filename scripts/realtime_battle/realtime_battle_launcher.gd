@@ -32,6 +32,10 @@ func start_battle(battle_data: Dictionary) -> void:
 	for child in game_world.get_children():
 		if child.visible:
 			child.visible = false
+			# Disable processing to stop physics/logic collisions during battle
+			if child.has_method("set_process_mode"):
+				child.set_meta("prev_process_mode", child.process_mode)
+				child.process_mode = Node.PROCESS_MODE_DISABLED
 			hidden_world_nodes.append(child)
 
 	# Create battle scene and add to game world
@@ -83,6 +87,12 @@ func end_battle() -> void:
 	for node in hidden_world_nodes:
 		if is_instance_valid(node):
 			node.visible = true
+			# Restore processing mode
+			if node.has_meta("prev_process_mode"):
+				node.process_mode = node.get_meta("prev_process_mode")
+				node.remove_meta("prev_process_mode")
+			else:
+				node.process_mode = Node.PROCESS_MODE_INHERIT
 	hidden_world_nodes.clear()
 
 	# Unregister from network

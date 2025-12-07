@@ -135,11 +135,13 @@ func save_character_on_disconnect(peer_id: int, username: String):
 	var character_id = player_data.get("character_id", "")
 
 	if character_id:
+		var char_repo = RepositoryFactory.get_character_repository()
+
 		# Build updated character data with current state
 		var character_data = player_data.get("character", {})
 		if character_data.is_empty():
 			# If character dict not stored, attempt to load it
-			var char_result = GameDatabase.get_character(character_id)
+			var char_result = char_repo.get_character(character_id)
 			if char_result.success:
 				character_data = char_result.character.duplicate()
 			else:
@@ -154,7 +156,7 @@ func save_character_on_disconnect(peer_id: int, username: String):
 		# Update any other runtime state (HP, MP, inventory, etc. as needed)
 		# For now, save what we have
 
-		var save_result = GameDatabase.save_character(character_id, character_data)
+		var save_result = char_repo.save_character(character_id, character_data)
 		if save_result:
 			log_message("[PERSIST] Saved character %s for %s on disconnect" % [character_id, username])
 		else:

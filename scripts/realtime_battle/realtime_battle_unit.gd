@@ -253,43 +253,77 @@ func _style_thin_bar(bar: ProgressBar, fill_color: Color, bg_color: Color) -> vo
 	bar.add_theme_stylebox_override("background", bg_style)
 	bar.add_theme_stylebox_override("fill", fill_style)
 
+## Stuck detection
+var last_check_pos: Vector2 = Vector2.ZERO
+var stuck_timer: float = 0.0
+const STUCK_THRESHOLD: float = 10.0  # Pixels
+const STUCK_TIME: float = 1.0  # Seconds
+
 func _process(delta: float):
-	# Remote units: Use interpolator for smooth movement
-	if not is_player_controlled and interpolator:
-		var interp_state = interpolator.get_interpolated_state(Time.get_ticks_msec())
+	# FIX: Prevent "sliding/moonwalking" attacks
+	# If playing an attack animation, DO NOT update position from server or interpolation.
+	# We want the unit to stand completely still while swinging/casting.
+	if not is_playing_attack:
+		# Remote units: Use interpolator for smooth movement
+		if not is_player_controlled and interpolator:
+			# --- STUCK DETECTION FOR NPCs ---
+			if unit_state == "moving":
+				if position.distance_to(last_check_pos) < STUCK_THRESHOLD * delta * 5: # Scale threshold with delta
+					stuck_timer += delta
+				else:
+					stuck_timer = 0.0
+					last_check_pos = position
+					
+				if stuck_timer > STUCK_TIME:
+					print("[RT_UNIT] %s stuck for %.1fs, forcing teleport" % [unit_name, stuck_timer])
+					# Force snap to server position immediately (usually frees them)
+					position = server_position
+					interpolator.reset(server_position) # Critical: prevent interpolator from overwriting
+					stuck_timer = 0.0
+			# --------------------------------
 
-		if interp_state.has("position"):
-			# Check for teleport (too far off)
-			var diff = position.distance_to(interp_state.position)
-			if diff > SNAP_DISTANCE:
-				position = interp_state.position  # Snap
-			else:
-				position = interp_state.position  # Use interpolated position directly
+			var interp_state = interpolator.get_interpolated_state(Time.get_ticks_msec())
 
-		interpolator.cleanup_old_states(Time.get_ticks_msec())
-	else:
-		# Player unit: client-side prediction with server reconciliation
-		# Don't apply server position until properly initialized
-		if not _position_initialized:
-			return
+			if interp_state.has("position"):
+				# Check for teleport (too far off)
+				var diff = position.distance_to(interp_state.position)
+				if diff > SNAP_DISTANCE:
+					position = interp_state.position  # Snap
+				else:
+					position = interp_state.position  # Use interpolated position directly
 
-		var is_in_special_movement = (server_attack_state in ["winding_up", "attacking", "recovering"]) or is_dodge_rolling
-
-		if is_in_special_movement:
-			# During special movements (attacks, dodge rolls): trust server completely
-			# Server is applying lunge/dodge physics that client doesn't predict
-			position = position.lerp(server_position, 10.0 * delta)  # Fast tracking
+			interpolator.cleanup_old_states(Time.get_ticks_msec())
 		else:
-			# Normal movement: use client-side prediction with gentle reconciliation
-			var diff = position.distance_to(server_position)
-			if diff > SNAP_DISTANCE:
-				# Large desync - snap immediately but log it
-				print("[RT_UNIT] SNAP: Player snapped %.1f pixels (from %s to %s)" % [diff, position, server_position])
-				position = server_position
-			elif diff > 100:
-				# Moderate desync - gentle reconciliation
-				position = position.lerp(server_position, 2.0 * delta)
-			# Small differences < 100 pixels: trust client prediction
+			# Player unit: client-side prediction with server reconciliation
+			# Don't apply server position until properly initialized
+			if not _position_initialized:
+				return
+
+			var is_in_special_movement = (server_attack_state in ["winding_up", "attacking", "recovering"]) or is_dodge_rolling
+
+			if is_in_special_movement:
+				# During special movements (attacks, dodge rolls): trust server completely
+				# Server is applying lunge/dodge physics that client doesn't predict
+				
+				# FIX: User requested stationary attacks (no sliding/lunging)
+				# If we are attacking, IGNORE the server's movement updates to stay planted
+				# Also include 'recovering' state to prevent sliding during follow-through
+				if server_attack_state == "attacking" or server_attack_state == "winding_up" or server_attack_state == "recovering":
+					pass # Do nothing, stay at current position
+				else:
+					# Dodge rolls still need movement
+					position = position.lerp(server_position, 10.0 * delta)  # Fast tracking
+			else:
+				# Normal movement: use client-side prediction with gentle reconciliation
+				var diff = position.distance_to(server_position)
+				if diff > SNAP_DISTANCE:
+					# Large desync - snap immediately but log it
+					print("[RT_UNIT] SNAP: Player snapped %.1f pixels (from %s to %s)" % [diff, position, server_position])
+					position = server_position
+				elif diff > 100:
+					# Moderate desync - gentle reconciliation
+					position = position.lerp(server_position, 2.0 * delta)
+				# Small differences < 100 pixels: trust client prediction
 
 	# Handle attack animation timer
 	if is_playing_attack:

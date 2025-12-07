@@ -1,8 +1,10 @@
 extends Control
 ## Login Screen for Odysseys Revival
 ## Connects to server for authentication
+## VERSION CHECK: Sends GameVersion.GAME_VERSION with login request
 
 const Log = preload("res://source/common/utils/logger.gd")
+const GameVersion = preload("res://source/common/version.gd")
 
 signal login_successful(username: String)
 
@@ -257,23 +259,6 @@ func create_ui():
 	bottom_spacer.custom_minimum_size = Vector2(0, 10)
 	panel_vbox.add_child(bottom_spacer)
 
-	# Local Server button (small, bottom right corner)
-	var server_button = Button.new()
-	server_button.text = "Start Local Server"
-	server_button.custom_minimum_size = Vector2(160, 35)
-	server_button.add_theme_font_size_override("font_size", 12)
-	server_button.pressed.connect(_on_local_server_pressed)
-
-	# Position in bottom-right corner
-	var server_container = Control.new()
-	server_container.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	server_container.offset_left = -180
-	server_container.offset_top = -55
-	server_container.offset_right = -20
-	server_container.offset_bottom = -20
-	server_container.add_child(server_button)
-	add_child(server_container)
-
 	# Setup keyboard navigation
 	setup_focus_navigation()
 
@@ -387,12 +372,13 @@ func _on_login_pressed():
 	login_button.disabled = true
 	create_account_button.disabled = true
 
-	Log.debug("Sending login request for user: %s" % username, "Auth")
+	Log.debug("Sending login request for user: %s (version: %s)" % [username, GameVersion.GAME_VERSION], "Auth")
 	var server_conn = get_tree().root.get_node_or_null("ServerConnection")
 	if not server_conn:
 		server_conn = get_tree().root.get_node_or_null("ServerWorld/ServerConnection")
 	if server_conn:
-		server_conn.request_login.rpc_id(1, username, password)
+		# Send version with login for server validation
+		server_conn.request_login.rpc_id(1, username, password, GameVersion.GAME_VERSION)
 	else:
 		Log.error("ServerConnection not found!", "Auth")
 		show_error("Connection error - please restart")
@@ -603,50 +589,66 @@ func _on_local_server_pressed():
 	if server_env_dropdown:
 		server_env_dropdown.select(ConfigManager.ServerEnvironment.LOCAL)
 
-	# Create batch script to launch server
-	# NOTE: Removed taskkill commands - they were killing the editor when launching server from in-game
-	# Using console exe to see output in command window
+	# ---------------------------------------------------------
+	# STEP 1: Create the VBS helper script (Hidden Console Launcher)
+	# ---------------------------------------------------------
+	var vbs_content = """Option Explicit
+Dim WshShell, exe, proj, scene, cmd
+Set WshShell = CreateObject("WScript.Shell")
+If WScript.Arguments.Count < 3 Then WScript.Quit
+exe = WScript.Arguments(0)
+proj = WScript.Arguments(1)
+scene = WScript.Arguments(2)
+' Build command line
+cmd = Chr(34) & exe & Chr(34) & " --path " & Chr(34) & proj & Chr(34) & " " & scene
+' Run with 0 (SW_HIDE) to hide the console window. 
+' Godot GUI will still appear as it's a separate window.
+WshShell.Run cmd, 0, False
+"""
+	var vbs_path = project_path + "launch_server_hidden.vbs"
+	var f_vbs = FileAccess.open(vbs_path, FileAccess.WRITE)
+	if f_vbs:
+		f_vbs.store_string(vbs_content)
+		f_vbs.close()
+	else:
+		Log.error("Failed to write VBS launcher script", "Server")
+
+	# ---------------------------------------------------------
+	# STEP 2: Create the Batch file (Finder & Caller)
+	# ---------------------------------------------------------
+	# We use %%~dp0 to find the VBS in the same directory
 	var batch_content = """@echo off
-:: Launch Godot server instance with console output visible
+set "PROJECT_PATH=%s"
+set "SCENE=source/server/server_world.tscn"
+set "VBS_NAME=launch_server_hidden.vbs"
 
-:: Try mono CONSOLE version first (4.5) - shows output in cmd window
-if exist "C:\\Godot\\Godot_v4.5-stable_mono_win64_console.exe" (
-    "C:\\Godot\\Godot_v4.5-stable_mono_win64_console.exe" --path "%s" source/server/server_world.tscn
-    pause
-    exit
-)
-
-:: Try mono version (4.5)
+:: Find Godot Executable
 if exist "C:\\Godot\\Godot_v4.5-stable_mono_win64.exe" (
-    start "" "C:\\Godot\\Godot_v4.5-stable_mono_win64.exe" --path "%s" source/server/server_world.tscn
-    exit
+    set "GODOT=C:\\Godot\\Godot_v4.5-stable_mono_win64.exe"
+    goto :found
 )
-
 if exist "C:\\Program Files\\Godot\\Godot_v4.5-stable_mono_win64.exe" (
-    start "" "C:\\Program Files\\Godot\\Godot_v4.5-stable_mono_win64.exe" --path "%s" source/server/server_world.tscn
-    exit
+    set "GODOT=C:\\Program Files\\Godot\\Godot_v4.5-stable_mono_win64.exe"
+    goto :found
 )
-
-:: Try non-mono version (4.5.1)
-if exist "C:\\Program Files\\Godot\\Godot_v4.5.1-stable_win64.exe" (
-    start "" "C:\\Program Files\\Godot\\Godot_v4.5.1-stable_win64.exe" --path "%s" source/server/server_world.tscn
-    exit
-)
-
 if exist "C:\\Godot\\Godot_v4.5.1-stable_win64.exe" (
-    start "" "C:\\Godot\\Godot_v4.5.1-stable_win64.exe" --path "%s" source/server/server_world.tscn
-    exit
+    set "GODOT=C:\\Godot\\Godot_v4.5.1-stable_win64.exe"
+    goto :found
 )
-
-:: Try the running Godot executable
-if exist "%s" (
-    start "" "%s" --path "%s" source/server/server_world.tscn
-    exit
+if exist "C:\\Program Files\\Godot\\Godot_v4.5.1-stable_win64.exe" (
+    set "GODOT=C:\\Program Files\\Godot\\Godot_v4.5.1-stable_win64.exe"
+    goto :found
 )
 
 echo ERROR: Godot executable not found!
 pause
-""" % [project_path, project_path, project_path, project_path, project_path, OS.get_executable_path(), OS.get_executable_path(), project_path]
+exit
+
+:found
+:: Launch via VBS to hide console
+start wscript "%%~dp0%%VBS_NAME%%" "%%GODOT%%" "%%PROJECT_PATH%%" "%%SCENE%%"
+exit
+""" % [project_path]
 
 	# Write batch file
 	var batch_path = project_path + "run_local_server.bat"
@@ -660,7 +662,7 @@ pause
 		if err != OK:
 			Log.error("Failed to launch server, error: %d" % err, "Server")
 		else:
-			Log.info("Local server launching...", "Server")
+			Log.info("Local server launching (Hidden Console)...", "Server")
 			show_status("Local server starting... Reconnecting...", Color.YELLOW)
 
 			# Give server time to start, then reconnect
@@ -668,6 +670,7 @@ pause
 			_on_server_env_changed(ConfigManager.ServerEnvironment.LOCAL)
 	else:
 		Log.error("Failed to create server launch script", "Server")
+
 
 
 func create_styled_button(text: String) -> Button:

@@ -41,11 +41,11 @@ var npc_type: String = "Rogue"  # NPC type for combat (Rogue, Goblin, etc.)
 func _ready():
 	print("WanderingNPC ready: ", npc_name)
 
-	# Setup collision - NPCs are solid but don't push players
-	collision_layer = 2  # NPCs on layer 2
-	collision_mask = 1   # NPCs only collide with walls, not players (server controls NPC movement)
-
-	# Create collision shape (rectangle to match player)
+	# Collision setup
+	collision_layer = 2  # Layer 2: Characters (NPCs/Players)
+	collision_mask = 3   # Mask 3: Walls (1) + Characters (2)
+	
+	# Add collision shape if missing
 	var collision_shape = CollisionShape2D.new()
 	var rect_shape = RectangleShape2D.new()
 	rect_shape.size = Vector2(50, 85)  # Match player collision box

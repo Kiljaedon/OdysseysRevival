@@ -18,3 +18,11 @@ saved_layouts/
 nul
 *.tmp
 *.bak
+
+# Credentials - NEVER commit these
+tools/rclone/rclone.conf
+deploy_log_*.txt
+temp_health.txt
+
+# Deploy staging
+deploy/

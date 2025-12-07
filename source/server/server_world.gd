@@ -52,7 +52,7 @@
 ##
 ## WHAT THIS FILE DOES NOT DO:
 ## - Game logic implementation (delegated to managers)
-## - Direct database access (uses GameDatabase singleton)
+## - Database access via RepositoryFactory pattern
 ## - Complex state management (managers own their state)
 ## - Business rule enforcement (managers validate their domains)
 ##
@@ -64,30 +64,35 @@
 ##
 ################################################################################
 
-extends Node2D
+extends Node
 # Preload all manager classes
 const ConfigManager = preload("res://source/common/config/config_manager.gd")
 const BaseServer = preload("res://source/common/network/base_server.gd")
-const UIManager = preload("res://source/server/managers/ui_manager.gd")
-const ServerAdminUI = preload("res://source/server/server_admin_ui.gd")
-const SpatialManager = preload("res://source/server/spatial_manager.gd")
-const NetworkSync = preload("res://source/server/network_sync.gd")
-const InputProcessor = preload("res://source/server/input_processor.gd")
-const MovementValidator = preload("res://source/server/movement_validator.gd")
-const AntiCheat = preload("res://source/server/anti_cheat.gd")
-const RateLimiter = preload("res://source/server/rate_limiter.gd")
-const AuthenticationManager = preload("res://source/server/managers/authentication_manager.gd")
-const PlayerManager = preload("res://source/server/managers/player_manager.gd")
-const ServerNPCManager = preload("res://source/server/managers/npc_manager.gd")
-# CombatManager removed - using RealtimeCombatManager only
-const StatsManager = preload("res://source/server/managers/stats_manager.gd")
-const ServerMapManager = preload("res://source/server/managers/map_manager.gd")
-const NetworkManager = preload("res://source/server/managers/network_manager.gd")
-const ChatManager = preload("res://source/server/managers/chat_manager.gd")
-const InputManager = preload("res://source/server/managers/input_manager.gd")
-const ContentManager = preload("res://source/server/managers/content_manager.gd")
-const ConnectionManager = preload("res://source/server/managers/connection_manager.gd")
-# RealtimeCombatManager, BattleMapLoader, BattleInstanceManager use class_name - no preload needed
+
+func _init():
+	print("[DEBUG] ServerWorld _init")
+# Managers with class_name are used directly to avoid cyclic dependencies:
+# - ServerUIManager (was UIManager)
+# - ServerAdminUI
+# - ServerMapManager
+# - ServerNPCManager
+# - SpatialManager
+# - NetworkSync
+# - InputProcessor
+# - MovementValidator
+# - AntiCheat
+# - RateLimiter
+# - AuthenticationManager
+# - PlayerManager
+# - StatsManager
+# - NetworkManager
+# - ChatManager
+# - InputManager
+# - ContentManager
+# - ConnectionManager
+# - RealtimeCombatManager
+# - BattleMapLoader
+# - BattleInstanceManager
 
 ################################################################################
 # SECTION 1: MANAGER REFERENCES
@@ -141,6 +146,10 @@ func get_player_teams() -> Dictionary:
 func get_server_npcs() -> Dictionary:
 	return npc_manager.server_npcs if npc_manager else {}
 
+# Convenience accessor for map_manager (used by spawner for collision validation)
+func get_map_manager():
+	return map_manager
+
 ################################################################################
 # SECTION 3: STATE DELEGATION NOTES
 ################################################################################
@@ -158,6 +167,8 @@ func get_server_npcs() -> Dictionary:
 var server_port: int = 9123
 var tick_rate: float = 0.05     # 20 updates per second
 var tick_timer: float = 0.0
+var restart_check_timer: float = 0.0
+const RESTART_SIGNAL_REL = "RESTART_REQUIRED.signal"
 
 var server_start_time: float = 0.0  # For uptime calculation
 var detected_local_ip: String = ""  # Local network IP
@@ -225,9 +236,8 @@ func _init_core_systems() -> void:
 	else:
 		print("[SERVER] ERROR: ServerConnection autoload not found!")
 
-	# Initialize database
-	GameDatabase.init_database()
-	log_message("[DATABASE] Initialized")
+	# Database uses RepositoryFactory - repos self-initialize on first use
+	log_message("[DATABASE] Using RepositoryFactory (self-initializing)")
 
 	# Load server configuration
 	var server_config = ConfigManager.get_server_config()
@@ -244,13 +254,15 @@ func _init_core_systems() -> void:
 	print("[NETWORK] Public IP detection skipped for stability.")
 
 	print("[DEBUG] Step 7: Init UI Manager")
-	ui_manager = UIManager.new()
+	var UIManagerScript = load("res://source/server/managers/ui_manager.gd")
+	ui_manager = UIManagerScript.new()
 	add_child(ui_manager)
 	ui_manager.initialize(self)
 
 	# Initialize admin UI handler (needed before create_server_ui) - skip in headless
 	if DisplayServer.get_name() != "headless":
-		admin_ui = ServerAdminUI.new(self)
+		var AdminUIScript = load("res://source/server/server_admin_ui.gd")
+		admin_ui = AdminUIScript.new(self)
 		add_child(admin_ui)
 
 	# Create server UI - will auto-skip in headless mode
@@ -295,7 +307,8 @@ func _init_core_systems() -> void:
 	log_message("[COLLISION] Server-side collision world initialized")
 
 	# Initialize map manager
-	map_manager = ServerMapManager.new()
+	var MapManagerScript = load("res://source/server/managers/map_manager.gd")
+	map_manager = MapManagerScript.new()
 	map_manager.initialize(self, collision_world)
 	add_child(map_manager)
 	log_message("[MAP] Map manager initialized")
@@ -328,7 +341,7 @@ func _init_core_systems() -> void:
 func _init_game_managers() -> void:
 	# Initialize authentication manager
 	auth_manager = AuthenticationManager.new()
-	auth_manager.initialize(self, network_handler, null, debug_console) # GameDatabase deprecated
+	auth_manager.initialize(self, network_handler, null, debug_console)
 	add_child(auth_manager)
 	log_message("[AUTH] Authentication manager initialized")
 
@@ -339,7 +352,8 @@ func _init_game_managers() -> void:
 	log_message("[PLAYER] Player manager initialized")
 
 	# Initialize NPC manager
-	npc_manager = ServerNPCManager.new()
+	var NPCManagerScript = load("res://source/server/managers/npc_manager.gd")
+	npc_manager = NPCManagerScript.new()
 	npc_manager.initialize(
 		self, network_handler, spatial_manager, network_sync,
 		movement_validator, player_manager, map_manager
@@ -354,8 +368,9 @@ func _init_game_managers() -> void:
 	if npc_manager:
 		npc_manager.spawn_server_npcs()
 
-	# Initialize battle map loader (loads battle maps and spawn points)
+	# Initialize battle map loader
 	battle_map_loader = BattleMapLoader.new()
+	battle_map_loader.initialize(map_manager)
 	add_child(battle_map_loader)
 	log_message("[BATTLE_MAP] Battle map loader initialized")
 
@@ -449,6 +464,35 @@ func _process(delta):
 			npc_manager.broadcast_npc_positions()
 
 	# Network and server stats are now updated by UIManager
+	
+	# Restart Watchdog Logic
+	restart_check_timer += delta
+	if restart_check_timer > 5.0:
+		restart_check_timer = 0.0
+		_check_for_restart_signal()
+
+func _check_for_restart_signal():
+	# Check for the signal file uploaded by Rclone
+	if FileAccess.file_exists(RESTART_SIGNAL_REL) or FileAccess.file_exists("res://" + RESTART_SIGNAL_REL):
+		log_message("[WATCHDOG] Restart signal detected! Initiating self-restart sequence...")
+		
+		# 1. Delete the signal file so we don't loop
+		if FileAccess.file_exists(RESTART_SIGNAL_REL):
+			DirAccess.remove_absolute(RESTART_SIGNAL_REL)
+		
+		# 2. Execute the helper script (Self-Healing)
+		# We spawn it as a separate process so it survives our death
+		# We use 'sh' explicitly so we don't need +x permission on the script file
+		var args = ["./restart_self.sh"]
+		var pid = OS.create_process("sh", args)
+		
+		if pid == -1:
+			log_message("[WATCHDOG] CRITICAL: Failed to launch restart_self.sh")
+		else:
+			log_message("[WATCHDOG] Restart script launched (PID: %d). Shutting down..." % pid)
+			
+		# 3. Quit gracefully
+		get_tree().quit()
 
 
 ################################################################################
@@ -577,7 +621,10 @@ func handle_realtime_battle_request(peer_id: int, npc_id: int):
 				return
 
 		# Pass map info to create_battle
-		realtime_combat_manager.create_battle(peer_id, npc_id, player_data, squad_data, enemy_data, current_map)
+		var battle_id = realtime_combat_manager.create_battle(peer_id, npc_id, player_data, squad_data, enemy_data, current_map)
+		if battle_id < 0:
+			print("[SERVER] Battle creation rejected for peer %d (cooldown or already in battle)" % peer_id)
+			return
 
 ## RPC Proxy: Realtime Player Movement
 func handle_realtime_player_move(peer_id: int, velocity: Vector2):

@@ -39,11 +39,13 @@ func initialize(server_ref, net_handler, spatial_mgr, net_sync, move_validator, 
 func spawn_server_npcs():
 	"""Spawn initial NPCs on the server - loads from characters/npcs/ directory"""
 	log_message("[NPC] Loading NPC spawn configurations...")
+	log_message("[NPC] map_manager available: %s" % (map_manager != null))
 
 	# Map boundaries (sample_map.tmx: 20x15 tiles, 32px tiles, 4x scale)
 	var map_width = 20 * 32 * 4  # 2560 pixels
 	var map_height = 15 * 32 * 4  # 1920 pixels
 	var padding = 128.0  # Keep NPCs away from edges
+	var collision_corrections = 0  # Track how many spawns were corrected
 
 	# Define available NPC types
 	var available_types = ["Rogue", "Goblin", "OrcWarrior", "DarkMage", "EliteGuard", "RogueBandit"]
@@ -82,8 +84,14 @@ func spawn_server_npcs():
 			continue
 
 		# COLLISION-FREE SPAWN: Find nearest free tile if spawn position is blocked
+		var original_pos = spawn_pos
 		if map_manager:
-			spawn_pos = map_manager.find_nearest_free_spawn("sample_map", spawn_pos)
+			spawn_pos = map_manager.validate_spawn_position("sample_map", spawn_pos)
+			if spawn_pos != original_pos:
+				collision_corrections += 1
+				log_message("[NPC] Collision correction: %s -> %s for %s" % [original_pos, spawn_pos, npc_type])
+		else:
+			log_message("[NPC] WARNING: map_manager is null - no collision validation!")
 
 		# Create NPC instance
 		var npc_id = next_npc_id
@@ -129,7 +137,7 @@ func spawn_server_npcs():
 
 		log_message("[NPC] Spawned NPC #%d: %s (Lv %d) at %s" % [npc_id, npc_type, level, str(spawn_pos)])
 
-	log_message("[NPC] Spawned %d NPCs total" % server_npcs.size())
+	log_message("[NPC] Spawned %d NPCs total (%d collision corrections applied)" % [server_npcs.size(), collision_corrections])
 
 	# Broadcast all NPCs to all connected clients
 	if network_handler and player_manager:
@@ -309,8 +317,7 @@ func load_npc_data(npc_type: String) -> Dictionary:
 		else:
 			data["hp"] = 100
 	
-	# Debug print
-	print("[NPC] Loaded data for %s - HP: %d" % [npc_type, data.get("hp", -999)])
+	# Removed debug print - runs for every NPC load
 			
 	return data
 

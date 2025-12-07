@@ -53,6 +53,27 @@ func add_state(state: Dictionary) -> void:
 	if state_buffer.size() > MAX_BUFFER_SIZE:
 		state_buffer.pop_front()
 
+func reset(new_pos: Vector2) -> void:
+	"""
+	Forcefully reset the interpolator to a specific position.
+	Clears history to prevent 'snapping back' to old positions.
+	Useful for teleportation or unstuck mechanics.
+	"""
+	state_buffer.clear()
+	
+	# Create a fake "initial state" so we don't vanish
+	state_buffer.append({
+		"timestamp": Time.get_ticks_msec(),
+		"position": new_pos,
+		"velocity": Vector2.ZERO,
+		"hp": 100, # Dummy values, will be updated next packet
+		"state": "idle",
+		"facing": "down",
+		"attack_state": ""
+	})
+	
+	last_render_timestamp = Time.get_ticks_msec()
+
 func get_interpolated_state(current_time: float) -> Dictionary:
 	"""
 	Get interpolated state at render time (current_time - delay).

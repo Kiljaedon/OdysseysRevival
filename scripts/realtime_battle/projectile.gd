@@ -39,11 +39,11 @@ func _physics_process(delta: float):
 	position += velocity * delta
 
 	# Rotate to face direction of travel
-	if velocity.length() > 0:
+	if velocity.length_squared() > 0.1: # Use length_squared for performance
 		rotation = velocity.angle()
 
 	# Animate sprite frames
-	if sprite and sprite.hframes > 1:
+	if sprite and is_instance_valid(sprite) and sprite.hframes > 1:
 		anim_timer += delta
 		if anim_timer >= anim_speed:
 			anim_timer = 0.0

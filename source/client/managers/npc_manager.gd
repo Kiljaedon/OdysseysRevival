@@ -129,18 +129,9 @@ func restore_npcs_from_battle() -> void:
 
 func handle_npc_spawned(npc_id: int, npc_data: Dictionary) -> void:
 	"""Server notified us of an NPC spawn"""
-	print("[NPCManager] ========== handle_npc_spawned CALLED ==========")
-	print("[NPCManager] NPC ID: %d" % npc_id)
-	print("[NPCManager] NPC Name: %s" % npc_data.get("npc_name", "MISSING"))
-	print("[NPCManager] Position: %s" % str(npc_data.get("position", Vector2.ZERO)))
-	print("[NPCManager] NPC Type: %s" % npc_data.get("npc_type", "MISSING"))
-	print("[NPCManager] Game World: %s" % game_world)
-	print("[NPCManager] Sprite Atlas Textures: %d loaded" % sprite_atlas_textures.size())
-
 	# Load NPC character data - ALWAYS use fallback for NPCs since server doesn't send animations
 	var npc_name = npc_data.npc_name
 	var npc_type = npc_data.get("npc_type", npc_name.replace("npc:", ""))  # Strip "npc:" prefix
-	print("[NPCManager] Loading NPC: %s (type: %s)" % [npc_name, npc_type])
 
 	# Load animations directly from JSON file
 	var npc_character_data = {}
@@ -154,7 +145,6 @@ func handle_npc_spawned(npc_id: int, npc_data: Dictionary) -> void:
 			var json = JSON.new()
 			if json.parse(json_text) == OK:
 				npc_character_data = json.data
-				print("[NPCManager] Loaded NPC data from: %s" % json_file)
 			else:
 				print("[NPCManager] ERROR: Failed to parse JSON: %s" % json_file)
 		else:
@@ -167,7 +157,6 @@ func handle_npc_spawned(npc_id: int, npc_data: Dictionary) -> void:
 		print("[NPCManager] ERROR: No animations found in JSON for NPC %s - cannot spawn" % npc_type)
 		return
 
-	print("[NPCManager] Creating WanderingNPC instance...")
 	# Create NPC node
 	var npc = WanderingNPC.new()
 	npc.name = "npc_%d" % npc_id  # Set node name for scene tree and attack detection
@@ -177,68 +166,39 @@ func handle_npc_spawned(npc_id: int, npc_data: Dictionary) -> void:
 	npc.position = npc_data.position
 	npc.z_index = 0  # Use y-sort instead of fixed z-index
 	npc.y_sort_enabled = true
-	print("[NPCManager] NPC node created: %s at position %s" % [npc.name, npc.position])
 
 	# Set animation data BEFORE adding to tree
-	print("[NPCManager] Setting animation data on NPC...")
 	npc.animation_data = npc_character_data.animations
 	npc.atlas_textures = sprite_atlas_textures
 	npc.crop_edge = CROP_EDGE
-	print("[NPCManager] Animation data set: %d atlas textures, crop_edge=%d" % [sprite_atlas_textures.size(), CROP_EDGE])
 
 	# Add to game world (this triggers _ready())
-	print("[NPCManager] Adding NPC to game_world...")
 	game_world.add_child(npc)
 	server_npcs[npc_id] = npc
-	print("[NPCManager] NPC added to game_world, stored in server_npcs[%d]" % npc_id)
 
 	# Disable client-side AI - server is authoritative (prevents client manipulation)
 	npc.set_process(false)  # Server controls all NPC movement
-	print("[NPCManager] Client-side AI disabled (server authoritative)")
 
 	# Reload animations after _ready() has created the sprite
-	print("[NPCManager] Waiting one frame for _ready() to complete...")
 	await get_tree().process_frame  # Wait one frame for _ready() to complete
-	print("[NPCManager] Reloading animations...")
 	npc.load_animations()  # Reload now that animation_data is set
 	npc.play_idle_animation()
-	print("[NPCManager] Animations reloaded and idle animation playing")
 
 	# Ensure NPC and sprite are visible
 	npc.visible = true
 	if npc.animated_sprite:
 		npc.animated_sprite.visible = true
-		print("[NPCManager] Visibility set: NPC=true, AnimatedSprite=true")
 	else:
-		print("[NPCManager] WARNING: animated_sprite is null!")
+		print("[NPCManager] WARNING: NPC #%d animated_sprite is null!" % npc_id)
 
-	if npc.animated_sprite and npc.animated_sprite.sprite_frames:
-		var anims = npc.animated_sprite.sprite_frames.get_animation_names()
-		print("[NPCManager] Spawned NPC #%d: %s with %d animations: %s" % [npc_id, npc_name, anims.size(), str(anims)])
-		print("[NPCManager]   Final state:")
-		print("[NPCManager]     - Visibility: NPC=%s, AnimatedSprite=%s" % [npc.visible, npc.animated_sprite.visible])
-		print("[NPCManager]     - Position: %s" % npc.position)
-		print("[NPCManager]     - Scale: %s" % npc.animated_sprite.scale)
-		print("[NPCManager]     - Modulate: %s" % npc.modulate)
-		print("[NPCManager]     - Z-Index: %d" % npc.z_index)
-		print("[NPCManager]     - Y-Sort: %s" % npc.y_sort_enabled)
-	else:
+	if not npc.animated_sprite or not npc.animated_sprite.sprite_frames:
 		print("[NPCManager] ERROR: NPC #%d (%s) has no animations loaded!" % [npc_id, npc_name])
-		if not npc.animated_sprite:
-			print("[NPCManager]   - animated_sprite is NULL")
-		elif not npc.animated_sprite.sprite_frames:
-			print("[NPCManager]   - sprite_frames is NULL")
 
 	# Apply visual distinction if this NPC is part of player's team
 	if team_npc_ids.has(npc_id):
-		# Team NPCs get a greenish tint to distinguish them from regular NPCs
 		npc.modulate = Color(0.8, 1.0, 0.8)  # Greenish tint
-		print("[TEAM] NPC #%d is on player's team - applied green tint" % npc_id)
 	else:
-		# Regular NPCs - normal coloring
 		npc.modulate = Color.WHITE
-
-	print("[NPC] Spawned server NPC #%d: %s (Team: %s)" % [npc_id, npc_name, "YES" if team_npc_ids.has(npc_id) else "NO"])
 
 @rpc
 func handle_sync_npc_positions(npc_positions: Dictionary) -> void:

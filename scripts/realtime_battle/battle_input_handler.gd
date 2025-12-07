@@ -22,6 +22,7 @@ const SPELL_TARGET_RANGE: float = 350.0  # Max range for spell targeting
 ## ========== STATE ==========
 var controller_ref: WeakRef  # Reference to parent controller
 var input_buffer: CombatInputBuffer = CombatInputBuffer.new()
+var action_input_enabled: bool = true # Controls whether attack inputs are processed
 
 ## Cached values
 var last_velocity: Vector2 = Vector2.ZERO
@@ -34,7 +35,10 @@ var target_index: int = -1
 func initialize(controller: Object) -> void:
 	"""Initialize with reference to parent controller"""
 	controller_ref = weakref(controller)
-	print("[BattleInputHandler] Initialized with input buffering")
+
+func set_action_input_enabled(enabled: bool) -> void:
+	"""Enable/disable attack inputs (used for grace period on battle start)"""
+	action_input_enabled = enabled
 
 ## ========== INPUT PROCESSING (MAIN LOOP) ==========
 
@@ -92,6 +96,9 @@ func _read_movement_input(controller: Object) -> Vector2:
 
 func _process_action_input(controller: Object) -> void:
 	"""Check for attack/dodge inputs (continuous polling)"""
+	if not action_input_enabled:
+		return
+
 	# Attack with spacebar (held) - auto-attacks at cooldown pace
 	if Input.is_action_pressed("action") or Input.is_key_pressed(KEY_SPACE):
 		try_attack(controller)
@@ -111,36 +118,30 @@ func try_attack(controller: Object) -> void:
 		_execute_attack(controller)
 	elif controller.attack_cooldown_timer <= input_buffer.BUFFER_WINDOW:
 		# Within buffer window - queue the attack
-		if input_buffer.buffer_action("attack", current_target_id):
-			print("[InputBuffer] Attack buffered (%.3fs until ready)" % controller.attack_cooldown_timer)
+		input_buffer.buffer_action("attack", current_target_id)
 
 func _execute_attack(controller: Object) -> void:
 	"""Execute attack immediately (called by buffer or direct input)"""
 	# Auto-target if no target selected
 	if current_target_id.is_empty():
 		_auto_select_target(controller)
-		print("[INPUT] Auto-targeted: %s" % current_target_id)
 
 	# Still no target? Can't attack
 	if current_target_id.is_empty():
-		print("[INPUT] No target available - cannot attack")
 		return
 
 	# Validate target exists and is alive
 	if not controller.battle_scene:
-		print("[INPUT] No battle_scene - cannot attack")
 		return
 
 	var target = controller.battle_scene.get_unit(current_target_id)
 	if not target or target.unit_state == "dead":
-		print("[INPUT] Target invalid or dead: %s" % current_target_id)
 		current_target_id = ""
 		return
 
 	# Check range using player's actual attack range (role-specific)
 	var player = controller.battle_scene.get_player_unit()
 	if not player:
-		print("[INPUT] No player unit - cannot attack")
 		return
 
 	# Get player's attack range from their combat role (caster=280, melee=120, etc)
@@ -154,19 +155,13 @@ func _execute_attack(controller: Object) -> void:
 	var target_pos = target.server_position if target.server_position != Vector2.ZERO else target.position
 	var distance = player_pos.distance_to(target_pos)
 
-	# DEBUG: Log detailed attack info
-	print("[INPUT] Attack check - player_pos=%s (client=%s), target_pos=%s, distance=%.1f" % [player_pos, player.position, target_pos, distance])
-	print("[INPUT] Attack check - role: '%s', range: %.1f, can_attack: %s" % [player_role, player_attack_range, distance <= player_attack_range])
-
 	if distance > player_attack_range:
-		print("[INPUT] Out of range (%.1f > %.1f) - move closer" % [distance, player_attack_range])
 		return  # Too far - let player move closer
 
 	# Valid target in range - execute attack
 	controller.attack_cooldown_timer = controller.ATTACK_COOLDOWN
 	controller.attack_freeze_timer = controller.ATTACK_FREEZE_TIME
 	_send_attack_to_server(controller, current_target_id)
-	print("[INPUT] Attack sent to server!")
 
 ## ========== DODGE ROLL INPUT ==========
 
@@ -175,8 +170,6 @@ func try_dodge_roll(controller: Object) -> void:
 	Attempt to dodge roll.
 	Buffers input if on cooldown within buffer window.
 	"""
-	print("[BattleInputHandler] Attempting dodge roll... Cooldown: %.2f" % controller.dodge_roll_cooldown_timer)
-
 	# Check cooldown
 	if controller.dodge_roll_cooldown_timer <= 0:
 		# Ready to dodge now
@@ -186,9 +179,7 @@ func try_dodge_roll(controller: Object) -> void:
 		var direction = last_velocity.normalized()
 		if direction.length() < 0.1:
 			direction = _get_fallback_dodge_direction(controller)
-
-		if input_buffer.buffer_action("dodge_roll", direction):
-			print("[InputBuffer] Dodge buffered (%.3fs until ready)" % controller.dodge_roll_cooldown_timer)
+		input_buffer.buffer_action("dodge_roll", direction)
 
 func _execute_dodge_roll(controller: Object) -> void:
 	"""Execute dodge roll immediately (called by buffer or direct input)"""
@@ -242,11 +233,9 @@ class BufferExecutor:
 	func execute_attack(target_id: String) -> void:
 		handler.current_target_id = target_id
 		handler._execute_attack(controller)
-		print("[InputBuffer] ✅ Buffered attack executed!")
 
 	func execute_dodge_roll(direction: Vector2) -> void:
 		handler._execute_dodge_roll(controller)
-		print("[InputBuffer] ✅ Buffered dodge executed!")
 
 ## ========== TARGETING SYSTEM ==========
 
@@ -255,7 +244,6 @@ func cycle_target(controller: Object, direction: int) -> void:
 	_update_targetable_enemies(controller)
 
 	if targetable_enemies.is_empty():
-		print("[BattleInputHandler] No targets in range")
 		return
 
 	# Find current target's index in the list
@@ -276,12 +264,6 @@ func cycle_target(controller: Object, direction: int) -> void:
 	# Set new target
 	var new_target_id = targetable_enemies[target_index]
 	set_target(controller, new_target_id)
-
-	print("[BattleInputHandler] Tab target: %s (%d/%d)" % [
-		new_target_id,
-		target_index + 1,
-		targetable_enemies.size()
-	])
 
 func _update_targetable_enemies(controller: Object) -> void:
 	"""Update list of enemies within spell range"""
@@ -352,8 +334,6 @@ func set_target(controller: Object, target_id: String) -> void:
 		var new_target = controller.battle_scene.get_unit(current_target_id)
 		if new_target and new_target.has_method("set_targeted"):
 			new_target.set_targeted(true)
-		if old_target_id != target_id:
-			print("[BattleInputHandler] Target set: %s" % current_target_id)
 
 func handle_click_target(controller: Object, screen_pos: Vector2) -> void:
 	"""Handle click to select target"""
@@ -386,18 +366,14 @@ func _send_attack_to_server(controller: Object, target_id: String) -> void:
 	var server_conn = controller.get_tree().root.get_node_or_null("ServerConnection")
 	if not server_conn:
 		return
-
 	server_conn.rt_player_attack.rpc_id(1, target_id)
-	print("[BattleInputHandler] Attack sent: target=%s" % target_id)
 
 func _send_dodge_roll_to_server(controller: Object, direction: Vector2) -> void:
 	"""Send dodge roll command to server via RPC"""
 	var server_conn = controller.get_tree().root.get_node_or_null("ServerConnection")
 	if not server_conn:
 		return
-
 	server_conn.rt_player_dodge_roll.rpc_id(1, direction.x, direction.y)
-	print("[BattleInputHandler] Dodge roll sent: direction=%s" % direction)
 
 ## ========== INFO / DEBUG ==========
 

@@ -1,15 +1,23 @@
 extends Node
 ## ServerConnection - Network Router/Facade
+## ==========================================
+## VERSION CHECK: All connections validate GameVersion.GAME_VERSION
+## Client and server MUST have matching versions to connect.
+
+func _init():
+	print("[DEBUG] ServerConnection _init")
+
 ## Delegates to domain-specific services while maintaining RPC interface
 ##
 ## Services:
-##   - AuthNetworkService: Account/login
+##   - AuthNetworkService: Account/login (includes version validation)
 ##   - CharacterNetworkService: Character CRUD
 ##   - WorldNetworkService: Movement/presence
 ##   - RealtimeCombatNetworkService: Real-time combat
 ##   - ChatNetworkService: Chat messages
 ##   - AdminNetworkService: Content uploads
 
+const GameVersion = preload("res://source/common/version.gd")
 const AuthNetworkService = preload("res://source/common/network/services/auth_network_service.gd")
 const CharacterNetworkService = preload("res://source/common/network/services/character_network_service.gd")
 const WorldNetworkService = preload("res://source/common/network/services/world_network_service.gd")
@@ -102,8 +110,8 @@ func request_create_account(username: String, password: String):
 	auth_service.handle_create_account(username, password)
 
 @rpc("any_peer")
-func request_login(username: String, password: String):
-	auth_service.handle_login(username, password)
+func request_login(username: String, password: String, client_version: String = ""):
+	auth_service.handle_login(username, password, client_version)
 
 @rpc
 func account_creation_response(success: bool, message: String):

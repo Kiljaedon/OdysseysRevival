@@ -1,4 +1,3 @@
-class_name AuthenticationService
 extends Node
 
 const CredentialsUtils = preload("res://source/common/utils/credentials_utils.gd")

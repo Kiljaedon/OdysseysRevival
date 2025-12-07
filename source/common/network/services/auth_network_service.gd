@@ -1,6 +1,11 @@
 class_name AuthNetworkService
 extends Node
 ## Handles account lifecycle, authentication, session management
+## ============================================================
+## VERSION VALIDATION: All logins are checked against GameVersion.GAME_VERSION
+## Mismatched versions are rejected before authentication.
+
+const GameVersion = preload("res://source/common/version.gd")
 
 var server_world: Node  # Set by ServerConnection
 
@@ -8,7 +13,8 @@ var server_world: Node  # Set by ServerConnection
 ## ========== CLIENT → SERVER HANDLERS ==========
 
 func handle_ping():
-	print("[AuthService] PING received from peer %d" % multiplayer.get_remote_sender_id())
+	# Removed: pings are frequent, no need to log each one
+	pass
 
 
 func handle_create_account(username: String, password: String):
@@ -16,11 +22,26 @@ func handle_create_account(username: String, password: String):
 		server_world.request_create_account(username, password)
 
 
-func handle_login(username: String, password: String):
+func handle_login(username: String, password: String, client_version: String = ""):
 	var peer_id = multiplayer.get_remote_sender_id()
-	print("[AuthService] Login request from peer %d for user '%s'" % [peer_id, username])
-	if multiplayer.is_server() and server_world:
-		server_world.request_login(username, password)
+	print("[AuthService] Login request from peer %d for user '%s' (version: %s)" % [peer_id, username, client_version])
+
+	if multiplayer.is_server():
+		# VERSION CHECK - MUST MATCH BEFORE LOGIN
+		var server_version = GameVersion.GAME_VERSION
+		if client_version.is_empty():
+			print("[AuthService] REJECTED peer %d - No version sent (legacy client)" % peer_id)
+			send_login_response(peer_id, false, "Version mismatch! Your client is outdated. Please download the latest version.", {})
+			return
+
+		if client_version != server_version:
+			print("[AuthService] REJECTED peer %d - Version mismatch (client: %s, server: %s)" % [peer_id, client_version, server_version])
+			send_login_response(peer_id, false, GameVersion.get_mismatch_message(client_version, server_version), {})
+			return
+
+		print("[AuthService] Version OK: %s" % server_version)
+		if server_world:
+			server_world.request_login(username, password)
 
 
 ## ========== SERVER → CLIENT SENDERS ==========

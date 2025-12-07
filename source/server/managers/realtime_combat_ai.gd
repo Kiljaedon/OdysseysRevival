@@ -318,7 +318,8 @@ static func _ai_attack(battle: Dictionary, unit: Dictionary, callbacks: Dictiona
 		return
 
 	# Start attack wind-up (damage happens after wind-up in realtime_combat_manager)
-	CombatRules.start_attack(unit, target.id)
+	# Pass battle.units so lunge direction can be calculated properly
+	CombatRules.start_attack(unit, target.id, battle.units)
 
 	# Set post-attack pause so enemy doesn't immediately attack again
 	unit["post_attack_pause"] = PAUSE_AFTER_ATTACK

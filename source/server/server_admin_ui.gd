@@ -219,15 +219,17 @@ func _on_admin_create_account(username_input: LineEdit, password_input: LineEdit
 
 	server_world.log_message("[ADMIN] Creating account: %s" % username)
 
-	# Use game database to create account
-	var result = GameDatabase.create_account(username, password)
-	if result:
+	# Use repository to create account
+	var password_hash = PasswordService.hash_password(password)
+	var account_repo = RepositoryFactory.get_account_repository()
+	var result = account_repo.create_account(username, password_hash)
+	if result.success:
 		server_world.log_message("[ADMIN] ✅ Account created successfully")
 		username_input.clear()
 		password_input.clear()
 		_on_refresh_accounts_list(accounts_list)
 	else:
-		server_world.log_message("[ADMIN] ❌ Failed to create account (may already exist)")
+		server_world.log_message("[ADMIN] ❌ Failed to create account: %s" % result.get("error", "unknown"))
 
 
 func _on_refresh_accounts_list(accounts_list_container: VBoxContainer):

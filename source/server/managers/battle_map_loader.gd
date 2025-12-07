@@ -29,9 +29,18 @@ const ALLY_SPREAD_Y: float = 128.0  # 1 tile vertical spread
 ## Cached map dimensions
 var map_dimensions: Dictionary = {}  # map_name -> {width, height}
 
+## Dependencies
+var map_manager = null
+
 
 func _ready() -> void:
 	print("[BattleMapLoader] Initialized - Dynamic spawn generation enabled")
+
+
+func initialize(p_map_manager) -> void:
+	"""Initialize with MapManager for collision checking"""
+	map_manager = p_map_manager
+	print("[BattleMapLoader] MapManager dependency set")
 
 
 ## ========== PUBLIC API ==========
@@ -79,8 +88,8 @@ func generate_battle_spawns(world_map_name: String, ally_count: int, enemy_count
 		enemy_facing = "up"
 
 	# Generate randomized positions within zones
-	var ally_spawns = _generate_team_spawns(ally_zone, ally_count, bounds)
-	var enemy_spawns = _generate_team_spawns(enemy_zone, enemy_count, bounds)
+	var ally_spawns = _generate_team_spawns(world_map_name, ally_zone, ally_count, bounds)
+	var enemy_spawns = _generate_team_spawns(world_map_name, enemy_zone, enemy_count, bounds)
 
 	print("[BattleMapLoader] Generated battle spawns for %s" % world_map_name)
 	print("[BattleMapLoader]   Player aggressor: %s" % player_is_aggressor)
@@ -151,7 +160,7 @@ func _calculate_spawn_zones(bounds: Dictionary, bottom_zone: Dictionary, top_zon
 	top_zone["y_max"] = usable_top + zone_height
 
 
-func _generate_team_spawns(zone: Dictionary, count: int, bounds: Dictionary) -> Array:
+func _generate_team_spawns(world_map_name: String, zone: Dictionary, count: int, bounds: Dictionary) -> Array:
 	"""Generate grouped spawn positions for a team within a zone"""
 	var spawns: Array = []
 
@@ -170,7 +179,17 @@ func _generate_team_spawns(zone: Dictionary, count: int, bounds: Dictionary) -> 
 	var leader_y = zone_center_y + randf_range(-y_range, y_range)
 
 	# Leader spawn (player or captain)
-	spawns.append(Vector2(leader_x, leader_y))
+	var leader_pos = Vector2(leader_x, leader_y)
+	
+	# Validate leader position
+	if map_manager:
+		leader_pos = map_manager.find_nearest_free_spawn(world_map_name, leader_pos)
+		
+	spawns.append(leader_pos)
+	
+	# Update leader position if it changed (so allies spawn near actual position)
+	leader_x = leader_pos.x
+	leader_y = leader_pos.y
 
 	# Generate ally/minion spawns near leader
 	for i in range(1, count):
@@ -190,7 +209,13 @@ func _generate_team_spawns(zone: Dictionary, count: int, bounds: Dictionary) -> 
 		var ally_x = clamp(leader_x + offset_x, zone.x_min, zone.x_max)
 		var ally_y = clamp(leader_y + offset_y, zone.y_min, zone.y_max)
 
-		spawns.append(Vector2(ally_x, ally_y))
+		var ally_pos = Vector2(ally_x, ally_y)
+		
+		# Validate ally position
+		if map_manager:
+			ally_pos = map_manager.find_nearest_free_spawn(world_map_name, ally_pos)
+			
+		spawns.append(ally_pos)
 
 	return spawns
 

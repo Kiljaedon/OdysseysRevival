@@ -59,7 +59,10 @@ func _process(_delta: float):
 	# Camera follows the player unit
 	var player = get_player_unit()
 	if player:
-		camera.global_position = player.position
+		if player.position.is_finite():
+			camera.global_position = player.position
+		else:
+			print("[RT_BATTLE_SCENE] WARNING: Player position invalid (NaN/Inf): ", player.position)
 
 ## ========== BATTLE LIFECYCLE ==========
 
@@ -472,6 +475,9 @@ func on_projectile_spawn(proj_data: Dictionary) -> void:
 
 	# Convert world position to arena position
 	start_pos = world_to_arena_pos(start_pos)
+	
+	# FIX: Offset projectile up to chest height (feet are at 0, top is ~ -96)
+	start_pos.y -= 48.0
 
 	print("[BATTLE_SCENE] Projectile spawn: %s from %s at %s, velocity=%s, texture=%s" % [proj_id, attacker_id, start_pos, velocity, texture_path])
 

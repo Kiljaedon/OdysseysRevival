@@ -1,16 +1,9 @@
 extends Node
 
-# Global game state - persists across scene changes
-
-# Selected character data from character selection
-var selected_character: Dictionary = {}
-
-# Character source type ("player" or "class")
-var character_source: String = ""
-
-# Multiplayer data (used by character select → dev_client flow)
 var current_username: String = ""
 var current_character: Dictionary = {}
+var selected_character: Dictionary = {}
+var character_source: String = ""
 var client: Node = null  # ServerConnection reference
 var world_client: Node = null  # WorldClient connection (persists across scene changes)
 

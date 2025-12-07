@@ -28,10 +28,10 @@
         },
         "C:/Users/dougd/GoldenSunMMO/GoldenSunMMO-Dev/maps/World Maps/sample_map.tmx": {
             "scale": 1.5,
-            "selectedLayer": 1,
+            "selectedLayer": 2,
             "viewCenter": {
-                "x": 239.99999999999997,
-                "y": 251.3333333333333
+                "x": 357,
+                "y": 173
             }
         },
         "C:/Users/dougd/GoldenSunMMO/GoldenSunMMO-Dev/maps/sample_map.tmx": {
@@ -43,7 +43,6 @@
             }
         },
         "C:/Users/dougd/GoldenSunMMO/GoldenSunMMO-Dev/maps/tiled_projects/collision_tileset.tsx": {
-            "dynamicWrapping": true,
             "scaleInDock": 1
         },
         "C:/Users/dougd/GoldenSunMMO/GoldenSunMMO-Dev/maps/tiled_projects/odyssey_tileset.tsx": {

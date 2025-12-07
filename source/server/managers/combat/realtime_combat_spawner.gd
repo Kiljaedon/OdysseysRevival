@@ -11,10 +11,36 @@ const TILE_SIZE_SCALED: int = 128
 const BATTLE_SPAWN_DISTANCE: int = BATTLE_TILE_SPACING * TILE_SIZE_SCALED
 const MAP_EDGE_PADDING: float = 128.0
 
+## ========== MAP MANAGER REFERENCE ==========
+## Used for collision-free spawn validation
+static var _map_manager = null
+
+static func set_map_manager(map_mgr) -> void:
+	"""Set map manager reference for collision validation during spawning"""
+	_map_manager = map_mgr
+
+static func _validate_spawn_position(position: Vector2, map_name: String, map_width: int, map_height: int) -> Vector2:
+	"""Validate spawn position is not in collision zone, find free spot if blocked"""
+	# Clamp to bounds first
+	position.x = clamp(position.x, MAP_EDGE_PADDING, map_width - MAP_EDGE_PADDING)
+	position.y = clamp(position.y, MAP_EDGE_PADDING, map_height - MAP_EDGE_PADDING)
+
+	# If map_manager available, find nearest free spawn
+	if _map_manager and _map_manager.has_method("find_nearest_free_spawn"):
+		position = _map_manager.find_nearest_free_spawn(map_name, position)
+
+	return position
+
 static func spawn_player_unit(battle: Dictionary, peer_id: int, player_data: Dictionary, player_world_pos: Vector2) -> void:
 	var unit_id = "player_%d" % peer_id
 	var unit = _create_unit_data(unit_id, player_data, "player")
-	
+
+	# VALIDATE spawn position against collision zones
+	var map_name = battle.get("battle_map_name", "sample_map")
+	var map_width = battle.get("map_width", 2560)
+	var map_height = battle.get("map_height", 1920)
+	player_world_pos = _validate_spawn_position(player_world_pos, map_name, map_width, map_height)
+
 	unit.position = player_world_pos
 	unit.facing = "up"
 	unit.is_player_controlled = true
@@ -32,16 +58,19 @@ static func spawn_squad_units(battle: Dictionary, peer_id: int, squad_data: Arra
 		Vector2(0, 80)       # Behind
 	]
 
+	# Get map name for collision validation
+	var map_name = battle.get("battle_map_name", "sample_map")
+
 	for i in range(min(squad_data.size(), squad_offsets.size())):
 		var merc_data = squad_data[i]
 		var unit_id = "squad_%d_%d" % [peer_id, i]
 
 		var unit = _create_unit_data(unit_id, merc_data, "player")
 		var spawn_pos = player_world_pos + squad_offsets[i]
-		
-		spawn_pos.x = clamp(spawn_pos.x, MAP_EDGE_PADDING, map_width - MAP_EDGE_PADDING)
-		spawn_pos.y = clamp(spawn_pos.y, MAP_EDGE_PADDING, map_height - MAP_EDGE_PADDING)
-		
+
+		# VALIDATE spawn position against collision zones
+		spawn_pos = _validate_spawn_position(spawn_pos, map_name, map_width, map_height)
+
 		unit.position = spawn_pos
 		unit.facing = "up"
 		unit.is_player_controlled = false
@@ -68,6 +97,9 @@ static func spawn_enemy_units(battle: Dictionary, enemy_data: Array, player_worl
 		Vector2(center_x + 100, enemy_y_back)
 	]
 
+	# Get map name for collision validation
+	var map_name = battle.get("battle_map_name", "sample_map")
+
 	var enemy_captain_set = false
 
 	for i in range(min(enemy_data.size(), enemy_positions.size())):
@@ -76,10 +108,10 @@ static func spawn_enemy_units(battle: Dictionary, enemy_data: Array, player_worl
 
 		var unit = _create_unit_data(unit_id, e_data, "enemy")
 		var spawn_pos = enemy_positions[i]
-		
-		spawn_pos.x = clamp(spawn_pos.x, MAP_EDGE_PADDING, map_width - MAP_EDGE_PADDING)
-		spawn_pos.y = clamp(spawn_pos.y, MAP_EDGE_PADDING, map_height - MAP_EDGE_PADDING)
-		
+
+		# VALIDATE spawn position against collision zones
+		spawn_pos = _validate_spawn_position(spawn_pos, map_name, map_width, map_height)
+
 		unit.position = spawn_pos
 		unit.facing = "down"
 		unit.is_player_controlled = false
@@ -112,25 +144,18 @@ static func _create_unit_data(unit_id: String, source_data: Dictionary, team: St
 	# Get combat role and its properties
 	# First check source_data, then look up from class_name if player character
 	var combat_role = source_data.get("combat_role", "")
-	var role_source = "source_data"
-
-	print("[RT_SPAWNER] Creating unit %s - checking combat_role in source_data: '%s'" % [unit_id, combat_role])
 
 	if combat_role == "":
 		# Try to get combat_role from class definition
 		var class_name_str = source_data.get("class_name", "")
-		print("[RT_SPAWNER] No combat_role in source_data, checking class_name: '%s'" % class_name_str)
 		if class_name_str != "":
 			var class_data = _load_class_data(class_name_str)
 			combat_role = class_data.get("combat_role", "melee")
-			role_source = "class_def:" + class_name_str
 		else:
 			combat_role = "melee"
-			role_source = "default"
 
 	var attack_range = CombatRoles.get_attack_range(combat_role)
 	var move_speed_mult = CombatRoles.get_move_speed_mult(combat_role)
-	print("[RT_SPAWNER] Unit %s FINAL: combat_role='%s' (from %s), attack_range=%.1f" % [unit_id, combat_role, role_source, attack_range])
 
 	var unit = {
 		"id": unit_id,
@@ -175,7 +200,6 @@ static func _load_class_data(class_name_str: String) -> Dictionary:
 	"""Load class definition to get combat_role and other class-specific data"""
 	var file_path = "res://characters/classes/%s.json" % class_name_str
 	if not FileAccess.file_exists(file_path):
-		print("[RT_SPAWNER] Class file not found: %s, defaulting to melee" % file_path)
 		return {"combat_role": "melee"}
 
 	var file = FileAccess.open(file_path, FileAccess.READ)
@@ -184,9 +208,6 @@ static func _load_class_data(class_name_str: String) -> Dictionary:
 
 	var json = JSON.new()
 	if json.parse(json_text) == OK:
-		var data = json.data
-		print("[RT_SPAWNER] Loaded class '%s' with combat_role: %s" % [class_name_str, data.get("combat_role", "melee")])
-		return data
+		return json.data
 
-	print("[RT_SPAWNER] Failed to parse class file: %s" % file_path)
 	return {"combat_role": "melee"}

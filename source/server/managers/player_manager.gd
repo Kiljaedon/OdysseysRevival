@@ -254,9 +254,15 @@ func request_spawn_character(username: String, character_id: String):
 	var default_spawn_y = 960
 	var spawn_position = Vector2(character.get("position_x", default_spawn_x), character.get("position_y", default_spawn_y))
 
-	# COLLISION-FREE SPAWN: Find nearest free tile if spawn position is blocked
+	# SAFETY CHECK: Validate spawn position using robust map validation
+	# This prevents spawning inside walls or objects (Middle layer)
+	var original_spawn = spawn_position
 	if map_manager:
-		spawn_position = map_manager.find_nearest_free_spawn("sample_map", spawn_position)
+		spawn_position = map_manager.validate_spawn_position("sample_map", spawn_position)
+		if spawn_position != original_spawn:
+			log_message("[PLAYER_MANAGER] Collision correction: %s -> %s" % [original_spawn, spawn_position])
+	else:
+		log_message("[PLAYER_MANAGER] WARNING: map_manager is null - no collision validation!")
 
 	var player_data = {
 		"peer_id": peer_id,
@@ -487,6 +493,10 @@ func _apply_stat_growth(character: Dictionary):
 func update_player_map(peer_id: int, map_name: String, position: Vector2) -> void:
 	"""Update player's current map and position after a map transition"""
 	var old_map = player_maps.get(peer_id, "sample_map")
+
+	# SAFETY CHECK: Validate the new map position to prevent zoning into walls
+	if map_manager:
+		position = map_manager.validate_spawn_position(map_name, position)
 
 	# Update map and position
 	player_maps[peer_id] = map_name

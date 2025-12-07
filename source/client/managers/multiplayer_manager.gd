@@ -134,7 +134,8 @@ func create_name_label() -> void:
 	name_label = Label.new()
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	name_label.position = Vector2(-50, -75)
+	# FIX: Adjusted Y position to -125 to clear sprite head (sprite scale 3.0, offset -16 = top around -96)
+	name_label.position = Vector2(-50, -125)
 	name_label.size = Vector2(100, 20)
 	name_label.add_theme_font_size_override("font_size", 12)
 	name_label.add_theme_color_override("font_color", Color.WHITE)
@@ -214,7 +215,9 @@ func receive_chat_message(player_name: String, message: String) -> void:
 ## SPAWN/DESPAWN HANDLERS
 ## ============================================================================
 
-func handle_spawn_accepted(player_data: Dictionary, on_character_loaded: Callable) -> void:
+signal character_loaded
+
+func handle_spawn_accepted(player_data: Dictionary) -> void:
 	"""Server accepted our spawn request"""
 	print("[MULTIPLAYER] Spawn accepted")
 
@@ -231,8 +234,7 @@ func handle_spawn_accepted(player_data: Dictionary, on_character_loaded: Callabl
 		print("[MULTIPLAYER] Set player position from server: ", spawn_pos)
 
 	# Reload sprite with server's character data
-	if on_character_loaded.is_valid():
-		on_character_loaded.call()
+	character_loaded.emit()
 
 	if chat_ui and chat_ui.has_method("add_system_message"):
 		var team_msg = "Team: %d NPCs assigned" % team_npc_ids.size() if team_npc_ids.size() > 0 else "Team: No NPCs available"

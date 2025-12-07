@@ -1,5 +1,5 @@
-class_name DeveloperToolsService
 extends Node
+## Autoload singleton - access via DeveloperToolsService
 
 func launch_pixi_editor(project_root: String):
 	print("Launching PixiEditor Art Studio...")
@@ -41,21 +41,65 @@ func deploy_to_remote(project_root: String):
 		OS.create_process("cmd.exe", ["/c", "start", batch_path])
 		print("Deployment started.")
 
-func _generate_deployment_script(project_root: String, batch_path: String):
-	# (Content from gateway.gd _on_push_remote_pressed)
-	var source_path = project_root + "/source"
-	var addons_path = project_root + "/addons"
-	var remote_host = "odyssey"
-	var remote_path = "/home/gameserver/odysseys_server_dev/"
+func deploy_client_dev(project_root: String):
+	print("Launching Dev Client Deployment...")
+	var batch_path = project_root + "/deploy_client_dev.bat"
+	
+	if FileAccess.file_exists(batch_path):
+		OS.create_process("cmd.exe", ["/c", "start", batch_path])
+		print("Dev Client Deployment started.")
+	else:
+		printerr("Dev Deployment Batch file not found: ", batch_path)
 
+func deploy_client_production(project_root: String):
+	print("Launching Production Client Deployment...")
+	var batch_path = project_root + "/deploy_client_production.bat"
+	
+	if FileAccess.file_exists(batch_path):
+		OS.create_process("cmd.exe", ["/c", "start", batch_path])
+		print("Production Client Deployment started.")
+	else:
+		printerr("Production Deployment Batch file not found: ", batch_path)
+
+func _generate_deployment_script(project_root: String, batch_path: String):
+	# Configuration
+	# We use the SFTP remote defined in rclone.conf
+	var rclone_remote = "odyssey_server:/home/gameserver/odysseys_server_dev/source"
+	
 	var batch_content = """@echo off
-title Golden Sun MMO - Deploying to Remote Server
-echo Deploying...
-rsync -avz --delete --exclude=".godot" "%s" %s:%ssource/
-echo Done.
+title Golden Sun MMO - Deploying to Remote Server (Signal Based)
+cd /d "%s"
+
+set RCLONE=tools\\rclone\\rclone.exe
+set CONFIG=tools\\rclone\\rclone.conf
+
+echo ========================================
+echo STARTING DEPLOYMENT TO: odyssey (Dev)
+echo ========================================
+
+echo 1. Syncing source code via Rclone (SFTP)...
+"%%RCLONE%%" copy source "odyssey_server:/home/gameserver/odysseys_server_dev/source" --config "%%CONFIG%%" --exclude ".godot/**" --progress
+
+if %%errorlevel%% neq 0 (
+    echo.
+    echo [ERROR] Rclone sync failed.
+    pause
+    exit /b %%errorlevel%%
+)
+
+echo.
+echo 2. Signaling server to restart...
+echoRESTART > RESTART_REQUIRED.signal
+"%%RCLONE%%" copy RESTART_REQUIRED.signal "odyssey_server:/home/gameserver/odysseys_server_dev/" --config "%%CONFIG%%"
+del RESTART_REQUIRED.signal
+
+echo.
+echo ========================================
+echo DEPLOYMENT SUCCESSFUL
+echo ========================================
+echo The server watchdog will detect the signal and restart within 5 seconds.
 pause
-""" % [source_path, remote_host, remote_path] 
-    # Simplified for brevity in this refactor step, full logic can be copied.
+""" % [project_root]
 	
 	var file = FileAccess.open(batch_path, FileAccess.WRITE)
 	if file:

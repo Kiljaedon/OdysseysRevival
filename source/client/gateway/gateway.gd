@@ -30,6 +30,10 @@ func _ready() -> void:
 	style_title_screen()
 	setup_keyboard_navigation()
 
+	# Show Admin Dashboard if in Editor
+	if OS.has_feature("editor"):
+		create_admin_dashboard()
+
 
 func _input(event: InputEvent):
 	"""Handle Enter key to activate focused button"""
@@ -58,13 +62,20 @@ func _setup_keyboard_navigation_deferred():
 		print("[Gateway] ERROR: Button container not found")
 		return
 
+	# Hide Development Tools button in Production builds
+	var guest_button = button_container.get_node_or_null("GuestButton")
+	if guest_button:
+		if not OS.has_feature("editor") and not OS.is_debug_build():
+			guest_button.hide()
+			print("[Gateway] Hiding Development Tools for Production Build")
+
 	var buttons = []
 	for child in button_container.get_children():
-		if child is Button:
+		if child is Button and child.visible:
 			buttons.append(child)
 			child.focus_mode = Control.FOCUS_ALL
-
-	if buttons.size() >= 3:
+	
+	if buttons.size() > 0:
 		# Setup linear navigation chain for all buttons
 		for i in range(buttons.size()):
 			if i > 0:
@@ -72,17 +83,12 @@ func _setup_keyboard_navigation_deferred():
 			if i < buttons.size() - 1:
 				buttons[i].focus_neighbor_bottom = buttons[i].get_path_to(buttons[i + 1])
 
-		# Store references for backwards compatibility
-		login_btn = buttons[0]
-		create_account_btn = buttons[1]
-		exit_btn = buttons[buttons.size() - 1]  # Exit is now last
-
-		# Set initial focus
-		login_btn.call_deferred("grab_focus")
+		# Set initial focus to first button (usually Login)
+		buttons[0].call_deferred("grab_focus")
 
 		print("[Gateway] OK: Keyboard navigation enabled for %d buttons" % buttons.size())
 	else:
-		print("[Gateway] ERROR: Expected at least 3 buttons, found ", buttons.size())
+		print("[Gateway] ERROR: No visible buttons found")
 
 
 func fix_background_letterboxing() -> void:
@@ -390,6 +396,71 @@ func create_development_tools_panel():
 	back_button.pressed.connect(_on_dev_tools_back_pressed)
 	style_rpg_button(back_button)
 	vbox.add_child(back_button)
+
+func create_admin_dashboard():
+	var admin_container = VBoxContainer.new()
+	# Move to Center Right to avoid bottom clipping
+	admin_container.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
+	admin_container.offset_left = -220   # Width of container + margin
+	admin_container.offset_top = -125    # Center vertically (half of approx height)
+	admin_container.offset_right = -20   # Margin from right edge
+	admin_container.offset_bottom = 125  # Height
+	admin_container.alignment = BoxContainer.ALIGNMENT_CENTER
+	admin_container.add_theme_constant_override("separation", 10)
+	add_child(admin_container)
+	
+	# Helper to create styled admin buttons
+	var create_btn = func(text: String, callback: Callable):
+		var btn = Button.new()
+		btn.text = text
+		btn.custom_minimum_size = Vector2(180, 40)
+		btn.add_theme_font_size_override("font_size", 12)
+		btn.pressed.connect(callback)
+		style_rpg_button(btn)
+		admin_container.add_child(btn)
+		return btn
+
+	# 1. Push Player Client (Production)
+	create_btn.call("Push Player Client", func():
+		print("Pushing Player Client...")
+		var project_path = ProjectSettings.globalize_path("res://")
+		DeveloperToolsService.deploy_client_production(project_path)
+	)
+
+	# 2. Push Dev Client
+	create_btn.call("Push Dev Client", func():
+		print("Pushing Dev Client...")
+		var project_path = ProjectSettings.globalize_path("res://")
+		DeveloperToolsService.deploy_client_dev(project_path)
+	)
+
+	# 3. Push Server Update
+	create_btn.call("Push Server Update", func():
+		print("Pushing Server Update...")
+		var project_path = ProjectSettings.globalize_path("res://")
+		DeveloperToolsService.deploy_to_remote(project_path)
+	)
+
+	# 3. Start Local Server - Launch separate Godot instance
+	create_btn.call("Start Local Server", func():
+		print("Launching Local Server...")
+		var godot_path = OS.get_executable_path()
+		var project_path = ProjectSettings.globalize_path("res://")
+		var args = ["--path", project_path, "res://source/server/server_world.tscn"]
+		OS.create_process(godot_path, args)
+	)
+
+	# 4. Copy Player Link
+	create_btn.call("Copy Player Link", func():
+		DisplayServer.clipboard_set("https://pub-bfb251fbb7f04473b6eb939aba7ccdfc.r2.dev/installers/OdysseyRevival.zip")
+		print("Player Link Copied!")
+	)
+
+	# 5. Copy Dev Link
+	create_btn.call("Copy Dev Link", func():
+		DisplayServer.clipboard_set("https://pub-bfb251fbb7f04473b6eb939aba7ccdfc.r2.dev/installers/OdysseyDevClient.zip")
+		print("Dev Link Copied!")
+	)
 
 func _on_art_studio_pressed():
 	DeveloperToolsService.launch_pixi_editor(ProjectSettings.globalize_path("res://"))

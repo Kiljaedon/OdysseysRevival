@@ -19,6 +19,7 @@ var middle_layer: TileMapLayer
 var top_layer: TileMapLayer
 var game_world: Node2D
 var test_character: CharacterBody2D
+var collision_system_manager: CollisionSystemManager
 
 # Map state
 var current_map_width: int = 0
@@ -55,15 +56,21 @@ const TILE_SIZE_SCALED: int = TILE_SIZE_BASE * TILE_SCALE  # 128px
 ## ============================================================================
 
 ## Initialize with required node references
-## SIGNATURE: initialize(bottom, middle, top, world, character)
+## SIGNATURE: initialize(bottom, middle, top, world, character, collision_sys)
 ## This signature differentiates from ServerMapManager.initialize()
 func initialize(bottom: TileMapLayer, middle: TileMapLayer, top: TileMapLayer,
-				world: Node2D, character: CharacterBody2D):
+				world: Node2D, character: CharacterBody2D, collision_sys: CollisionSystemManager = null):
 	bottom_layer = bottom
 	middle_layer = middle
 	top_layer = top
 	game_world = world
 	test_character = character
+	
+	# Optional dependency (might be null in some contexts)
+	if collision_sys:
+		collision_system_manager = collision_sys
+		print("[MapManager] CollisionSystemManager dependency set")
+	
 	print("[MapManager] ✓ Client-side MapManager initialized")
 
 ## Load selected map by name
@@ -177,9 +184,11 @@ func parse_and_load_tmx(tmx_content: String, map_name: String):
 
 		# Only process collision object layers
 		if "collision" in group_name.to_lower():
-			# Note: This would call collision_system_manager.load_collision_objects()
-			# For now, tracking that collision loading happens here
-			print("  [MapManager] Collision objects handled by CollisionSystemManager")
+			if collision_system_manager:
+				print("  [MapManager] Delegating collision loading to CollisionSystemManager")
+				collision_system_manager.load_collision_objects(group_content, tile_width, tile_height)
+			else:
+				print("  [MapManager] WARNING: No CollisionSystemManager! Collision objects ignored.")
 
 	# Parse transition zones from Transitions objectgroup
 	parse_transitions_from_tmx(tmx_content)
@@ -218,10 +227,9 @@ func parse_and_load_tmx(tmx_content: String, map_name: String):
 		# Create map boundaries
 		create_map_boundaries(map_width, map_height, tile_width, tile_height)
 
-		# NOTE: Middle layer collision DISABLED - use Collision objectgroup in TMX instead
-		# The auto-collision was making ALL middle layer tiles solid (including decorations)
-		# To add collision: In Tiled, add rectangles to the "Collision" object layer
-		# generate_middle_layer_collision(map_width, map_height)
+		# NOTE: Middle layer collision ENABLED per user request
+		# Auto-collision makes ALL middle layer tiles solid
+		generate_middle_layer_collision(map_width, map_height)
 
 		print("TMX map loaded successfully: ", map_name)
 		print("  Map size: ", map_width, "x", map_height, " tiles")

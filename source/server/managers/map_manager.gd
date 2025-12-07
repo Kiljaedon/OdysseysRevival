@@ -106,10 +106,13 @@ func get_battle_map_path(map_name: String) -> String:
 	return get_map_path(map_name)
 
 
-# ========== MAP COLLISION LOADING (Server-Side Validation) ==========
+# ========== MAP COLLISION LOADING (Server-Side Validation) ========== 
 
 func load_map_collision(map_path: String):
 	"""Load collision objects from TMX file for server-side validation"""
+	var debug_file = FileAccess.open("user://server_map_debug.txt", FileAccess.WRITE)
+	if debug_file: debug_file.store_line("Loading map collision: %s" % map_path)
+	
 	server_world.log_message("[COLLISION] Loading map collision from: %s" % map_path)
 
 	# Clear existing collision objects
@@ -121,10 +124,13 @@ func load_map_collision(map_path: String):
 	var file = FileAccess.open(map_path, FileAccess.READ)
 	if not file:
 		server_world.log_message("[COLLISION] ERROR: Failed to load map file: %s" % map_path)
+		if debug_file: debug_file.store_line("ERROR: File not found")
 		return
 
 	var tmx_content = file.get_as_text()
 	file.close()
+	
+	if debug_file: debug_file.store_line("TMX content read: %d bytes" % tmx_content.length())
 
 	# Parse tile dimensions
 	var map_regex = RegEx.new()
@@ -133,10 +139,13 @@ func load_map_collision(map_path: String):
 
 	if not map_match:
 		server_world.log_message("[COLLISION] ERROR: Could not parse map dimensions")
+		if debug_file: debug_file.store_line("ERROR: Map dimensions parse failed")
 		return
 
 	var tile_width = map_match.get_string(1).to_int()
 	var tile_height = map_match.get_string(2).to_int()
+	
+	if debug_file: debug_file.store_line("Map dims: %dx%d tiles" % [tile_width, tile_height])
 
 	# Find objectgroup with "collision" in the name (case-insensitive)
 	var group_regex = RegEx.new()
@@ -150,9 +159,14 @@ func load_map_collision(map_path: String):
 		total_objects += objects_created
 
 	server_world.log_message("[COLLISION] Loaded %d collision objects from map" % total_objects)
+	if debug_file: debug_file.store_line("Collision objects loaded: %d" % total_objects)
 
 	# Also parse Middle layer tiles for collision
+	if debug_file: debug_file.store_line("Starting middle layer parsing...")
 	_parse_middle_layer_collision(tmx_content, map_path.get_file().get_basename())
+	if debug_file: 
+		debug_file.store_line("Middle layer parsing complete")
+		debug_file.close()
 
 
 func load_collision_objects(objectgroup_content: String, tile_width: int, tile_height: int) -> int:
@@ -198,62 +212,142 @@ func load_collision_objects(objectgroup_content: String, tile_width: int, tile_h
 	return objects_created
 
 
-# ========== MIDDLE LAYER COLLISION PARSING ==========
+# ========== MIDDLE LAYER COLLISION PARSING ========== 
 
 func _parse_middle_layer_collision(tmx_content: String, map_name: String):
-	"""Parse Middle layer tiles from TMX to identify collision tiles"""
-
-	# Parse map dimensions
-	var map_regex = RegEx.new()
-	map_regex.compile('width="(\\d+)"\\s+height="(\\d+)"\\s+tilewidth="(\\d+)"\\s+tileheight="(\\d+)"')
-	var map_result = map_regex.search(tmx_content)
-
-	if not map_result:
-		return
-
-	var map_width = map_result.get_string(1).to_int()
-	var map_height = map_result.get_string(2).to_int()
-	var tile_width = map_result.get_string(3).to_int()
-	var tile_height = map_result.get_string(4).to_int()
-
+	"""Parse collision tiles from TMX - robust version checking for 'Collision' or 'Middle' layers"""
+	
+	# Initialize collision dictionary immediately
+	map_collision_tiles[map_name] = {}
+	
+	# 1. Parse map dimensions
+	var map_width = 20
+	var map_height = 15
+	
+	var dim_regex = RegEx.new()
+	dim_regex.compile('width="(\\d+)"\\s+height="(\\d+)"')
+	var dim_match = dim_regex.search(tmx_content)
+	if dim_match:
+		map_width = dim_match.get_string(1).to_int()
+		map_height = dim_match.get_string(2).to_int()
+		
 	# Store map dimensions
 	map_dimensions[map_name] = {
 		"width": map_width,
 		"height": map_height,
-		"tile_width": tile_width,
-		"tile_height": tile_height
+		"tile_width": 32,
+		"tile_height": 32
 	}
 
-	# Find Middle layer (contains collision tiles)
-	var layer_regex = RegEx.new()
-	layer_regex.compile('<layer[^>]*name="([^"]*[Mm]iddle[^"]*)"[^>]*>[\\s\\S]*?<data encoding="csv">([\\s\\S]*?)</data>[\\s\\S]*?</layer>')
-	var layer_result = layer_regex.search(tmx_content)
-
-	if not layer_result:
-		map_collision_tiles[map_name] = {}
-		return
-
-	var csv_data = layer_result.get_string(2).strip_edges()
-
-	# Parse CSV to find non-empty tiles
-	csv_data = csv_data.replace("\n", "").replace("\r", "")
-	var tile_ids = csv_data.split(",")
-
+	# 2. Find collision tileset GID
+	var collision_gid: int = 0
+	var tileset_regex = RegEx.new()
+	tileset_regex.compile('<tileset[^>]*firstgid="(\\d+)"[^>]*source="[^"]*[Cc]ollision[^"]*"')
+	var tileset_result = tileset_regex.search(tmx_content)
+	if tileset_result:
+		collision_gid = tileset_result.get_string(1).to_int()
+	
+	# 3. Parse ALL layers using string splitting (safer than complex regex)
+	var layer_blocks = tmx_content.split("<layer ")
+	
 	var collision_tiles = {}
-	var tile_index = 0
 	var blocked_count = 0
-
-	for y in range(map_height):
-		for x in range(map_width):
-			if tile_index < tile_ids.size():
-				var tile_id = tile_ids[tile_index].strip_edges().to_int()
-				# If tile is not empty (0), it's a collision tile
-				if tile_id > 0:
-					collision_tiles[Vector2i(x, y)] = true
-					blocked_count += 1
-			tile_index += 1
+	
+	for i in range(1, layer_blocks.size()):
+		var block = layer_blocks[i]
+		
+		# Extract layer name
+		var is_explicit_collision_layer = false
+		if 'name="' in block:
+			var name_start = block.find('name="') + 6
+			var name_end = block.find('"', name_start)
+			if name_start > 5 and name_end > name_start:
+				var layer_name = block.substr(name_start, name_end - name_start)
+				# Treat 'Middle' layer as collision too, as per requirement
+				if "Collision" in layer_name or "collision" in layer_name or "Middle" in layer_name:
+					is_explicit_collision_layer = true
+		
+		# Find CSV data
+		var data_start = block.find('<data encoding="csv">')
+		if data_start == -1: continue
+		
+		data_start += 21 # Length of tag
+		var data_end = block.find('</data>', data_start)
+		if data_end == -1: continue
+		
+		var csv_data = block.substr(data_start, data_end - data_start).strip_edges()
+		csv_data = csv_data.replace("\n", "").replace("\r", "")
+		var tile_ids = csv_data.split(",")
+		
+		var tile_index = 0
+		for y in range(map_height):
+			for x in range(map_width):
+				if tile_index < tile_ids.size():
+					var tile_id = tile_ids[tile_index].strip_edges().to_int()
+					
+					var is_blocked = false
+					# If it's an explicit collision/middle layer, ANY tile is blocked
+					if is_explicit_collision_layer and tile_id > 0:
+						is_blocked = true
+					# Or if it matches the specific collision tileset GID
+					elif collision_gid > 0 and tile_id >= collision_gid:
+						is_blocked = true
+						
+					if is_blocked:
+						if not collision_tiles.has(Vector2i(x, y)):
+							collision_tiles[Vector2i(x, y)] = true
+							blocked_count += 1
+				
+				tile_index += 1
 
 	map_collision_tiles[map_name] = collision_tiles
+	server_world.log_message("[COLLISION] Parsed %d blocked tiles for %s (Middle layer enabled)" % [blocked_count, map_name])
+
+	# Debug: Show a sample of blocked tiles
+	var sample_tiles = []
+	var count = 0
+	for tile_pos in collision_tiles:
+		if count < 5:
+			sample_tiles.append("(%d,%d)" % [tile_pos.x, tile_pos.y])
+			count += 1
+		else:
+			break
+	if sample_tiles.size() > 0:
+		server_world.log_message("[COLLISION] Sample blocked tiles: %s..." % ", ".join(sample_tiles))
+	
+	# Generate physics bodies for these tiles so MovementValidator works
+	_generate_tile_colliders(map_name, collision_tiles)
+
+
+func _generate_tile_colliders(map_name: String, tiles: Dictionary):
+	"""Convert parsed blocked tiles into StaticBody2D objects for the physics engine"""
+	if not collision_world:
+		return
+		
+	var bodies_created = 0
+	var shape = RectangleShape2D.new()
+	shape.size = Vector2(TILE_SIZE_SCALED, TILE_SIZE_SCALED)
+	
+	for tile_pos in tiles:
+		# Calculate world position (center of tile)
+		# Tile (0,0) is at 64,64 (half of 128)
+		var world_x = tile_pos.x * TILE_SIZE_SCALED + (TILE_SIZE_SCALED / 2.0)
+		var world_y = tile_pos.y * TILE_SIZE_SCALED + (TILE_SIZE_SCALED / 2.0)
+		
+		var body = StaticBody2D.new()
+		body.name = "TileCol_%d_%d" % [tile_pos.x, tile_pos.y]
+		body.position = Vector2(world_x, world_y)
+		body.collision_layer = 1 # Layer 1 is for World Collision
+		body.collision_mask = 0
+		
+		var collision = CollisionShape2D.new()
+		collision.shape = shape
+		body.add_child(collision)
+		
+		collision_world.add_child(body)
+		bodies_created += 1
+		
+	server_world.log_message("[COLLISION] Generated %d physics bodies for middle layer tiles" % bodies_created)
 
 
 # Cached collision data for fast lookups (avoids dictionary lookup every frame)
@@ -272,10 +366,33 @@ func is_tile_blocked(map_name: String, tile_x: int, tile_y: int) -> bool:
 	return _cached_collision_tiles.has(Vector2i(tile_x, tile_y))
 
 
+func is_area_blocked(map_name: String, center_pos: Vector2, radius: int = 16) -> bool:
+	"""
+	Check if an area (defined by center + radius) overlaps any blocked tiles.
+	Checks Center + 4 corners of the bounding box.
+	Robust check for entity spawning.
+	"""
+	# Points to check: Center, TopLeft, TopRight, BottomLeft, BottomRight
+	var points = [
+		center_pos,
+		center_pos + Vector2(-radius, -radius),
+		center_pos + Vector2(radius, -radius),
+		center_pos + Vector2(-radius, radius),
+		center_pos + Vector2(radius, radius)
+	]
+	
+	for point in points:
+		var tile_x = int(point.x) >> 7
+		var tile_y = int(point.y) >> 7
+		if is_tile_blocked(map_name, tile_x, tile_y):
+			return true
+			
+	return false
+
+
 func is_position_blocked(map_name: String, position: Vector2) -> bool:
-	"""Check if a world position is blocked (converts to tile coords)"""
-	# Inline the division for speed (avoid function call overhead)
-	return is_tile_blocked(map_name, int(position.x) >> 7, int(position.y) >> 7)  # >> 7 = divide by 128
+	"""Check if a world position is blocked (Legacy wrapper for single point)"""
+	return is_area_blocked(map_name, position, 5) # Small radius for point check
 
 
 func load_map_collision_tiles(map_name: String):
@@ -292,20 +409,19 @@ func load_map_collision_tiles(map_name: String):
 
 
 func find_nearest_free_spawn(map_name: String, position: Vector2, max_search_radius: int = 10) -> Vector2:
-	"""Find the nearest non-blocked tile position from a given position
-	Returns the position if it's already free, or searches in a spiral pattern for the nearest free tile"""
-
+	"""Find the nearest non-blocked AREA from a given position"""
 	# First check if we have collision data
 	if not map_collision_tiles.has(map_name):
 		load_map_collision_tiles(map_name)
 
-	# Convert world position to tile coordinates
+	# 1. Check if current position is already free (using robust area check)
+	# Use a 24px radius (approx half of 64px width/height for safety)
+	if not is_area_blocked(map_name, position, 24):
+		return position  # Already in a free spot
+
+	# Convert world position to tile coordinates for search grid
 	var center_tile_x = int(position.x / TILE_SIZE_SCALED)
 	var center_tile_y = int(position.y / TILE_SIZE_SCALED)
-
-	# Check if current position is already free
-	if not is_tile_blocked(map_name, center_tile_x, center_tile_y):
-		return position  # Already in a free spot
 
 	# Get map dimensions
 	var dims = map_dimensions.get(map_name, {"width": 20, "height": 15})
@@ -316,32 +432,63 @@ func find_nearest_free_spawn(map_name: String, position: Vector2, max_search_rad
 	for radius in range(1, max_search_radius + 1):
 		for dx in range(-radius, radius + 1):
 			for dy in range(-radius, radius + 1):
-				# Only check tiles on the edge of this square
 				if abs(dx) != radius and abs(dy) != radius:
 					continue
 
 				var check_x = center_tile_x + dx
 				var check_y = center_tile_y + dy
 
-				# Skip out of bounds
-				if check_x < 1 or check_x >= map_width - 1:
-					continue
-				if check_y < 1 or check_y >= map_height - 1:
-					continue
+				if check_x < 1 or check_x >= map_width - 1: continue
+				if check_y < 1 or check_y >= map_height - 1: continue
 
-				# Check if this tile is free
-				if not is_tile_blocked(map_name, check_x, check_y):
-					# Convert tile back to world position (center of tile)
-					return Vector2(
-						check_x * TILE_SIZE_SCALED + TILE_SIZE_SCALED / 2,
-						check_y * TILE_SIZE_SCALED + TILE_SIZE_SCALED / 2
-					)
+				# Candidate position: Center of the tile
+				var candidate_pos = Vector2(
+					check_x * TILE_SIZE_SCALED + TILE_SIZE_SCALED / 2,
+					check_y * TILE_SIZE_SCALED + TILE_SIZE_SCALED / 2
+				)
+				
+				# Check if this AREA is free (not just the center point)
+				if not is_area_blocked(map_name, candidate_pos, 24):
+					return candidate_pos
+
+	return position
+
 
 	# Fallback: return original position if no free spot found
 	return position
 
 
+func validate_spawn_position(map_name: String, target_position: Vector2) -> Vector2:
+	"""
+	SAFETY CHECK: Validate that a spawn position is safe (not in collision).
+	Returns a safe position (either original or corrected).
+	"""
+	# Ensure collision data is loaded
+	if not map_collision_tiles.has(map_name):
+		server_world.log_message("[MAP_SAFETY] Loading collision tiles for %s..." % map_name)
+		load_map_collision_tiles(map_name)
+
+	var blocked_count = map_collision_tiles.get(map_name, {}).size()
+
+	if is_position_blocked(map_name, target_position):
+		# Try to find a safe spot
+		var safe_pos = find_nearest_free_spawn(map_name, target_position, 20)
+		if safe_pos != target_position:
+			server_world.log_message("[MAP_SAFETY] Corrected spawn: %s -> %s (blocked tiles: %d)" % [target_position, safe_pos, blocked_count])
+			return safe_pos
+		else:
+			server_world.log_message("[MAP_SAFETY] WARNING: Could not find free spawn near %s!" % target_position)
+
+	return target_position
+
+
 # ========== PLAYER MAP TRACKING ==========
+
+
+# ========== PLAYER MAP TRACKING ==========
+
+
+# ========== PLAYER MAP TRACKING ========== 
 
 func add_player_to_map(player_id: int, map_name: String, position: Vector2 = Vector2.ZERO):
 	"""Add a player to a specific map"""
@@ -395,7 +542,7 @@ func get_player_position(player_id: int) -> Vector2:
 	return player_positions.get(player_id, Vector2.ZERO)
 
 
-# ========== MAP TRANSITION VALIDATION ==========
+# ========== MAP TRANSITION VALIDATION ========== 
 
 func load_map_transitions(map_name: String):
 	"""Load transition zones from a map's TMX file"""
@@ -545,7 +692,7 @@ func process_map_transition(player_id: int, target_map: String, spawn_x: int, sp
 	}
 
 
-# ========== BATTLE INSTANCE MANAGEMENT ==========
+# ========== BATTLE INSTANCE MANAGEMENT ========== 
 
 func create_battle_instance(world_map_name: String, player_ids: Array, npc_ids: Array = []) -> int:
 	"""Create a new instanced battle for players attacking NPCs on a world map.

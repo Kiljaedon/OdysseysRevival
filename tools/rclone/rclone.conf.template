@@ -1,0 +1,20 @@
+# Rclone Configuration Template
+# Copy this file to rclone.conf and fill in your credentials
+# DO NOT commit rclone.conf - it contains secrets!
+
+[odyssey_updates]
+type = s3
+provider = Cloudflare
+access_key_id = YOUR_R2_ACCESS_KEY_ID
+secret_access_key = YOUR_R2_SECRET_ACCESS_KEY
+endpoint = https://YOUR_ACCOUNT_ID.r2.cloudflarestorage.com
+acl = private
+
+[odyssey_server]
+type = sftp
+host = YOUR_SERVER_IP
+user = root
+key_file = C:\Users\YOUR_USERNAME\.ssh\id_rsa
+shell_type = unix
+md5sum_command = md5sum
+sha1sum_command = sha1sum

@@ -55,6 +55,8 @@ const CombatRoles = preload("res://source/server/managers/combat/combat_roles.gd
 var active_battles: Dictionary = {}  # battle_id -> battle data
 var next_battle_id: int = 1
 var state_update_timer: float = 0.0
+var battle_cooldowns: Dictionary = {}  # peer_id -> timestamp when they can start next battle
+const BATTLE_START_COOLDOWN: float = 3.0  # Seconds before player can start another battle
 
 ## Projectile constants
 const PROJECTILE_SPEED: float = 600.0  # Pixels per second
@@ -87,6 +89,13 @@ func initialize(p_server_world, p_player_manager, p_npc_manager) -> void:
 	if server_world and "network_handler" in server_world:
 		network_handler = server_world.network_handler
 
+	# Pass map_manager to spawner for collision-free spawn validation
+	if server_world and "map_manager" in server_world and server_world.map_manager:
+		RealTimeCombatSpawner.set_map_manager(server_world.map_manager)
+		print("[RT_COMBAT] Map manager passed to spawner for collision validation")
+	else:
+		print("[RT_COMBAT] WARNING: No map_manager available - spawns may collide!")
+
 	print("[RT_COMBAT] Initialized with manager references")
 
 func _physics_process(delta: float) -> void:
@@ -108,11 +117,20 @@ func _physics_process(delta: float) -> void:
 func create_battle(peer_id: int, npc_id: int, player_data: Dictionary, squad_data: Array, enemy_data: Array, battle_map_name: String = "sample_map") -> int:
 	"""Create a new battle instance. Returns battle_id."""
 
-	# CRITICAL: End any existing battle for this peer first
+	# Check cooldown - prevent rapid battle starts
+	var current_time = Time.get_ticks_msec() / 1000.0
+	if battle_cooldowns.has(peer_id):
+		var cooldown_end = battle_cooldowns[peer_id]
+		if current_time < cooldown_end:
+			var remaining = cooldown_end - current_time
+			print("[RT_COMBAT] Battle rejected: Peer %d on cooldown (%.1fs remaining)" % [peer_id, remaining])
+			return -1
+
+	# If player is already in an active battle, just ignore the new request
 	var existing_battle = get_battle_for_peer(peer_id)
 	if not existing_battle.is_empty():
-		print("[RT_COMBAT] WARNING: Peer %d already in battle %d - ending it first" % [peer_id, existing_battle.id])
-		end_battle(existing_battle.id, "abandoned")
+		print("[RT_COMBAT] Battle request ignored: Peer %d already in active battle %d" % [peer_id, existing_battle.id])
+		return -1  # Don't abandon - just reject the new request
 
 	var battle_id = next_battle_id
 	next_battle_id += 1
@@ -178,6 +196,28 @@ func get_battle_for_peer(peer_id: int) -> Dictionary:
 			return battle
 	return {}
 
+func get_any_battle_for_peer(peer_id: int) -> Dictionary:
+	"""Find any battle for a peer (including 'ending' state - for position updates)"""
+	for battle in active_battles.values():
+		if peer_id in battle.participants and battle.state in ["active", "ending"]:
+			return battle
+	return {}
+
+const BATTLE_END_DELAY: float = 1.0  # Seconds to wait after captain dies before ending battle
+
+func _delayed_end_battle(battle_id: int, result: String) -> void:
+	"""End battle after a short delay so player can see the result"""
+	if not active_battles.has(battle_id):
+		return
+
+	var battle = active_battles[battle_id]
+	# Mark as pending end so no new attacks/processing happens
+	battle.state = "ending"
+
+	# Wait before officially ending
+	await get_tree().create_timer(BATTLE_END_DELAY).timeout
+	end_battle(battle_id, result)
+
 func end_battle(battle_id: int, result: String) -> void:
 	"""End a battle with victory or defeat"""
 	if not active_battles.has(battle_id):
@@ -186,7 +226,12 @@ func end_battle(battle_id: int, result: String) -> void:
 	var battle = active_battles[battle_id]
 	battle.state = result  # "victory" or "defeat"
 
-	print("[RT_COMBAT] Battle %d ended: %s" % [battle_id, result])
+	# Set cooldown for all participants to prevent rapid re-engagement
+	var current_time = Time.get_ticks_msec() / 1000.0
+	for peer_id in battle.participants:
+		battle_cooldowns[peer_id] = current_time + BATTLE_START_COOLDOWN
+
+	print("[RT_COMBAT] Battle %d ended: %s (cooldown set for %.1fs)" % [battle_id, result, BATTLE_START_COOLDOWN])
 
 	# Calculate rewards if victory
 	var rewards = {}
@@ -231,24 +276,27 @@ func _process_battle(battle: Dictionary, delta: float) -> void:
 		# Process combo window timer
 		CombatRules.process_combo_window(unit, delta)
 
+		# Get battle map name for collision checks
+		var battle_map = battle.get("battle_map_name", "sample_map")
+
 		# Process dodge roll movement (overrides normal movement)
 		var roll_velocity = CombatRules.process_dodge_roll(unit, delta)
 		if roll_velocity.length() > 0:
 			unit.position += roll_velocity * delta
-			_clamp_unit_to_arena(unit, battle.arena_pixels)
+			_clamp_unit_to_arena(unit, battle.arena_pixels, battle_map)
 
 		# Process knockback movement
 		if CombatRules.process_knockback(unit, delta):
 			# Apply knockback velocity (overrides normal movement)
 			var kb_vel = unit.get("knockback_velocity", Vector2.ZERO)
 			unit.position += kb_vel * delta
-			_clamp_unit_to_arena(unit, battle.arena_pixels)
+			_clamp_unit_to_arena(unit, battle.arena_pixels, battle_map)
 
 		# Process lunge movement (Fluid Combat)
 		var lunge_vel = CombatRules.process_lunge(unit, delta)
 		if lunge_vel.length() > 0:
 			unit.position += lunge_vel * delta
-			_clamp_unit_to_arena(unit, battle.arena_pixels)
+			_clamp_unit_to_arena(unit, battle.arena_pixels, battle_map)
 
 		# Process attack state machine (wind-up -> attack -> recovery)
 		var attack_event = CombatRules.process_attack_state(unit, delta)
@@ -274,7 +322,7 @@ func _process_battle(battle: Dictionary, delta: float) -> void:
 		if unit.velocity.length() > 0 and CombatRules.can_move(unit):
 			var normalized_velocity = unit.velocity.normalized() * min(unit.velocity.length(), unit.move_speed)
 			unit.position += normalized_velocity * delta
-			_clamp_unit_to_arena(unit, battle.arena_pixels)
+			_clamp_unit_to_arena(unit, battle.arena_pixels, battle_map)
 
 	# Process projectiles (move, check hits, despawn)
 	_process_projectiles(battle, delta)
@@ -282,15 +330,18 @@ func _process_battle(battle: Dictionary, delta: float) -> void:
 	# Check victory/defeat conditions
 	_check_battle_end_conditions(battle)
 
-func _clamp_unit_to_arena(unit: Dictionary, arena_pixels: Vector2) -> void:
-	"""Keep unit within map bounds with proper padding"""
-	var old_pos = unit.position
+func _clamp_unit_to_arena(unit: Dictionary, arena_pixels: Vector2, map_name: String = "sample_map") -> void:
+	"""Keep unit within map bounds with proper padding and avoid collision zones"""
 	unit.position.x = clamp(unit.position.x, MAP_EDGE_PADDING, arena_pixels.x - MAP_EDGE_PADDING)
 	unit.position.y = clamp(unit.position.y, MAP_EDGE_PADDING, arena_pixels.y - MAP_EDGE_PADDING)
 
-	# Log if position was clamped significantly
-	if old_pos.distance_to(unit.position) > 10:
-		print("[RT_COMBAT] Position clamped: %s -> %s (arena: %s)" % [old_pos, unit.position, arena_pixels])
+	# Check if new position is in a collision zone and find free spot if needed
+	if server_world and server_world.map_manager:
+		var map_mgr = server_world.map_manager
+		if map_mgr.is_position_blocked(map_name, unit.position):
+			# Find nearest free position
+			var free_pos = map_mgr.find_nearest_free_spawn(map_name, unit.position, 2)
+			unit.position = free_pos
 
 ## ========== COMBAT LOGIC ==========
 
@@ -299,9 +350,9 @@ func _execute_attack(battle: Dictionary, attacker: Dictionary, target: Dictionar
 
 	# Check if attacker uses projectiles (ranged or caster)
 	var attacker_role = attacker.get("combat_role", "melee")
-	var uses_projectile = CombatRoles.uses_projectile(attacker_role)
+	var uses_projectile_attack = CombatRoles.uses_projectile(attacker_role)
 
-	if uses_projectile:
+	if uses_projectile_attack:
 		# Spawn projectile - damage calculated when it hits
 		_spawn_projectile(battle, attacker, target)
 		return
@@ -309,7 +360,7 @@ func _execute_attack(battle: Dictionary, attacker: Dictionary, target: Dictionar
 	# Melee/Hybrid - instant damage
 	_apply_attack_damage(battle, attacker, target)
 
-func _apply_attack_damage(battle: Dictionary, attacker: Dictionary, target: Dictionary) -> void:
+func _apply_attack_damage(battle: Dictionary, attacker: Dictionary, target: Dictionary, damage_source: String = "melee") -> void:
 	"""Calculate and apply damage immediately (for melee or projectile hits)"""
 
 	# 1. Calculate Base Damage (Stats)
@@ -355,6 +406,7 @@ func _apply_attack_damage(battle: Dictionary, attacker: Dictionary, target: Dict
 	# Dodge roll grants invincibility - damage is handled by invincibility frames in CombatRules
 
 	# Apply damage with invincibility check (dodge roll gives iframes)
+	var hp_before = target.hp
 	var actual_damage = CombatRules.apply_damage(target, damage)
 
 	# Notify clients via Network component
@@ -369,7 +421,8 @@ func _apply_attack_damage(battle: Dictionary, attacker: Dictionary, target: Dict
 		# Check if captain died
 		if target.is_captain:
 			var result = "victory" if target.team == "enemy" else "defeat"
-			end_battle(battle.id, result)
+			# Delay before ending battle so player can see the victory
+			_delayed_end_battle(battle.id, result)
 
 func _spawn_projectile(battle: Dictionary, attacker: Dictionary, target: Dictionary) -> void:
 	"""Spawn a projectile that must hit target to deal damage"""
@@ -402,10 +455,6 @@ func _spawn_projectile(battle: Dictionary, attacker: Dictionary, target: Diction
 
 	# Notify clients about projectile spawn
 	RealTimeCombatNetwork.broadcast_projectile_spawn(battle, projectile, network_handler)
-	print("[RT_COMBAT] Projectile %s spawned: attacker=%s at %s, target=%s at %s, distance=%.1f, travel_time=%.2fs (min_travel=%.0f)" % [
-		projectile_id, attacker.id, attacker.position, target.id, target.position,
-		distance_to_target, distance_to_target / PROJECTILE_SPEED, PROJECTILE_MIN_TRAVEL
-	])
 
 func _process_projectiles(battle: Dictionary, delta: float) -> void:
 	"""Move projectiles, check for hits, and despawn misses"""
@@ -422,7 +471,6 @@ func _process_projectiles(battle: Dictionary, delta: float) -> void:
 		if distance_traveled > PROJECTILE_MAX_RANGE:
 			projectiles_to_remove.append(proj_id)
 			RealTimeCombatNetwork.broadcast_projectile_miss(battle, proj_id, proj.position, network_handler)
-			print("[RT_COMBAT] Projectile %s missed (max range)" % proj_id)
 			continue
 
 		# Check hit against all enemy units (opposite team)
@@ -431,9 +479,8 @@ func _process_projectiles(battle: Dictionary, delta: float) -> void:
 			# Get attacker for damage calculation
 			var attacker = battle.units.get(proj.attacker_id)
 			if attacker:
-				# Apply damage to hit unit
-				_apply_attack_damage(battle, attacker, hit_unit)
-				print("[RT_COMBAT] Projectile %s HIT %s" % [proj_id, hit_unit.id])
+				# Apply damage to hit unit (from projectile, not melee)
+				_apply_attack_damage(battle, attacker, hit_unit, "projectile")
 
 			# Notify clients and remove projectile
 			RealTimeCombatNetwork.broadcast_projectile_hit(battle, proj_id, hit_unit.id, proj.position, network_handler)
@@ -527,31 +574,47 @@ func _calculate_rewards(battle: Dictionary) -> Dictionary:
 
 func handle_player_movement(peer_id: int, velocity: Vector2) -> void:
 	"""Process player movement input"""
-	var battle = get_battle_for_peer(peer_id)
+	var battle = get_any_battle_for_peer(peer_id)
 	if battle.is_empty():
+		return
+
+	# Freeze player during battle ending (victory/defeat moment)
+	if battle.state == "ending":
+		var unit = battle.units.get(battle.player_unit_id)
+		if unit:
+			unit.velocity = Vector2.ZERO
 		return
 
 	var unit = battle.units.get(battle.player_unit_id)
 	if not unit:
 		return
-		
+
 	RealTimeCombatInput.handle_player_movement(battle, unit, velocity)
 
 func handle_player_attack(peer_id: int, target_id: String) -> void:
 	"""Process player attack input"""
+	# Check if in any battle (including ending) first
+	var any_battle = get_any_battle_for_peer(peer_id)
+	if not any_battle.is_empty() and any_battle.state == "ending":
+		return
+
 	var battle = get_battle_for_peer(peer_id)
 	if battle.is_empty():
-		print("[RT_COMBAT] Attack rejected: no battle for peer %d" % peer_id)
 		return
 
 	var unit = battle.units.get(battle.player_unit_id)
 	if not unit:
 		return
-		
+
 	RealTimeCombatInput.handle_player_attack(battle, unit, target_id)
 
 func handle_player_dodge_roll(peer_id: int, direction_x: float, direction_y: float) -> void:
 	"""Process player dodge roll input"""
+	# Check if in any battle (including ending) first
+	var any_battle = get_any_battle_for_peer(peer_id)
+	if not any_battle.is_empty() and any_battle.state == "ending":
+		return  # No dodge rolls during battle ending
+
 	var battle = get_battle_for_peer(peer_id)
 	if battle.is_empty():
 		return
@@ -559,7 +622,7 @@ func handle_player_dodge_roll(peer_id: int, direction_x: float, direction_y: flo
 	var unit = battle.units.get(battle.player_unit_id)
 	if not unit:
 		return
-		
+
 	var result = RealTimeCombatInput.handle_player_dodge_roll(battle, unit, direction_x, direction_y)
 	if result.success:
 		# Notify clients via Network component

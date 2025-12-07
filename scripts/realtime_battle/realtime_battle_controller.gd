@@ -27,6 +27,7 @@ var in_battle: bool = false
 var battle_id: int = -1
 var input_timer: float = 0.0
 var movement_speed: float = 300.0  # Base walk speed (same as server)
+var _accept_action_input: bool = false # Grace period flag to prevent auto-attack on entry
 
 ## Attack/dodge cooldowns (read by input_handler)
 var attack_cooldown_timer: float = 0.0  # Prevents spamming attacks to server
@@ -69,6 +70,13 @@ func _process(delta: float):
 		attack_freeze_timer -= delta
 	if dodge_roll_cooldown_timer > 0:
 		dodge_roll_cooldown_timer -= delta
+
+	# Input Grace Period: Wait for action key release before allowing attacks
+	if not _accept_action_input:
+		if not Input.is_action_pressed("action") and not Input.is_key_pressed(KEY_SPACE):
+			_accept_action_input = true
+			input_handler.set_action_input_enabled(true)
+			# print("[RT_CONTROLLER] Input grace period ended - actions enabled")
 
 	# Process input via handler
 	var input_result = input_handler.process_input(delta)
@@ -146,6 +154,11 @@ func on_battle_start(battle_data: Dictionary) -> void:
 	battle_id = battle_data.get("id", -1)
 	movement_speed = battle_data.get("player_move_speed", 200.0)
 
+	# Reset input grace period
+	_accept_action_input = false
+	if input_handler:
+		input_handler.set_action_input_enabled(false)
+
 	# Initialize scene
 	if battle_scene:
 		battle_scene.start_battle(battle_data)
@@ -165,6 +178,12 @@ func on_battle_start(battle_data: Dictionary) -> void:
 
 func on_battle_end(battle_id_param: int, result: String, rewards: Dictionary) -> void:
 	"""Called when server sends battle end"""
+	# CRITICAL: Only end if this is OUR battle, not a stale/abandoned one
+	if battle_id_param != battle_id:
+		print("[RT_CONTROLLER] IGNORED battle_end for battle %d (our battle is %d)" % [battle_id_param, battle_id])
+		return
+
+	print("[RT_CONTROLLER] Battle %d ending with result: %s" % [battle_id_param, result])
 	in_battle = false
 	set_process(false)
 

@@ -143,7 +143,7 @@ func _ready():
 		print("[DevClient] Beige/cream background added to DevUI")
 
 	# Create draggable UI system
-	create_draggable_ui()
+	_create_draggable_ui()
 
 	# Wait a frame for UI to be ready
 	await get_tree().process_frame
@@ -154,23 +154,31 @@ func _ready():
 	# Initialize UI Layout Manager after draggable panels are created
 	ui_layout_manager.initialize(draggable_panels)
 
-	# Initialize multiplayer first (loads player sprite)
-	setup_multiplayer()
+	# Initialize Multiplayer Manager first (loads player sprite)
+	if multiplayer_manager:
+		multiplayer_manager.setup_multiplayer(Callable(self, "setup_character_sprite"))
+	else:
+		print("WARNING: Multiplayer manager not initialized")
 
 	# Load character classes for UI dropdown (only if not in multiplayer mode)
 	if not GameState.get("client"):
-		load_character_classes()
+		_load_character_classes()
 
 	# Restore NPCs if returning from battle
 	if npc_manager:
 		npc_manager.restore_npcs_from_battle()
 
 	# Populate map dropdown
-	populate_map_dropdown()
+	_populate_map_dropdown()
 
 	# Load first TMX map if available
 	if available_maps.size() > 0:
-		load_selected_map(available_maps[0])
+		if collision_system_manager:
+			collision_system_manager.clear_collision_objects()
+		if map_manager:
+			# Set map_info label (though it might be null until UI is created? No, panels are created before this)
+			if map_info: map_manager.set_map_info_label(map_info)
+			map_manager.load_selected_map(available_maps[0])
 
 	# Load saved layout (call manager directly)
 	if ui_layout_manager:
@@ -252,27 +260,28 @@ func _initialize_managers() -> void:
 	development_tools_manager.initialize(character_sprite_manager)
 
 	# Connect UI panel manager signals
-	ui_panel_manager.sprite_creator_requested.connect(_on_sprite_creator_pressed)
-	ui_panel_manager.map_editor_requested.connect(_on_map_editor_pressed)
-	ui_panel_manager.art_studio_requested.connect(_on_art_studio_pressed)
-	ui_panel_manager.map_load_requested.connect(_on_load_map_pressed)
+	ui_panel_manager.sprite_creator_requested.connect(development_tools_manager._on_sprite_creator_pressed)
+	ui_panel_manager.map_editor_requested.connect(development_tools_manager._on_map_editor_pressed)
+	ui_panel_manager.art_studio_requested.connect(development_tools_manager._on_art_studio_pressed)
+	ui_panel_manager.map_load_requested.connect(_on_map_load_ui_event)
 	ui_panel_manager.character_selected.connect(_on_class_selected)
+
+	# Collision System Manager (Phase 4)
+	# MUST be initialized before MapManager to allow dependency injection
+	collision_system_manager = CollisionSystemManager.new()
+	add_child(collision_system_manager)
+	collision_system_manager.initialize(game_world)
 
 	# Map Manager (Phase 4)
 	map_manager = MapManager.new()
 	add_child(map_manager)
-	map_manager.initialize(bottom_layer, middle_layer, top_layer, game_world, test_character)
+	map_manager.initialize(bottom_layer, middle_layer, top_layer, game_world, test_character, collision_system_manager)
 
 	# Connect map_manager to input_handler for transition detection
 	input_handler_manager.set_map_manager(map_manager)
 
 	# Connect transition signal to handle map changes
 	map_manager.transition_triggered.connect(_on_map_transition)
-
-	# Collision System Manager (Phase 4)
-	collision_system_manager = CollisionSystemManager.new()
-	add_child(collision_system_manager)
-	collision_system_manager.initialize(game_world)
 
 	# Multiplayer Manager (Phase 5)
 	multiplayer_manager = MultiplayerManager.new()
@@ -283,6 +292,9 @@ func _initialize_managers() -> void:
 	# Connect input handler to multiplayer manager for prediction
 	input_handler_manager.set_multiplayer_manager(multiplayer_manager)
 	multiplayer_manager.set_input_handler_manager(input_handler_manager)
+	
+	# Connect character loaded signal
+	multiplayer_manager.character_loaded.connect(setup_character_sprite)
 
 	# NPC Manager (Phase 5)
 	npc_manager = NPCManager.new()
@@ -341,8 +353,8 @@ func setup_ui_connections():
 	animation_dropdown.add_item("Attack")
 	animation_dropdown.selected = 0
 
-func populate_map_dropdown():
-	"""Delegation wrapper for DevelopmentToolsManager.load_maps()"""
+func _populate_map_dropdown():
+	"""Update map dropdown UI from DevelopmentToolsManager"""
 	if development_tools_manager:
 		development_tools_manager.load_maps()
 		# Sync with local variable for backward compatibility
@@ -355,8 +367,8 @@ func populate_map_dropdown():
 	else:
 		print("WARNING: Development tools manager not initialized")
 
-func load_character_classes():
-	"""Delegation wrapper for DevelopmentToolsManager.load_character_classes()"""
+func _load_character_classes():
+	"""Update character class dropdown from DevelopmentToolsManager"""
 	if development_tools_manager:
 		development_tools_manager.load_character_classes()
 		# Sync loaded classes with local variable for backward compatibility
@@ -388,6 +400,10 @@ func setup_character_sprite():
 
 		character_setup_manager.setup_character_sprite(char_data)
 		update_frame_display()
+		
+		# Sync team IDs to NPC manager if available
+		if npc_manager and multiplayer_manager:
+			npc_manager.set_team_npc_ids(multiplayer_manager.get_team_npc_ids())
 	else:
 		print("WARNING: Character setup manager not initialized")
 
@@ -412,6 +428,10 @@ func _input(event):
 		# Don't consume it here, let it propagate to chat_ui
 		pass
 
+	# Stop input processing if in battle
+	if battle_launcher and battle_launcher.is_in_battle():
+		return
+
 	# Only delegate non-chat input to InputHandlerManager
 	if event is InputEventMouseButton:
 		# Delegate mouse input (zoom controls)
@@ -430,8 +450,12 @@ func _input(event):
 func _physics_process(delta):
 	# ESC to return to main menu - check first to allow graceful exit
 	if Input.is_action_just_pressed("main_menu"):
-		return_to_main_menu()
+		_return_to_main_menu()
 		return  # Exit early to prevent further processing
+
+	# Stop physics processing if in battle
+	if battle_launcher and battle_launcher.is_in_battle():
+		return
 
 	# Delegate movement and input handling to InputHandlerManager (Phase 2)
 	if input_handler_manager:
@@ -547,36 +571,19 @@ func _on_direction_selected(index: int):
 			animated_sprite.play(full_anim)
 			update_frame_display()
 
-func _on_load_map_pressed():
-	"""Delegation wrapper for MapManager.load_selected_map()"""
+func _on_map_load_ui_event():
 	var selected_index = map_dropdown.selected
 	if selected_index < available_maps.size():
 		var map_name = available_maps[selected_index]
-		load_selected_map(map_name)
-	else:
-		print("ERROR: Invalid map index ", selected_index)
-
-func load_selected_map(map_name: String):
-	"""Delegation wrapper for MapManager.load_selected_map()"""
-	if map_manager:
-		# Set map_info label reference in manager if available
-		if map_info:
-			map_manager.set_map_info_label(map_info)
-
-		# Clear collision objects before loading new map
 		if collision_system_manager:
 			collision_system_manager.clear_collision_objects()
-
-		# Load the map
-		map_manager.load_selected_map(map_name)
-
-		# NOTE: Rectangle collision objects DISABLED
-		# Collision now comes from tiles in the collision_tileset (firstgid=6980)
-		# Place collision tiles on any layer in Tiled using the collision_tileset
-		# The tileset has physics collision built into the tiles
-		print("[DevClient] Map loaded - collision from tileset physics")
+		if map_manager:
+			if map_info: map_manager.set_map_info_label(map_info)
+			map_manager.load_selected_map(map_name)
+			# NOTE: Rectangle collision objects enabled via CollisionSystemManager
+			print("[DevClient] Map loaded - collision from TMX objects")
 	else:
-		print("WARNING: Map manager not initialized")
+		print("ERROR: Invalid map index ", selected_index)
 
 ## ============================================================================
 ## MAP TRANSITION HANDLING
@@ -608,7 +615,10 @@ func _on_map_transition(target_map: String, spawn_x: int, spawn_y: int) -> void:
 		print("  Stored spawn position: ", spawn_pos)
 
 	# Load the new map
-	load_selected_map(target_map)
+	if collision_system_manager:
+		collision_system_manager.clear_collision_objects()
+	if map_manager:
+		map_manager.load_selected_map(target_map)
 
 	# Position the player at spawn location
 	if test_character:
@@ -667,33 +677,13 @@ func _on_pause_pressed():
 func _on_stop_pressed():
 	animated_sprite.stop()
 
-# Tool handlers
-func _on_sprite_creator_pressed():
-	"""Delegation wrapper for DevelopmentToolsManager._on_sprite_creator_pressed()"""
-	if development_tools_manager:
-		development_tools_manager._on_sprite_creator_pressed()
-	else:
-		print("WARNING: Development tools manager not initialized")
-
-func _on_map_editor_pressed():
-	"""Delegation wrapper for DevelopmentToolsManager._on_map_editor_pressed()"""
-	if development_tools_manager:
-		development_tools_manager._on_map_editor_pressed()
-	else:
-		print("WARNING: Development tools manager not initialized")
-
-func _on_art_studio_pressed():
-	"""Delegation wrapper for DevelopmentToolsManager._on_art_studio_pressed()"""
-	if development_tools_manager:
-		development_tools_manager._on_art_studio_pressed()
-	else:
-		print("WARNING: Development tools manager not initialized")
+# Tool handlers are connected directly in _initialize_managers
 
 ## ============================================================================
 ## MENU AND SCENE MANAGEMENT
 ## ============================================================================
 
-func return_to_main_menu():
+func _return_to_main_menu():
 	"""Delegation wrapper for DevelopmentToolsManager.return_to_main_menu()"""
 	if ui_layout_manager:
 		ui_layout_manager.save_ui_layout()
@@ -713,7 +703,7 @@ func return_to_main_menu():
 ## DRAGGABLE UI PANEL CREATION
 ## ============================================================================
 
-func create_draggable_ui():
+func _create_draggable_ui():
 	"""Delegation wrapper for UIPanelManager.create_draggable_ui()"""
 	if ui_panel_manager:
 		ui_panel_manager.create_draggable_ui()
@@ -724,30 +714,8 @@ func create_draggable_ui():
 # NOTE: UI layout functions removed - call ui_layout_manager directly
 
 ## ============================================================================
-## MULTIPLAYER SETUP
-## ============================================================================
-
-func setup_multiplayer():
-	"""Delegation wrapper for MultiplayerManager.setup_multiplayer()"""
-	if multiplayer_manager:
-		multiplayer_manager.setup_multiplayer(Callable(self, "setup_character_sprite"))
-	else:
-		print("WARNING: Multiplayer manager not initialized")
-
-## ============================================================================
 ## SERVER RPC HANDLERS (Delegated to Managers)
 ## ============================================================================
-
-func handle_spawn_accepted(player_data: Dictionary):
-	"""Delegation wrapper for MultiplayerManager.handle_spawn_accepted()"""
-	if multiplayer_manager:
-		multiplayer_manager.handle_spawn_accepted(player_data, Callable(self, "setup_character_sprite"))
-
-		# Update NPC manager with team assignment
-		if npc_manager:
-			npc_manager.set_team_npc_ids(multiplayer_manager.get_team_npc_ids())
-	else:
-		print("WARNING: Multiplayer manager not initialized")
 
 ## ============================================================================
 ## NPC RPC HANDLERS (Delegated to NPCManager)

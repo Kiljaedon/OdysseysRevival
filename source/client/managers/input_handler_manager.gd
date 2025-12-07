@@ -24,6 +24,15 @@ var is_attacking: bool = false
 var attack_timer: float = 0.0
 var current_zoom: float = 2.0
 
+# Dash/Teleport State
+var is_dashing: bool = false
+var dash_timer: float = 0.0
+var dash_cooldown: float = 0.0
+var dash_direction: Vector2 = Vector2.ZERO
+const DASH_SPEED: float = 600.0
+const DASH_DURATION: float = 0.2
+const DASH_COOLDOWN_TIME: float = 1.0
+
 # ============================================================================
 # NODE REFERENCES - Injected via initialize()
 # ============================================================================
@@ -131,6 +140,34 @@ func process_movement(delta: float) -> void:
 	if transition_cooldown > 0:
 		transition_cooldown -= delta
 
+	# Handle Dash Cooldown
+	if dash_cooldown > 0:
+		dash_cooldown -= delta
+
+	# Handle Dash Movement
+	if is_dashing:
+		dash_timer -= delta
+		if dash_timer <= 0:
+			# End Dash
+			is_dashing = false
+			dash_cooldown = DASH_COOLDOWN_TIME
+			test_character.velocity = Vector2.ZERO
+			# Restore collision mask (Map + NPCs)
+			test_character.collision_mask = 3
+			print("[DASH] Ended - Mask restored to 3")
+		else:
+			# Apply Dash Velocity using move_and_collide to stop on walls
+			test_character.velocity = dash_direction * DASH_SPEED
+			var collision = test_character.move_and_collide(test_character.velocity * delta)
+			if collision:
+				# Hit a wall - stop immediately
+				is_dashing = false
+				dash_cooldown = DASH_COOLDOWN_TIME
+				test_character.velocity = Vector2.ZERO
+				test_character.collision_mask = 3
+				print("[DASH] Hit wall - Stopped")
+			return # Skip normal movement while dashing
+
 	handle_movement()
 	
 	# Apply physics movement (Prediction)
@@ -181,14 +218,35 @@ func handle_movement() -> void:
 		else:
 			pass
 
+	# Check if in battle - if so, skip ALL main world movement
+	var game_state = get_node_or_null("/root/GameState")
+	var in_battle = game_state and game_state.has_meta("in_server_battle") and game_state.get_meta("in_server_battle")
+
+	if in_battle:
+		# Freeze main world character during battle
+		velocity = Vector2.ZERO
+		if test_character:
+			test_character.velocity = Vector2.ZERO
+		return  # Skip all main world input processing
+
 	# Only allow movement if not attacking
 	if not is_attacking:
+		# Handle Dash Input (Shift / Run)
+		if (Input.is_action_just_pressed("run") or Input.is_key_pressed(KEY_SHIFT)):
+			if dash_cooldown > 0:
+				print("[DASH] Failed: Cooldown active (%.2f)" % dash_cooldown)
+			elif is_dashing:
+				print("[DASH] Failed: Already dashing")
+			else:
+				start_dash()
+				return # Don't process normal movement on the frame we start dashing
+
 		# Capture Input
 		var up = Input.is_action_pressed("up")
 		var down = Input.is_action_pressed("down")
 		var left = Input.is_action_pressed("left")
 		var right = Input.is_action_pressed("right")
-		
+
 		# Calculate Velocity
 		if up:
 			velocity.y -= movement_speed
@@ -213,34 +271,44 @@ func handle_movement() -> void:
 			play_walk_animation()
 		else:
 			play_idle_animation()
-			
-		# CLIENT-SIDE PREDICTION (only when NOT in combat)
-		var game_state = get_node_or_null("/root/GameState")
-		var in_battle = game_state and game_state.has_meta("in_server_battle") and game_state.get_meta("in_server_battle")
 
-		if not in_battle and multiplayer_manager and multiplayer_manager.has_method("send_player_input"):
-			# Increment sequence
-			current_sequence = (current_sequence + 1) % 65536
-			var timestamp = Time.get_ticks_msec()
-
-			# Send input to server
-			var packet = PacketEncoder.build_player_input_packet(up, down, left, right, current_sequence, timestamp)
-			multiplayer_manager.send_player_input(packet)
-
-			# Record prediction history (Position will be updated after move_and_slide)
-			prediction_history.append({
-				"sequence": current_sequence,
-				"timestamp": timestamp,
-				"velocity": velocity,
-				"position": Vector2.ZERO # Placeholder, updated in process_movement
-			})
-
-			# Limit history size (keep ~1 second worth of 60fps frames = 60)
-			if prediction_history.size() > 120:
-				prediction_history.pop_front()
 	else:
 		# During attack, stop all movement
 		velocity = Vector2.ZERO
+
+	# CLIENT-SIDE PREDICTION - ALWAYS send input to server (even if attacking/stopped)
+	# This prevents "ghost movement" where server keeps moving player because it didn't get a stop packet
+	if multiplayer_manager and multiplayer_manager.has_method("send_player_input"):
+		# Increment sequence
+		current_sequence = (current_sequence + 1) % 65536
+		var timestamp = Time.get_ticks_msec()
+
+		# If attacking, inputs are effectively forced to false for the server
+		# (Since we aren't processing WASD variables in the else block above, we rely on them being initialized to false/0 if we move them out, 
+		#  but wait, 'up', 'down' etc are local variables inside the 'if' block. We need to scope them properly.)
+		
+		# Re-capture raw input state or assume false if attacking?
+		# Better to send 'false' if attacking to enforce the stop on server.
+		var send_up = Input.is_action_pressed("up") if not is_attacking else false
+		var send_down = Input.is_action_pressed("down") if not is_attacking else false
+		var send_left = Input.is_action_pressed("left") if not is_attacking else false
+		var send_right = Input.is_action_pressed("right") if not is_attacking else false
+
+		# Send input to server
+		var packet = PacketEncoder.build_player_input_packet(send_up, send_down, send_left, send_right, current_sequence, timestamp)
+		multiplayer_manager.send_player_input(packet)
+
+		# Record prediction history
+		prediction_history.append({
+			"sequence": current_sequence,
+			"timestamp": timestamp,
+			"velocity": velocity,
+			"position": Vector2.ZERO # Placeholder, updated in process_movement
+		})
+
+		# Limit history size
+		if prediction_history.size() > 120:
+			prediction_history.pop_front()
 
 	# Apply velocity to character
 	if test_character:
@@ -249,6 +317,34 @@ func handle_movement() -> void:
 	# Check for map transitions when moving
 	if moving and map_manager and transition_cooldown <= 0:
 		check_map_transition()
+
+func start_dash() -> void:
+	"""Initiate a dash/teleport action"""
+	print("[DASH] STARTING DASH! Direction: ", current_direction)
+	is_dashing = true
+	dash_timer = DASH_DURATION
+	
+	# Determine dash direction from current input or facing
+	dash_direction = Vector2.ZERO
+	if Input.is_action_pressed("up"): dash_direction.y -= 1
+	if Input.is_action_pressed("down"): dash_direction.y += 1
+	if Input.is_action_pressed("left"): dash_direction.x -= 1
+	if Input.is_action_pressed("right"): dash_direction.x += 1
+	
+	if dash_direction == Vector2.ZERO:
+		# If no input, use current facing
+		match current_direction:
+			"up": dash_direction.y = -1
+			"down": dash_direction.y = 1
+			"left": dash_direction.x = -1
+			"right": dash_direction.x = 1
+	
+	dash_direction = dash_direction.normalized()
+	
+	# Change collision mask to 1 (Map only) - Ignore NPCs (Layer 2)
+	if test_character:
+		test_character.collision_mask = 1
+		print("[DASH] Started - Mask set to 1 (Ghost Mode)")
 
 # ============================================================================
 # MAP TRANSITION CHECKING
@@ -478,7 +574,14 @@ func reconcile(server_sequence: int, server_position: Vector2) -> void:
 	var predicted_pos = prediction_history[match_index].position
 	var error_distance = predicted_pos.distance_to(server_position)
 
-	if error_distance > 2.0:
+	# FIX: Bouncy Collision
+	# If we are rubbing against a wall, client and server might disagree slightly on how deep we are.
+	# Increase tolerance to prevent "bouncing" (snapping back and forth).
+	var threshold = 2.0
+	if test_character.is_on_wall():
+		threshold = 20.0 # Higher tolerance when pushing walls
+
+	if error_distance > threshold:
 		print("[PREDICTION] Reconciling! Error: %.2f (Seq: %d)" % [error_distance, server_sequence])
 		
 		# 3. Snap to authoritative position

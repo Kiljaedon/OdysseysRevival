@@ -36,7 +36,7 @@ func send_prediction_ack(peer_id: int, sequence: int, position: Vector2):
 
 
 func send_npc_spawn(peer_id: int, npc_id: int, npc_data: Dictionary):
-	print("[WorldService] Sending NPC spawn to peer %d: NPC %d" % [peer_id, npc_id])
+	# Removed: prints for every NPC spawn (20+ NPCs * players = spam)
 	get_parent().npc_spawned.rpc_id(peer_id, npc_id, npc_data)
 
 
@@ -97,7 +97,7 @@ func on_binary_positions(packet: PackedByteArray):
 
 
 func on_npc_spawned(npc_id: int, npc_data: Dictionary):
-	print("[WorldService] NPC spawned received: %d" % npc_id)
+	# Removed: prints for every NPC spawn received
 	
 	# Try direct routing
 	var manager = get_parent().get_meta("npc_manager", null)

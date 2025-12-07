@@ -1,244 +1,55 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3 uid="uid://map_linker_main"]
 
-[ext_resource type="Script" path="res://tools/map_linker/map_linker.gd" id="1_linker"]
+[ext_resource type="Script" path="res://tools/map_linker/map_linker.gd" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://world_canvas_scene" path="res://tools/map_linker/world_canvas.tscn" id="2_canvas"]
 
 [node name="MapLinker" type="Control"]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-mouse_filter = 2
-script = ExtResource("1_linker")
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
 
-[node name="Background" type="ColorRect" parent="."]
+[node name="HSplitContainer" type="HSplitContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-mouse_filter = 2
-color = Color(0.12, 0.12, 0.15, 1)
+grow_horizontal = 2
+grow_vertical = 2
 
-[node name="UI" type="CanvasLayer" parent="."]
+[node name="SidePanel" type="Panel" parent="HSplitContainer"]
+custom_minimum_size = Vector2(250, 0)
+layout_mode = 2
 
-[node name="TitleBar" type="Panel" parent="UI"]
-layout_mode = 1
-anchors_preset = 10
-anchor_right = 1.0
-offset_bottom = 40.0
-
-[node name="HBoxContainer" type="HBoxContainer" parent="UI/TitleBar"]
+[node name="VBoxContainer" type="VBoxContainer" parent="HSplitContainer/SidePanel"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 10.0
-offset_top = 5.0
-offset_right = -10.0
-offset_bottom = -5.0
-theme_override_constants/separation = 10
+grow_horizontal = 2
+grow_vertical = 2
 
-[node name="BackButton" type="Button" parent="UI/TitleBar/HBoxContainer"]
+[node name="Label" type="Label" parent="HSplitContainer/SidePanel/VBoxContainer"]
 layout_mode = 2
-text = "< Back"
-
-[node name="Title" type="Label" parent="UI/TitleBar/HBoxContainer"]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "MAP LINKER"
-horizontal_alignment = 1
-vertical_alignment = 1
-
-[node name="RefreshButton" type="Button" parent="UI/TitleBar/HBoxContainer"]
-layout_mode = 2
-text = "Refresh Maps"
-
-[node name="HSplitContainer" type="HSplitContainer" parent="UI"]
-layout_mode = 1
-anchors_preset = -1
-anchor_top = 0.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 10.0
-offset_top = 50.0
-offset_right = -10.0
-offset_bottom = -40.0
-theme_override_constants/separation = 8
-
-[node name="MapListPanel" type="Panel" parent="UI/HSplitContainer"]
-layout_mode = 2
-custom_minimum_size = Vector2(200, 0)
-mouse_filter = 2
-
-[node name="Content" type="VBoxContainer" parent="UI/HSplitContainer/MapListPanel"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 8.0
-offset_top = 8.0
-offset_right = -8.0
-offset_bottom = -8.0
-mouse_filter = 2
-theme_override_constants/separation = 6
-
-[node name="Label" type="Label" parent="UI/HSplitContainer/MapListPanel/Content"]
-layout_mode = 2
-mouse_filter = 2
-text = "WORLD MAP"
+text = "Available Maps"
 horizontal_alignment = 1
 
-[node name="WorldMapDropdown" type="OptionButton" parent="UI/HSplitContainer/MapListPanel/Content"]
-layout_mode = 2
-
-[node name="BattleLabel" type="Label" parent="UI/HSplitContainer/MapListPanel/Content"]
-layout_mode = 2
-mouse_filter = 2
-text = "BATTLE MAP"
-horizontal_alignment = 1
-
-[node name="BattleMapDropdown" type="OptionButton" parent="UI/HSplitContainer/MapListPanel/Content"]
-layout_mode = 2
-
-[node name="MapPreviewPanel" type="Panel" parent="UI/HSplitContainer"]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_stretch_ratio = 3.0
-
-[node name="Content" type="VBoxContainer" parent="UI/HSplitContainer/MapPreviewPanel"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 8.0
-offset_top = 8.0
-offset_right = -8.0
-offset_bottom = -8.0
-theme_override_constants/separation = 6
-
-[node name="Label" type="Label" parent="UI/HSplitContainer/MapPreviewPanel/Content"]
-layout_mode = 2
-text = "MAP PREVIEW"
-horizontal_alignment = 1
-
-[node name="SubViewportContainer" type="SubViewportContainer" parent="UI/HSplitContainer/MapPreviewPanel/Content"]
+[node name="MapList" type="ItemList" parent="HSplitContainer/SidePanel/VBoxContainer"]
 layout_mode = 2
 size_flags_vertical = 3
-stretch = true
-
-[node name="SubViewport" type="SubViewport" parent="UI/HSplitContainer/MapPreviewPanel/Content/SubViewportContainer"]
-handle_input_locally = false
-size = Vector2i(800, 500)
-render_target_update_mode = 4
-
-[node name="Camera2D" type="Camera2D" parent="UI/HSplitContainer/MapPreviewPanel/Content/SubViewportContainer/SubViewport"]
-anchor_mode = 0
-
-[node name="Controls" type="HBoxContainer" parent="UI/HSplitContainer/MapPreviewPanel/Content"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="PlaceWarpButton" type="Button" parent="UI/HSplitContainer/MapPreviewPanel/Content/Controls"]
-layout_mode = 2
-text = "+ Warp"
-
-[node name="PlaceSpawnButton" type="Button" parent="UI/HSplitContainer/MapPreviewPanel/Content/Controls"]
-layout_mode = 2
-text = "+ NPC Spawn"
-
-[node name="PlacePlayerButton" type="Button" parent="UI/HSplitContainer/MapPreviewPanel/Content/Controls"]
-layout_mode = 2
-text = "+ Player Spawn"
-
-[node name="HSeparator" type="VSeparator" parent="UI/HSplitContainer/MapPreviewPanel/Content/Controls"]
-layout_mode = 2
-
-[node name="ZoomOutButton" type="Button" parent="UI/HSplitContainer/MapPreviewPanel/Content/Controls"]
-layout_mode = 2
-text = "-"
-
-[node name="ZoomLabel" type="Label" parent="UI/HSplitContainer/MapPreviewPanel/Content/Controls"]
-layout_mode = 2
-custom_minimum_size = Vector2(80, 0)
-text = "Zoom: 100%"
-horizontal_alignment = 1
-
-[node name="ZoomInButton" type="Button" parent="UI/HSplitContainer/MapPreviewPanel/Content/Controls"]
-layout_mode = 2
-text = "+"
-
-[node name="ZoomResetButton" type="Button" parent="UI/HSplitContainer/MapPreviewPanel/Content/Controls"]
-layout_mode = 2
-text = "Reset"
-
-[node name="Spacer" type="Control" parent="UI/HSplitContainer/MapPreviewPanel/Content/Controls"]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="SaveButton" type="Button" parent="UI/HSplitContainer/MapPreviewPanel/Content/Controls"]
-layout_mode = 2
-text = "Save Map"
-
-[node name="ObjectPanel" type="Panel" parent="UI/HSplitContainer"]
-layout_mode = 2
-custom_minimum_size = Vector2(220, 0)
-
-[node name="Content" type="VBoxContainer" parent="UI/HSplitContainer/ObjectPanel"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 8.0
-offset_top = 8.0
-offset_right = -8.0
-offset_bottom = -8.0
-theme_override_constants/separation = 6
-
-[node name="Label" type="Label" parent="UI/HSplitContainer/ObjectPanel/Content"]
-layout_mode = 2
-text = "OBJECTS"
-horizontal_alignment = 1
-
-[node name="ObjectList" type="ItemList" parent="UI/HSplitContainer/ObjectPanel/Content"]
-layout_mode = 2
-size_flags_vertical = 3
-select_mode = 0
 allow_reselect = true
 
-[node name="PropertiesLabel" type="Label" parent="UI/HSplitContainer/ObjectPanel/Content"]
+[node name="SaveButton" type="Button" parent="HSplitContainer/SidePanel/VBoxContainer"]
 layout_mode = 2
-text = "PROPERTIES"
-horizontal_alignment = 1
+text = "Save All Changes"
 
-[node name="PropertiesContainer" type="VBoxContainer" parent="UI/HSplitContainer/ObjectPanel/Content"]
+[node name="CanvasPanel" type="Panel" parent="HSplitContainer"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 150)
-theme_override_constants/separation = 4
 
-[node name="StatusBar" type="Panel" parent="UI"]
+[node name="WorldCanvas" parent="HSplitContainer/CanvasPanel" instance=ExtResource("2_canvas")]
 layout_mode = 1
-anchors_preset = 12
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_top = -30.0
 
-[node name="StatusLabel" type="Label" parent="UI/StatusBar"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 10.0
-offset_right = -10.0
-text = "Ready"
-vertical_alignment = 1
-
-[connection signal="item_selected" from="UI/HSplitContainer/ObjectPanel/Content/ObjectList" to="." method="_on_object_selected"]
-[connection signal="pressed" from="UI/TitleBar/HBoxContainer/BackButton" to="." method="_on_back_button_pressed"]
-[connection signal="pressed" from="UI/TitleBar/HBoxContainer/RefreshButton" to="." method="_on_refresh_button_pressed"]
-[connection signal="pressed" from="UI/HSplitContainer/MapPreviewPanel/Content/Controls/PlaceWarpButton" to="." method="_on_place_warp_pressed"]
-[connection signal="pressed" from="UI/HSplitContainer/MapPreviewPanel/Content/Controls/PlaceSpawnButton" to="." method="_on_place_spawn_pressed"]
-[connection signal="pressed" from="UI/HSplitContainer/MapPreviewPanel/Content/Controls/PlacePlayerButton" to="." method="_on_place_player_pressed"]
-[connection signal="pressed" from="UI/HSplitContainer/MapPreviewPanel/Content/Controls/ZoomOutButton" to="." method="_on_zoom_out_pressed"]
-[connection signal="pressed" from="UI/HSplitContainer/MapPreviewPanel/Content/Controls/ZoomInButton" to="." method="_on_zoom_in_pressed"]
-[connection signal="pressed" from="UI/HSplitContainer/MapPreviewPanel/Content/Controls/ZoomResetButton" to="." method="_on_zoom_reset_pressed"]
-[connection signal="pressed" from="UI/HSplitContainer/MapPreviewPanel/Content/Controls/SaveButton" to="." method="_on_save_pressed"]
+[connection signal="pressed" from="HSplitContainer/SidePanel/VBoxContainer/SaveButton" to="." method="_on_save_pressed"]

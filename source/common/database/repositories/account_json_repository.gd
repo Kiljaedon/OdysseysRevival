@@ -40,10 +40,15 @@ func save_account(username: String, account_data: Dictionary) -> bool:
 func create_account(username: String, password_hash: String) -> Dictionary:
 	"""Create a new account"""
 	var account_file = ProjectSettings.globalize_path(ACCOUNTS_DIR + username.to_lower() + ".json")
-	
+
 	if FileAccess.file_exists(account_file):
 		return {"success": false, "error": "Account already exists"}
-		
+
+	# Ensure directory exists
+	var dir = account_file.get_base_dir()
+	if not DirAccess.dir_exists_absolute(dir):
+		DirAccess.make_dir_recursive_absolute(dir)
+
 	var account_data = {
 		"username": username,
 		"password_hash": password_hash,
@@ -52,41 +57,29 @@ func create_account(username: String, password_hash: String) -> Dictionary:
 		"admin_level": 0,
 		"characters": []
 	}
-	
-	
-	
-	return {"success": false, "error": "Failed to write account file"}
-	
 
-	
+	var file = FileAccess.open(account_file, FileAccess.WRITE)
+	if file:
+		file.store_string(JSON.stringify(account_data, "\t"))
+		file.close()
+		print("[AccountRepo] Created account: ", username)
+		return {"success": true, "account": account_data}
+
+	return {"success": false, "error": "Failed to write account file"}
+
 func get_account_characters(username: String) -> Dictionary:
-	
 	"""Get all characters for an account"""
-	
 	var result = get_account(username)
-	
 	if not result.success:
-	
 		return {"success": false, "error": "Account not found"}
-	
-		
-	
+
 	var account = result.account
-	
 	var characters = []
-	
 	var char_repo = RepositoryFactory.get_character_repository()
-	
-	
-	
+
 	for char_id in account.characters:
-	
 		var char_result = char_repo.get_character(char_id)
-	
 		if char_result.success:
-	
 			characters.append(char_result.character)
-	
-			
-	
+
 	return {"success": true, "characters": characters}

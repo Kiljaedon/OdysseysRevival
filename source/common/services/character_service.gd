@@ -1,7 +1,7 @@
 class_name CharacterService
 extends Node
 
-const GameDatabase = preload("res://source/common/database/game_database.gd") # For static helpers (load_class_data) if needed, or move them here.
+# const GameDatabase = preload("res://source/common/database/game_database.gd") # REMOVED to prevent circular dependency
 
 func create_character(username: String, character_data: Dictionary) -> Dictionary:
 	"""Create a new character with validation and stat generation"""

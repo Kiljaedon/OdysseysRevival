@@ -1,40 +1,31 @@
 @echo off
-:: Launch Godot server instance with console output visible
+set "PROJECT_PATH=C:/Users/dougd/GoldenSunMMO/GoldenSunMMO-Dev/"
+set "SCENE=source/server/server_world.tscn"
+set "VBS_NAME=launch_server_hidden.vbs"
 
-:: Try mono CONSOLE version first (4.5) - shows output in cmd window
-if exist "C:\Godot\Godot_v4.5-stable_mono_win64_console.exe" (
-    "C:\Godot\Godot_v4.5-stable_mono_win64_console.exe" --path "C:/Users/dougd/GoldenSunMMO/GoldenSunMMO-Dev/" source/server/server_world.tscn
-    pause
-    exit
-)
-
-:: Try mono version (4.5)
+:: Find Godot Executable
 if exist "C:\Godot\Godot_v4.5-stable_mono_win64.exe" (
-    start "" "C:\Godot\Godot_v4.5-stable_mono_win64.exe" --path "C:/Users/dougd/GoldenSunMMO/GoldenSunMMO-Dev/" source/server/server_world.tscn
-    exit
+    set "GODOT=C:\Godot\Godot_v4.5-stable_mono_win64.exe"
+    goto :found
 )
-
 if exist "C:\Program Files\Godot\Godot_v4.5-stable_mono_win64.exe" (
-    start "" "C:\Program Files\Godot\Godot_v4.5-stable_mono_win64.exe" --path "C:/Users/dougd/GoldenSunMMO/GoldenSunMMO-Dev/" source/server/server_world.tscn
-    exit
+    set "GODOT=C:\Program Files\Godot\Godot_v4.5-stable_mono_win64.exe"
+    goto :found
 )
-
-:: Try non-mono version (4.5.1)
-if exist "C:\Program Files\Godot\Godot_v4.5.1-stable_win64.exe" (
-    start "" "C:\Program Files\Godot\Godot_v4.5.1-stable_win64.exe" --path "C:/Users/dougd/GoldenSunMMO/GoldenSunMMO-Dev/" source/server/server_world.tscn
-    exit
-)
-
 if exist "C:\Godot\Godot_v4.5.1-stable_win64.exe" (
-    start "" "C:\Godot\Godot_v4.5.1-stable_win64.exe" --path "C:/Users/dougd/GoldenSunMMO/GoldenSunMMO-Dev/" source/server/server_world.tscn
-    exit
+    set "GODOT=C:\Godot\Godot_v4.5.1-stable_win64.exe"
+    goto :found
 )
-
-:: Try the running Godot executable
-if exist "C:/Godot/Godot_v4.5-stable_mono_win64.exe" (
-    start "" "C:/Godot/Godot_v4.5-stable_mono_win64.exe" --path "C:/Users/dougd/GoldenSunMMO/GoldenSunMMO-Dev/" source/server/server_world.tscn
-    exit
+if exist "C:\Program Files\Godot\Godot_v4.5.1-stable_win64.exe" (
+    set "GODOT=C:\Program Files\Godot\Godot_v4.5.1-stable_win64.exe"
+    goto :found
 )
 
 echo ERROR: Godot executable not found!
 pause
+exit
+
+:found
+:: Launch via VBS to hide console
+start wscript "%~dp0%VBS_NAME%" "%GODOT%" "%PROJECT_PATH%" "%SCENE%"
+exit

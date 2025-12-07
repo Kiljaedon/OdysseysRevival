@@ -80,9 +80,12 @@ func on_rt_dodge_roll_event(unit_id: String, direction_x: float, direction_y: fl
 
 func on_rt_battle_end(battle_id: int, result: String, rewards: Dictionary):
 	"""Handle battle end on client"""
+	print("[RT_NET_SERVICE] Received battle_end for battle %d, result=%s" % [battle_id, result])
 	var controller = _find_realtime_battle_controller()
 	if controller and controller.has_method("on_battle_end"):
 		controller.on_battle_end(battle_id, result, rewards)
+	else:
+		print("[RT_NET_SERVICE] WARNING: No controller to handle battle_end")
 
 func on_rt_projectile_spawn(proj_data: Dictionary):
 	"""Handle projectile spawn on client"""

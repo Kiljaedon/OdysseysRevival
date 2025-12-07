@@ -83,9 +83,19 @@ static func save_server_config(config: Dictionary) -> bool:
 
 ## Get client configuration
 static func get_client_config() -> Dictionary:
+	var default_address = "127.0.0.1"
+	var default_env = ServerEnvironment.LOCAL
+	
+	# Production build override - Force remote server
+	if OS.has_feature("production"):
+		default_address = "178.156.202.89"
+		default_env = ServerEnvironment.REMOTE
+		print("[ConfigManager] Production build detected - defaulting to Remote Server")
+
 	var default_config = {
-		"server_address": "127.0.0.1",
+		"server_address": default_address,
 		"server_port": 9043,
+		"server_environment": default_env,
 		"last_updated": Time.get_datetime_string_from_system()
 	}
 
@@ -103,7 +113,12 @@ static func get_client_config() -> Dictionary:
 
 		var json = JSON.new()
 		if json.parse(json_text) == OK:
-			return json.data
+			var data = json.data
+			# If production build, FORCE the address even if config file exists (unless dev override)
+			if OS.has_feature("production") and not OS.has_feature("allow_local_config"):
+				data["server_address"] = "178.156.202.89"
+				data["server_environment"] = ServerEnvironment.REMOTE
+			return data
 
 	return default_config
 

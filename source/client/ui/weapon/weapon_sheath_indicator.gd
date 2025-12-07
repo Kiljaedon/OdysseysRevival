@@ -41,7 +41,7 @@ func _ready() -> void:
 	set_anchors_preset(Control.PRESET_CENTER_TOP)
 
 	# Position icon to LEFT of player name on same line
-	position = Vector2(-45, -75)
+	position = Vector2(-45, -125)
 	print("[WeaponSheathIndicator] Positioned at (", position.x, ", ", position.y, ")")
 
 
