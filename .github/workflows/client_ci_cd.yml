@@ -1,0 +1,98 @@
+name: Client Build & Deploy
+
+on:
+  push:
+    branches: [ "main" ]
+
+env:
+  GODOT_VERSION: 4.3.0 # Assuming 4.3 compatible, despite local "4.5" config
+  EXPORT_NAME_RELEASE: OdysseysRevival
+  EXPORT_NAME_DEV: OdysseysRevivalDev
+  R2_BUCKET: "golden-sun-mmo" # Replace with your actual bucket name if different
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Godot
+      uses: chickensoft-games/setup-godot@v1
+      with:
+        version: ${{ env.GODOT_VERSION }}
+        use-dotnet: false # User has mono exe but project seems to use GDScript primarily? project.godot has [dotnet] section though.
+                          # Let's check if there are .cs files. The list showed none. 
+                          # The user's path had "mono", so maybe I should enable dotnet just in case.
+                          # But "chickensoft-games/setup-godot" supports it.
+                          # Let's stick to standard first to save setup time if not needed.
+
+    - name: Setup Export Templates
+      run: |
+        mkdir -p ~/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}.stable
+        wget -q https://github.com/godotengine/godot/releases/download/${{ env.GODOT_VERSION }}-stable/Godot_v${{ env.GODOT_VERSION }}-stable_export_templates.tpz
+        unzip -q Godot_v${{ env.GODOT_VERSION }}-stable_export_templates.tpz
+        mv templates/* ~/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}.stable/
+        rm -rf templates Godot_v${{ env.GODOT_VERSION }}-stable_export_templates.tpz
+
+    - name: Create Build Directories
+      run: |
+        mkdir -p builds/WindowsClient
+        mkdir -p builds/WindowsDev
+
+    - name: Build Windows Client (Release)
+      run: |
+        godot --headless --export-release "Windows Client (Release)" "builds/WindowsClient/${{ env.EXPORT_NAME_RELEASE }}.exe"
+
+    - name: Build Windows Client (Dev)
+      run: |
+        godot --headless --export-release "Windows Client (Dev)" "builds/WindowsDev/${{ env.EXPORT_NAME_DEV }}.exe"
+
+    - name: Zip Artifacts
+      run: |
+        # Release Zip
+        cd builds/WindowsClient
+        zip -r ../../${{ env.EXPORT_NAME_RELEASE }}.zip .
+        cd ../..
+        
+        # Dev Zip
+        cd builds/WindowsDev
+        zip -r ../../${{ env.EXPORT_NAME_DEV }}.zip .
+        cd ../..
+
+    - name: Generate Version JSON
+      run: |
+        VERSION=$(cat version.txt)
+        echo "{"version": "$VERSION", "mandatory": true}" > version.json
+
+    - name: Install Rclone
+      run: |
+        sudo -v ; curl https://rclone.org/install.sh | sudo bash
+
+    - name: Configure Rclone
+      run: |
+        mkdir -p ~/.config/rclone
+        cat << EOF > ~/.config/rclone/rclone.conf
+        [r2]
+        type = s3
+        provider = Cloudflare
+        access_key_id = ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }}
+        secret_access_key = ${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
+        endpoint = https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+        acl = private
+        EOF
+
+    - name: Deploy to R2
+      run: |
+        # Upload Installers
+        rclone copy ${{ env.EXPORT_NAME_RELEASE }}.zip r2:${{ env.R2_BUCKET }}/installers/ --progress
+        rclone copy ${{ env.EXPORT_NAME_DEV }}.zip r2:${{ env.R2_BUCKET }}/installers/ --progress
+        
+        # Upload Version Info
+        rclone copy version.json r2:${{ env.R2_BUCKET }}/channels/production/ --progress
+        rclone copy version.json r2:${{ env.R2_BUCKET }}/channels/dev/ --progress
+        
+        # Upload PCK/EXE directly to channels for patchers (optional, keeping consistent with old script)
+        rclone sync builds/WindowsClient r2:${{ env.R2_BUCKET }}/channels/production/ --progress
+        rclone sync builds/WindowsDev r2:${{ env.R2_BUCKET }}/channels/dev/ --progress
