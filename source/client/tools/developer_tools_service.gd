@@ -1,6 +1,13 @@
 extends Node
 ## Autoload singleton - access via DeveloperToolsService
 
+var http_request: HTTPRequest
+
+func _ready():
+	http_request = HTTPRequest.new()
+	add_child(http_request)
+
+
 func launch_pixi_editor(project_root: String):
 	print("Launching PixiEditor Art Studio...")
 	var portable_pixieditor = project_root + "/tools/pixieditor/PixiEditor/PixiEditor.exe"
@@ -28,80 +35,40 @@ func launch_tiled_editor(project_root: String):
 	else:
 		print("Portable Tiled not found at: ", portable_tiled)
 
+const REMOTE_SERVER_IP = "178.156.202.89"
+const ADMIN_PORT = 9124
+const ADMIN_ENDPOINT = "/admin/update"
+const ADMIN_TOKEN = "YOUR_SUPER_SECRET_ADMIN_TOKEN" # !!! CHANGE THIS TO A STRONG, UNIQUE TOKEN !!!
+
 func deploy_to_remote(project_root: String):
-	print("Pushing to Remote Server (Odyssey)...")
-	var batch_path = project_root + "/deploy_to_remote.bat"
-	
-	# Logic to generate the batch file could be moved here if it needs to be dynamic,
-	# or we just execute the existing one.
-	# For now, let's assume the file generation logic stays in the service to keep it self-contained.
-	_generate_deployment_script(project_root, batch_path)
-	
-	if FileAccess.file_exists(batch_path):
-		OS.create_process("cmd.exe", ["/c", "start", batch_path])
-		print("Deployment started.")
+	print("Triggering Remote Server Update...")
 
-func deploy_client_dev(project_root: String):
-	print("Launching Dev Client Deployment...")
-	var batch_path = project_root + "/deploy_client_dev.bat"
+	var url = "http://%s:%d%s" % [REMOTE_SERVER_IP, ADMIN_PORT, ADMIN_ENDPOINT]
+	var headers = [
+		"Content-Type: application/json",
+		"Authorization: Bearer " + ADMIN_TOKEN
+	]
+	var body = JSON.stringify({"admin_token": ADMIN_TOKEN}) # Send token in body as well, just in case
+
+	print("Sending POST request to: %s" % url)
+	print("Body: %s" % body)
 	
-	if FileAccess.file_exists(batch_path):
-		OS.create_process("cmd.exe", ["/c", "start", batch_path])
-		print("Dev Client Deployment started.")
+	var error = http_request.request(url, headers, HTTPClient.METHOD_POST, body)
+
+	if error != OK:
+		printerr("Failed to send update request: %s" % error)
+		return
+
+	var result = await http_request.request_completed
+	var status_code = result[1]
+	var response_body = result[3].get_string_from_utf8()
+
+	if status_code == 200:
+		print("Server Update Triggered: %s" % response_body)
+		OS.alert("Server Update Initiated Successfully!\nThe server is now pulling the latest code and will restart momentarily.", "Update Success")
 	else:
-		printerr("Dev Deployment Batch file not found: ", batch_path)
-
-func deploy_client_production(project_root: String):
-	print("Launching Production Client Deployment...")
-	var batch_path = project_root + "/deploy_client_production.bat"
+		printerr("Server Update Request Failed: Status %d, Response: %s" % [status_code, response_body])
+		OS.alert("Server Update Failed.\nStatus: %d\nResponse: %s\n\nIs the server running and is AdminManager listening?" % [status_code, response_body], "Update Error")
 	
-	if FileAccess.file_exists(batch_path):
-		OS.create_process("cmd.exe", ["/c", "start", batch_path])
-		print("Production Client Deployment started.")
-	else:
-		printerr("Production Deployment Batch file not found: ", batch_path)
-
-func _generate_deployment_script(project_root: String, batch_path: String):
-	# Configuration
-	# We use the SFTP remote defined in rclone.conf
-	var rclone_remote = "odyssey_server:/home/gameserver/odysseys_server_dev/source"
-	
-	var batch_content = """@echo off
-title Golden Sun MMO - Deploying to Remote Server (Signal Based)
-cd /d "%s"
-
-set RCLONE=tools\\rclone\\rclone.exe
-set CONFIG=tools\\rclone\\rclone.conf
-
-echo ========================================
-echo STARTING DEPLOYMENT TO: odyssey (Dev)
-echo ========================================
-
-echo 1. Syncing source code via Rclone (SFTP)...
-"%%RCLONE%%" copy source "odyssey_server:/home/gameserver/odysseys_server_dev/source" --config "%%CONFIG%%" --exclude ".godot/**" --progress
-
-if %%errorlevel%% neq 0 (
-    echo.
-    echo [ERROR] Rclone sync failed.
-    pause
-    exit /b %%errorlevel%%
-)
-
-echo.
-echo 2. Signaling server to restart...
-echoRESTART > RESTART_REQUIRED.signal
-"%%RCLONE%%" copy RESTART_REQUIRED.signal "odyssey_server:/home/gameserver/odysseys_server_dev/" --config "%%CONFIG%%"
-del RESTART_REQUIRED.signal
-
-echo.
-echo ========================================
-echo DEPLOYMENT SUCCESSFUL
-echo ========================================
-echo The server watchdog will detect the signal and restart within 5 seconds.
-pause
-""" % [project_root]
-	
-	var file = FileAccess.open(batch_path, FileAccess.WRITE)
-	if file:
-		file.store_string(batch_content)
-		file.close()
+# The _generate_deployment_script and old batch-file related functions are no longer needed
+# and should be removed from this file.
