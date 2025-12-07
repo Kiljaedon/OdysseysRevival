@@ -35,8 +35,9 @@ var temp_download_path: String = ""
 
 
 func _ready():
-	# Read version from ProjectSettings
-	CURRENT_VERSION = ProjectSettings.get_setting("application/config/version", "0.0.0")
+	# Read version from GameVersion class (in PCK, updates with patches)
+	# NOT from ProjectSettings (in EXE, never updates with PCK patches)
+	CURRENT_VERSION = GameVersion.GAME_VERSION
 
 	# Determine channel based on feature tags
 	if OS.has_feature("dev_channel"):
