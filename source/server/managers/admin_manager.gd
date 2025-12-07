@@ -16,6 +16,11 @@ func _ready():
 	var admin_port = 9124 # Configurable port
 	var bind_address = "0.0.0.0" # Listen on all interfaces
 	
+	# The HTTPServer addon might auto-start on 8088 in its _ready().
+	# We must stop it first to re-bind to our desired port.
+	if http_server.server.is_listening():
+		http_server.server.stop()
+	
 	http_server.server.listen(admin_port, bind_address)
 	print("[AdminManager] Admin HTTP Server listening on %s:%d" % [bind_address, admin_port])
 
