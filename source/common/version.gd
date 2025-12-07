@@ -20,10 +20,10 @@ extends RefCounted
 
 
 ## CURRENT GAME VERSION - MUST MATCH version.txt
-const GAME_VERSION: String = "0.1.2"
+const GAME_VERSION: String = "0.1.4"
 
 ## Minimum compatible version (for backwards compatibility if needed)
-const MIN_COMPATIBLE_VERSION: String = "0.1.2"
+const MIN_COMPATIBLE_VERSION: String = "0.1.4"
 
 
 ## Check if a version string matches current version

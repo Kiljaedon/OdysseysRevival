@@ -4,7 +4,7 @@ class_name AdminManager
 const HTTPServer = preload("res://addons/httpserver/http_server.gd")
 
 var http_server: HTTPServer
-var admin_token: String = "YOUR_SECRET_ADMIN_TOKEN_HERE" # TODO: Load from config
+var admin_token: String = "ODY-2024-a9f3b7c2e8d1f4a6-ADMIN-KEY"
 
 func _init():
 	print("[AdminManager] Initializing HTTP Admin Server.")

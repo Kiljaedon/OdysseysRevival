@@ -38,7 +38,7 @@ func launch_tiled_editor(project_root: String):
 const REMOTE_SERVER_IP = "178.156.202.89"
 const ADMIN_PORT = 9124
 const ADMIN_ENDPOINT = "/admin/update"
-const ADMIN_TOKEN = "YOUR_SUPER_SECRET_ADMIN_TOKEN" # !!! CHANGE THIS TO A STRONG, UNIQUE TOKEN !!!
+const ADMIN_TOKEN = "ODY-2024-a9f3b7c2e8d1f4a6-ADMIN-KEY"
 
 func deploy_to_remote(project_root: String):
 	print("Triggering Remote Server Update...")
@@ -69,6 +69,29 @@ func deploy_to_remote(project_root: String):
 	else:
 		printerr("Server Update Request Failed: Status %d, Response: %s" % [status_code, response_body])
 		OS.alert("Server Update Failed.\nStatus: %d\nResponse: %s\n\nIs the server running and is AdminManager listening?" % [status_code, response_body], "Update Error")
+
+func deploy_client_dev(project_root: String):
+	print("Triggering Dev Client Build via GitHub...")
+	_trigger_github_build("Dev Client")
+
+func deploy_client_production(project_root: String):
+	print("Triggering Production Client Build via GitHub...")
+	_trigger_github_build("Production Client")
+
+func _trigger_github_build(build_name: String):
+	# This function commits any pending changes and pushes to main
+	# which triggers the GitHub Action to build and deploy.
 	
-# The _generate_deployment_script and old batch-file related functions are no longer needed
-# and should be removed from this file.
+	print("Staging and committing changes...")
+	OS.execute("git", ["add", "."], [], true)
+	OS.execute("git", ["commit", "-m", "chore: Trigger %s build via DevTools" % build_name], [], true)
+	
+	print("Pushing to GitHub...")
+	var output = []
+	var exit_code = OS.execute("git", ["push", "origin", "main"], output, true)
+	
+	if exit_code == 0:
+		OS.alert("%s Build Triggered!\nChanges pushed to GitHub.\nWait for the build to complete on GitHub Actions." % build_name, "Deployment Started")
+	else:
+		printerr("Git Push Failed: ", output)
+		OS.alert("Failed to push changes to GitHub.\nCheck the console/logs for details.", "Deployment Error")

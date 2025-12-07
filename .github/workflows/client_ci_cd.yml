@@ -5,10 +5,10 @@ on:
     branches: [ "main" ]
 
 env:
-  GODOT_VERSION: 4.3.0 # Assuming 4.3 compatible, despite local "4.5" config
+  GODOT_VERSION: 4.5
   EXPORT_NAME_RELEASE: OdysseysRevival
   EXPORT_NAME_DEV: OdysseysRevivalDev
-  R2_BUCKET: "golden-sun-mmo" # Replace with your actual bucket name if different
+  R2_BUCKET: "odysseys-updates"
 
 jobs:
   build-and-deploy:
@@ -30,10 +30,11 @@ jobs:
 
     - name: Setup Export Templates
       run: |
-        mkdir -p ~/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}.stable
+        TEMPLATE_DIR="${{ env.GODOT_VERSION }}.stable"
+        mkdir -p ~/.local/share/godot/export_templates/$TEMPLATE_DIR
         wget -q https://github.com/godotengine/godot/releases/download/${{ env.GODOT_VERSION }}-stable/Godot_v${{ env.GODOT_VERSION }}-stable_export_templates.tpz
         unzip -q Godot_v${{ env.GODOT_VERSION }}-stable_export_templates.tpz
-        mv templates/* ~/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}.stable/
+        mv templates/* ~/.local/share/godot/export_templates/$TEMPLATE_DIR/
         rm -rf templates Godot_v${{ env.GODOT_VERSION }}-stable_export_templates.tpz
 
     - name: Create Build Directories
@@ -64,7 +65,7 @@ jobs:
     - name: Generate Version JSON
       run: |
         VERSION=$(cat version.txt)
-        echo "{"version": "$VERSION", "mandatory": true}" > version.json
+        echo "{\"version\": \"$VERSION\", \"mandatory\": true}" > version.json
 
     - name: Install Rclone
       run: |
