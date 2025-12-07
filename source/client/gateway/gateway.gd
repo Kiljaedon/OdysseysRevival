@@ -486,11 +486,11 @@ func _on_start_local_server_pressed():
 	OS.create_process(godot_path, args)
 
 func _on_copy_player_link_pressed():
-	DisplayServer.clipboard_set("https://pub-bfb251fbb7f04473b6eb939aba7ccdfc.r2.dev/installers/OdysseyRevival.zip")
+	DisplayServer.clipboard_set("https://pub-bfb251fbb7f04473b6eb939aba7ccdfc.r2.dev/installers/OdysseysRevival.zip")
 	print("Player Link Copied!")
 
 func _on_copy_dev_link_pressed():
-	DisplayServer.clipboard_set("https://pub-bfb251fbb7f04473b6eb939aba7ccdfc.r2.dev/installers/OdysseyDevClient.zip")
+	DisplayServer.clipboard_set("https://pub-bfb251fbb7f04473b6eb939aba7ccdfc.r2.dev/installers/OdysseysRevivalDev.zip")
 	print("Dev Link Copied!")
 
 func _on_art_studio_pressed():
