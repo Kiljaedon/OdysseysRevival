@@ -18,6 +18,9 @@ var server_npcs: Dictionary = {}            # npc_id -> {npc_name, position, tar
 var npc_positions: Dictionary = {}          # npc_id -> Vector2
 var next_npc_id: int = 1                    # Auto-incrementing NPC ID
 
+# Combat engagement tracking (one player per NPC)
+var npc_engagements: Dictionary = {}        # npc_id -> peer_id (-1 = not engaged)
+
 
 func _ready():
 	pass
@@ -327,10 +330,86 @@ func send_npcs_to_player(peer_id: int):
 	if not network_handler:
 		log_message("[NPC] ERROR: Cannot send NPCs - network_handler is null")
 		return
-	
+
 	log_message("[NPC] Sending %d NPCs to peer %d" % [server_npcs.size(), peer_id])
-	
+
 	for npc_id in server_npcs:
 		network_handler.send_npc_spawn(peer_id, npc_id, server_npcs[npc_id])
-	
+
 	log_message("[NPC] Finished sending NPCs to peer %d" % peer_id)
+
+
+# ========== COMBAT ENGAGEMENT SYSTEM ==========
+
+func is_npc_engaged(npc_id: int) -> bool:
+	"""Check if NPC is currently engaged in combat with any player"""
+	return npc_engagements.get(npc_id, -1) >= 0
+
+
+func get_npc_engaged_peer(npc_id: int) -> int:
+	"""Get the peer_id of the player engaging this NPC, or -1 if not engaged"""
+	return npc_engagements.get(npc_id, -1)
+
+
+func engage_npc(npc_id: int, peer_id: int) -> bool:
+	"""Lock NPC to a specific player for combat. Returns false if already engaged."""
+	if is_npc_engaged(npc_id):
+		var current_peer = npc_engagements[npc_id]
+		if current_peer != peer_id:
+			log_message("[NPC] Engagement REJECTED: NPC %d already engaged by peer %d" % [npc_id, current_peer])
+			return false
+
+	npc_engagements[npc_id] = peer_id
+	log_message("[NPC] Engagement SET: NPC %d now engaged by peer %d" % [npc_id, peer_id])
+
+	# Stop NPC movement while engaged
+	if server_npcs.has(npc_id):
+		server_npcs[npc_id]["state"] = "engaged"
+
+	# Broadcast engagement to all players
+	broadcast_npc_engagement(npc_id, peer_id)
+	return true
+
+
+func disengage_npc(npc_id: int):
+	"""Release NPC from combat engagement"""
+	if npc_engagements.has(npc_id):
+		var old_peer = npc_engagements[npc_id]
+		npc_engagements[npc_id] = -1
+		log_message("[NPC] Engagement RELEASED: NPC %d freed from peer %d" % [npc_id, old_peer])
+
+		# Resume NPC wandering
+		if server_npcs.has(npc_id):
+			server_npcs[npc_id]["state"] = "idle"
+			server_npcs[npc_id]["idle_timer"] = randf_range(1.0, 2.0)
+
+		# Broadcast disengagement to all players
+		broadcast_npc_engagement(npc_id, -1)
+
+
+func broadcast_npc_engagement(npc_id: int, engaged_peer_id: int):
+	"""Notify all clients about NPC engagement status change"""
+	if not network_handler or not player_manager:
+		return
+
+	for peer_id in player_manager.connected_players:
+		network_handler.rpc_id(peer_id, "on_npc_engagement_changed", npc_id, engaged_peer_id)
+
+
+func get_all_engagements() -> Dictionary:
+	"""Get all current NPC engagements for syncing to new players"""
+	var active_engagements = {}
+	for npc_id in npc_engagements:
+		if npc_engagements[npc_id] >= 0:
+			active_engagements[npc_id] = npc_engagements[npc_id]
+	return active_engagements
+
+
+func send_engagements_to_player(peer_id: int):
+	"""Send all current NPC engagements to a newly connected player"""
+	if not network_handler:
+		return
+
+	for npc_id in npc_engagements:
+		if npc_engagements[npc_id] >= 0:
+			network_handler.rpc_id(peer_id, "on_npc_engagement_changed", npc_id, npc_engagements[npc_id])

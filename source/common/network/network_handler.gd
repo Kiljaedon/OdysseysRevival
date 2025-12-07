@@ -287,6 +287,18 @@ func send_sync_npc_positions(peer_id: int, npc_positions: Dictionary):
 	"""Send NPC position sync to specific peer"""
 	rpc_id(peer_id, "sync_npc_positions", npc_positions)
 
+
+# ========== NPC ENGAGEMENT SYSTEM ==========
+
+@rpc
+func on_npc_engagement_changed(npc_id: int, engaged_peer_id: int):
+	"""NPC engagement status changed - relay to client NPC manager"""
+	var handler = find_node_with_method(get_tree().root, "handle_npc_engagement_changed")
+	if handler and handler != self:
+		handler.handle_npc_engagement_changed(npc_id, engaged_peer_id)
+	else:
+		Log.warn("No handler found for on_npc_engagement_changed", "Network")
+
 # ========== GAMEPLAY RESPONSE RECEIVERS (called by server, executed on client) ==========
 
 @rpc

@@ -132,6 +132,13 @@ func create_battle(peer_id: int, npc_id: int, player_data: Dictionary, squad_dat
 		print("[RT_COMBAT] Battle request ignored: Peer %d already in active battle %d" % [peer_id, existing_battle.id])
 		return -1  # Don't abandon - just reject the new request
 
+	# Check if NPC is already engaged by another player (1:1 combat lock)
+	if npc_manager and npc_manager.is_npc_engaged(npc_id):
+		var engaged_peer = npc_manager.get_npc_engaged_peer(npc_id)
+		if engaged_peer != peer_id:
+			print("[RT_COMBAT] Battle rejected: NPC %d already engaged by peer %d" % [npc_id, engaged_peer])
+			return -1
+
 	var battle_id = next_battle_id
 	next_battle_id += 1
 
@@ -170,6 +177,11 @@ func create_battle(peer_id: int, npc_id: int, player_data: Dictionary, squad_dat
 	RealTimeCombatSpawner.spawn_enemy_units(battle, enemy_data, player_world_pos, map_width, map_height)
 
 	active_battles[battle_id] = battle
+
+	# Lock NPC to this player (prevents other players from attacking)
+	if npc_manager:
+		npc_manager.engage_npc(npc_id, peer_id)
+
 	print("[RT_COMBAT] Battle %d created for peer %d vs NPC %d" % [battle_id, peer_id, npc_id])
 
 	# Debug: print unit info
@@ -225,6 +237,11 @@ func end_battle(battle_id: int, result: String) -> void:
 
 	var battle = active_battles[battle_id]
 	battle.state = result  # "victory" or "defeat"
+
+	# Release NPC engagement lock so others can fight it
+	var npc_id = battle.get("npc_id", -1)
+	if npc_id > 0 and npc_manager:
+		npc_manager.disengage_npc(npc_id)
 
 	# Set cooldown for all participants to prevent rapid re-engagement
 	var current_time = Time.get_ticks_msec() / 1000.0

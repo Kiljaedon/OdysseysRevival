@@ -38,6 +38,11 @@ var animated_sprite: AnimatedSprite2D = null
 var hurtbox: Area2D = null
 var npc_type: String = "Rogue"  # NPC type for combat (Rogue, Goblin, etc.)
 
+# Engagement state (for 1:1 combat lock)
+var is_engaged: bool = false
+var engaged_by_peer: int = -1
+var combat_indicator: Label = null  # Visual indicator showing NPC is in combat
+
 func _ready():
 	print("WanderingNPC ready: ", npc_name)
 
@@ -70,6 +75,7 @@ func _ready():
 	create_animated_sprite()
 	load_animations()
 	play_idle_animation()
+	create_combat_indicator()
 
 func create_animated_sprite():
 	"""Create the animated sprite for this NPC"""
@@ -309,6 +315,11 @@ func _on_attack_hit(area: Area2D):
 		print("[NPC_HURTBOX] Combat disabled on this map - ignoring attack on ", npc_name)
 		return
 
+	# Check if NPC is already engaged with another player
+	if is_engaged:
+		print("[NPC_HURTBOX] NPC already engaged in combat with peer %d - cannot attack" % engaged_by_peer)
+		return
+
 	# This is client-side NPC, but we need the server NPC ID
 	# Find the NPC ID from the name (format: "npc_<id>")
 	var npc_id_str = name
@@ -327,3 +338,42 @@ func _on_attack_hit(area: Area2D):
 			print("[NPC_HURTBOX] ERROR: Could not find ServerConnection node!")
 	else:
 		print("[NPC_HURTBOX] ERROR: NPC name doesn't match expected format: %s" % name)
+
+
+## ============================================================================
+## COMBAT ENGAGEMENT INDICATOR
+## ============================================================================
+
+func create_combat_indicator():
+	"""Create visual indicator that shows when NPC is in combat"""
+	combat_indicator = Label.new()
+	combat_indicator.text = "⚔"  # Crossed swords emoji
+	combat_indicator.add_theme_font_size_override("font_size", 24)
+	combat_indicator.add_theme_color_override("font_color", Color.RED)
+	combat_indicator.add_theme_color_override("font_outline_color", Color.BLACK)
+	combat_indicator.add_theme_constant_override("outline_size", 2)
+	combat_indicator.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	combat_indicator.position = Vector2(-15, -80)  # Position above NPC head
+	combat_indicator.z_index = 100  # Always on top
+	combat_indicator.visible = false  # Hidden by default
+	add_child(combat_indicator)
+
+
+func set_engaged(engaged: bool, peer_id: int = -1):
+	"""Set NPC engagement state and update visual indicator"""
+	is_engaged = engaged
+	engaged_by_peer = peer_id
+
+	# Update visual indicator
+	if combat_indicator:
+		combat_indicator.visible = engaged
+
+	# Apply visual tint to show engagement
+	if engaged:
+		# Reddish tint to show NPC is in combat
+		modulate = Color(1.0, 0.7, 0.7)
+	else:
+		# Reset to normal (or team color if applicable)
+		modulate = Color.WHITE
+
+	print("[WanderingNPC] %s engagement: %s (peer: %d)" % [npc_name, engaged, peer_id])

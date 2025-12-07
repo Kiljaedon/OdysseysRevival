@@ -22,6 +22,7 @@ var sprite_atlas_textures: Array[Texture2D] = []
 # NPC state
 var server_npcs: Dictionary = {}  # npc_id -> WanderingNPC instance (server-controlled)
 var team_npc_ids: Array = []  # NPC IDs assigned to player's team
+var npc_engagements: Dictionary = {}  # npc_id -> peer_id (who is fighting this NPC)
 
 # Configuration
 var CROP_EDGE: int = 1  # Sprite cropping setting
@@ -239,3 +240,33 @@ func get_npc_by_id(npc_id: int):
 func has_npc(npc_id: int) -> bool:
 	"""Check if NPC exists"""
 	return server_npcs.has(npc_id)
+
+
+## ============================================================================
+## COMBAT ENGAGEMENT SYSTEM
+## ============================================================================
+
+func handle_npc_engagement_changed(npc_id: int, engaged_peer_id: int) -> void:
+	"""Server notified us of NPC engagement status change"""
+	print("[NPCManager] Engagement changed: NPC %d -> peer %d" % [npc_id, engaged_peer_id])
+
+	# Update local tracking
+	if engaged_peer_id >= 0:
+		npc_engagements[npc_id] = engaged_peer_id
+	else:
+		npc_engagements.erase(npc_id)
+
+	# Update NPC visual indicator
+	var npc = server_npcs.get(npc_id)
+	if npc and is_instance_valid(npc):
+		npc.set_engaged(engaged_peer_id >= 0, engaged_peer_id)
+
+
+func is_npc_engaged(npc_id: int) -> bool:
+	"""Check if NPC is currently engaged in combat"""
+	return npc_engagements.has(npc_id) and npc_engagements[npc_id] >= 0
+
+
+func get_engaged_peer(npc_id: int) -> int:
+	"""Get peer ID of player engaging this NPC, or -1 if not engaged"""
+	return npc_engagements.get(npc_id, -1)
