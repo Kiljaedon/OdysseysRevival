@@ -580,8 +580,9 @@ func _on_character_selected(world_id: int, character_id: int) -> void:
 		for button: Button in v_box_container.get_children():
 			button.pressed.connect(_on_skin_selected.bind(button))
 
-	$CharacterCreation.show()
-	return
+		$CharacterCreation.show()
+		return
+
 	$CharacterSelection.hide()
 
 	var d: Dictionary = await do_request(
