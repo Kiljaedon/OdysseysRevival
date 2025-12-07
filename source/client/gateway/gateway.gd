@@ -409,58 +409,89 @@ func create_admin_dashboard():
 	admin_container.add_theme_constant_override("separation", 10)
 	add_child(admin_container)
 	
-	# Helper to create styled admin buttons
-	var create_btn = func(text: String, callback: Callable):
-		var btn = Button.new()
-		btn.text = text
-		btn.custom_minimum_size = Vector2(180, 40)
-		btn.add_theme_font_size_override("font_size", 12)
-		btn.pressed.connect(callback)
-		style_rpg_button(btn)
-		admin_container.add_child(btn)
-		return btn
-
 	# 1. Push Player Client (Production)
-	create_btn.call("Push Player Client", func():
-		print("Pushing Player Client...")
-		var project_path = ProjectSettings.globalize_path("res://")
-		DeveloperToolsService.deploy_client_production(project_path)
-	)
+	var push_player_btn = Button.new()
+	push_player_btn.text = "Push Player Client"
+	push_player_btn.custom_minimum_size = Vector2(180, 40)
+	push_player_btn.add_theme_font_size_override("font_size", 12)
+	push_player_btn.pressed.connect(_on_push_player_client_pressed)
+	style_rpg_button(push_player_btn)
+	admin_container.add_child(push_player_btn)
 
 	# 2. Push Dev Client
-	create_btn.call("Push Dev Client", func():
-		print("Pushing Dev Client...")
-		var project_path = ProjectSettings.globalize_path("res://")
-		DeveloperToolsService.deploy_client_dev(project_path)
-	)
+	var push_dev_btn = Button.new()
+	push_dev_btn.text = "Push Dev Client"
+	push_dev_btn.custom_minimum_size = Vector2(180, 40)
+	push_dev_btn.add_theme_font_size_override("font_size", 12)
+	push_dev_btn.pressed.connect(_on_push_dev_client_pressed)
+	style_rpg_button(push_dev_btn)
+	admin_container.add_child(push_dev_btn)
 
 	# 3. Push Server Update
-	create_btn.call("Push Server Update", func():
-		print("Pushing Server Update...")
-		var project_path = ProjectSettings.globalize_path("res://")
-		DeveloperToolsService.deploy_to_remote(project_path)
-	)
+	var push_server_btn = Button.new()
+	push_server_btn.text = "Push Server Update"
+	push_server_btn.custom_minimum_size = Vector2(180, 40)
+	push_server_btn.add_theme_font_size_override("font_size", 12)
+	push_server_btn.pressed.connect(_on_push_server_pressed)
+	style_rpg_button(push_server_btn)
+	admin_container.add_child(push_server_btn)
 
 	# 3. Start Local Server - Launch separate Godot instance
-	create_btn.call("Start Local Server", func():
-		print("Launching Local Server...")
-		var godot_path = OS.get_executable_path()
-		var project_path = ProjectSettings.globalize_path("res://")
-		var args = ["--path", project_path, "res://source/server/server_world.tscn"]
-		OS.create_process(godot_path, args)
-	)
+	var start_local_btn = Button.new()
+	start_local_btn.text = "Start Local Server"
+	start_local_btn.custom_minimum_size = Vector2(180, 40)
+	start_local_btn.add_theme_font_size_override("font_size", 12)
+	start_local_btn.pressed.connect(_on_start_local_server_pressed)
+	style_rpg_button(start_local_btn)
+	admin_container.add_child(start_local_btn)
 
 	# 4. Copy Player Link
-	create_btn.call("Copy Player Link", func():
-		DisplayServer.clipboard_set("https://pub-bfb251fbb7f04473b6eb939aba7ccdfc.r2.dev/installers/OdysseyRevival.zip")
-		print("Player Link Copied!")
-	)
+	var copy_player_link_btn = Button.new()
+	copy_player_link_btn.text = "Copy Player Link"
+	copy_player_link_btn.custom_minimum_size = Vector2(180, 40)
+	copy_player_link_btn.add_theme_font_size_override("font_size", 12)
+	copy_player_link_btn.pressed.connect(_on_copy_player_link_pressed)
+	style_rpg_button(copy_player_link_btn)
+	admin_container.add_child(copy_player_link_btn)
 
 	# 5. Copy Dev Link
-	create_btn.call("Copy Dev Link", func():
-		DisplayServer.clipboard_set("https://pub-bfb251fbb7f04473b6eb939aba7ccdfc.r2.dev/installers/OdysseyDevClient.zip")
-		print("Dev Link Copied!")
-	)
+	var copy_dev_link_btn = Button.new()
+	copy_dev_link_btn.text = "Copy Dev Link"
+	copy_dev_link_btn.custom_minimum_size = Vector2(180, 40)
+	copy_dev_link_btn.add_theme_font_size_override("font_size", 12)
+	copy_dev_link_btn.pressed.connect(_on_copy_dev_link_pressed)
+	style_rpg_button(copy_dev_link_btn)
+	admin_container.add_child(copy_dev_link_btn)
+
+func _on_push_player_client_pressed():
+	print("Pushing Player Client...")
+	var project_path = ProjectSettings.globalize_path("res://")
+	DeveloperToolsService.deploy_client_production(project_path)
+
+func _on_push_dev_client_pressed():
+	print("Pushing Dev Client...")
+	var project_path = ProjectSettings.globalize_path("res://")
+	DeveloperToolsService.deploy_client_dev(project_path)
+
+func _on_push_server_pressed():
+	print("Pushing Server Update...")
+	var project_path = ProjectSettings.globalize_path("res://")
+	DeveloperToolsService.deploy_to_remote(project_path)
+
+func _on_start_local_server_pressed():
+	print("Launching Local Server...")
+	var godot_path = OS.get_executable_path()
+	var project_path = ProjectSettings.globalize_path("res://")
+	var args = ["--path", project_path, "res://source/server/server_world.tscn"]
+	OS.create_process(godot_path, args)
+
+func _on_copy_player_link_pressed():
+	DisplayServer.clipboard_set("https://pub-bfb251fbb7f04473b6eb939aba7ccdfc.r2.dev/installers/OdysseyRevival.zip")
+	print("Player Link Copied!")
+
+func _on_copy_dev_link_pressed():
+	DisplayServer.clipboard_set("https://pub-bfb251fbb7f04473b6eb939aba7ccdfc.r2.dev/installers/OdysseyDevClient.zip")
+	print("Dev Link Copied!")
 
 func _on_art_studio_pressed():
 	DeveloperToolsService.launch_pixi_editor(ProjectSettings.globalize_path("res://"))
