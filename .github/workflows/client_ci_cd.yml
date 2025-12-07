@@ -84,16 +84,22 @@ jobs:
         acl = private
         EOF
 
+    - name: Prepare PCK files for updater
+      run: |
+        # Rename PCK files to game.pck for the client updater
+        mv builds/WindowsClient/${{ env.EXPORT_NAME_RELEASE }}.pck builds/WindowsClient/game.pck || true
+        mv builds/WindowsDev/${{ env.EXPORT_NAME_DEV }}.pck builds/WindowsDev/game.pck || true
+
     - name: Deploy to R2
       run: |
         # Upload Installers
         rclone copy ${{ env.EXPORT_NAME_RELEASE }}.zip r2:${{ env.R2_BUCKET }}/installers/ --progress
         rclone copy ${{ env.EXPORT_NAME_DEV }}.zip r2:${{ env.R2_BUCKET }}/installers/ --progress
-        
+
         # Upload Version Info
         rclone copy version.json r2:${{ env.R2_BUCKET }}/channels/production/ --progress
         rclone copy version.json r2:${{ env.R2_BUCKET }}/channels/dev/ --progress
-        
-        # Upload PCK/EXE directly to channels for patchers (optional, keeping consistent with old script)
-        rclone sync builds/WindowsClient r2:${{ env.R2_BUCKET }}/channels/production/ --progress
-        rclone sync builds/WindowsDev r2:${{ env.R2_BUCKET }}/channels/dev/ --progress
+
+        # Upload game.pck to channels for the auto-updater
+        rclone copy builds/WindowsClient/game.pck r2:${{ env.R2_BUCKET }}/channels/production/ --progress
+        rclone copy builds/WindowsDev/game.pck r2:${{ env.R2_BUCKET }}/channels/dev/ --progress
