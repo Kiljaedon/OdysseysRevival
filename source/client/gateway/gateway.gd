@@ -578,17 +578,10 @@ func _on_character_selected(world_id: int, character_id: int) -> void:
 		# DISABLED FOR CLIENT-FIRST DEVELOPMENT: animated_sprite_2d.play(&"run")
 		var v_box_container: GridContainer = $CharacterCreation/VBoxContainer/VBoxContainer/HBoxContainer/VBoxContainer/VBoxContainer
 		for button: Button in v_box_container.get_children():
-			button.pressed.connect(func():
-				# DELETED SYSTEMS: ContentRegistryHub reference disabled for client-first development
-				# var sprite = ContentRegistryHub.load_by_slug(&"sprites", button.text.to_lower())
-				# if not sprite:
-				#	return
-				selected_skin = button.text.to_lower()
-				# animated_sprite_2d.sprite_frames = sprite
-				# animated_sprite_2d.play(&"run")
-			)
-		$CharacterCreation.show()
-		return
+			button.pressed.connect(_on_skin_selected.bind(button))
+
+	$CharacterCreation.show()
+	return
 	$CharacterSelection.hide()
 
 	var d: Dictionary = await do_request(
@@ -600,6 +593,10 @@ func _on_character_selected(world_id: int, character_id: int) -> void:
 		return
 	world_server.connect_to_server(d["adress"], d["port"], d["token"])
 	queue_free.call_deferred()
+
+func _on_skin_selected(button: Button):
+	selected_skin = button.text.to_lower()
+	# animated_sprite_2d logic disabled for now
 
 
 func _on_create_character_button_pressed() -> void:
