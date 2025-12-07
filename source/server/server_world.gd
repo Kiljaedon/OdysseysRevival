@@ -68,6 +68,7 @@ extends Node
 # Preload all manager classes
 const ConfigManager = preload("res://source/common/config/config_manager.gd")
 const BaseServer = preload("res://source/common/network/base_server.gd")
+const AdminManager = preload("res://source/server/managers/admin_manager.gd")
 
 func _init():
 	print("[DEBUG] ServerWorld _init")
@@ -125,6 +126,7 @@ var realtime_combat_manager = null  # Realtime combat manager (new tactical comb
 var battle_map_loader = null  # Battle map loader (loads battle maps and spawn points)
 var battle_instance_manager = null  # Battle instance manager (isolated battle instances)
 var content_manager = null  # Content manager (uploads)
+var admin_manager = null  # Admin manager for server updates
 
 ################################################################################
 # SECTION 2: CONVENIENCE ACCESSORS
@@ -336,6 +338,13 @@ func _init_core_systems() -> void:
 	rate_limiter.name = "RateLimiter"
 	add_child(rate_limiter)
 	log_message("[RATE_LIMITER] RPC rate limiting enabled")
+
+	# Initialize AdminManager for server update triggers
+	admin_manager = AdminManager.new()
+	admin_manager.name = "AdminManager"
+	add_child(admin_manager)
+	admin_manager.initialize(self) # Pass self reference if needed
+	log_message("[ADMIN] Admin manager initialized with HTTP listener")
 
 
 func _init_game_managers() -> void:
