@@ -21,7 +21,13 @@
       "Bash(\"C:/Users/dougd/GoldenSunMMO/GoldenSunMMO-Dev/tools/rclone/rclone.exe\" ls:*)",
       "Bash(\"C:/Users/dougd/GoldenSunMMO/GoldenSunMMO-Dev/tools/rclone/rclone.exe\" lsd:*)",
       "WebFetch(domain:www.odysseyclassic.info)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(git config:*)",
+      "Bash(cat:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfix: Correct CI/CD configuration, version sync, and admin tokens\n\n- Update GODOT_VERSION from 4.3.0 to 4.5 in GitHub Actions\n- Fix R2_BUCKET from ''golden-sun-mmo'' to ''odysseys-updates''\n- Fix JSON echo syntax error in workflow (escape quotes)\n- Sync all version files to 0.1.4 (version.txt, project.godot, version.gd)\n- Update export_presets.cfg version metadata from 0.0.8 to 0.1.4\n- Set matching admin tokens for client/server update functionality\n- Fix typo in gateway.gd (ttitle_label -> title_label)\n- Fix indentation error in developer_tools_service.gd\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []
